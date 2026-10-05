@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+@import '@nuxt/ui';
+
+@theme {
+  --font-sans: 'Segoe UI', Arial, sans-serif;
+}
+
+body {
+  background: #faf9f6;
+  color: #292524;
+}
+
+.display-heading {
+  font-family: Georgia, 'Times New Roman', serif;
+  letter-spacing: -0.04em;
+}

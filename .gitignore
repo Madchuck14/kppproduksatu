@@ -1,0 +1,16 @@
+node_modules/
+.nuxt/
+.output/
+.data/
+.wrangler/
+.npm-cache*/
+.env
+.env.*
+!.env.example
+!.env.production.example
+.dev.vars
+.dev.vars.*
+*.log
+coverage/
+supabase/.temp/
+supabase/.branches/
