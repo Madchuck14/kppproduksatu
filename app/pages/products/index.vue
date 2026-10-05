@@ -1,10 +1,35 @@
 <script setup lang="ts">
+import { educationLevelSchema } from '#shared/schemas/auth'
 const config = useRuntimeConfig()
-useSeoMeta({ title: `Katalog | ${config.public.siteName}`, description: 'Jelajahi seluruh koleksi produk kami.' })
-const search = ref('')
-const appliedSearch = ref('')
+useSeoMeta({
+  title: `Katalog | ${config.public.siteName}`,
+  description: 'Jelajahi seluruh koleksi produk kami.',
+})
+const route = useRoute()
+const appliedSearch = computed(() =>
+  typeof route.query.q === 'string' ? route.query.q.trim().slice(0, 100) : '',
+)
+const search = ref(appliedSearch.value)
+const appliedLevel = computed(() => {
+  const parsed = educationLevelSchema.safeParse(route.query.level)
+  return parsed.success ? parsed.data : ''
+})
+const level = ref(appliedLevel.value)
+watch(appliedLevel, (value) => {
+  level.value = value
+})
+watch(appliedSearch, (value) => {
+  search.value = value
+})
+async function searchCatalog() {
+  const q = search.value.trim()
+  await navigateTo({
+    path: '/products',
+    query: { ...(q ? { q } : {}), ...(level.value ? { level: level.value } : {}) },
+  })
+}
 const { data, error, status } = await useFetch('/api/products', {
-  query: computed(() => ({ q: appliedSearch.value })),
+  query: computed(() => ({ q: appliedSearch.value, level: appliedLevel.value || undefined })),
 })
 </script>
 
@@ -12,15 +37,37 @@ const { data, error, status } = await useFetch('/api/products', {
   <section>
     <p class="mb-3 text-xs font-medium uppercase tracking-widest text-emerald-800">Koleksi kami</p>
     <h1 class="display-heading mb-8 text-5xl">Katalog produk</h1>
-    <form class="mb-8 flex max-w-lg gap-3" @submit.prevent="appliedSearch = search.trim()">
-      <label for="catalog-search" class="sr-only">Cari judul atau penulis</label>
-      <input id="catalog-search" v-model="search" maxlength="100" type="search" placeholder="Cari judul atau penulis..." class="min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-4 py-3">
+    <form class="mb-8 flex max-w-3xl flex-wrap gap-3" @submit.prevent="searchCatalog">
+      <label for="catalog-search" class="sr-only">Cari judul, kode buku, atau penulis</label>
+      <input
+        id="catalog-search"
+        v-model="search"
+        maxlength="100"
+        type="search"
+        placeholder="Cari judul, kode buku, atau penulis..."
+        class="min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-4 py-3"
+      />
+      <label for="catalog-level" class="sr-only">Jenjang pendidikan</label>
+      <select
+        id="catalog-level"
+        v-model="level"
+        class="rounded-lg border border-stone-300 bg-white px-4 py-3"
+      >
+        <option value="">Semua jenjang</option>
+        <option v-for="item in educationLevelSchema.options" :key="item" :value="item">
+          {{ item }}
+        </option>
+      </select>
       <UButton type="submit" :loading="status === 'pending'">Cari</UButton>
     </form>
-    <p v-if="error" role="alert" class="text-red-700">Katalog belum dapat dimuat. Coba lagi nanti.</p>
+    <p v-if="error" role="alert" class="text-red-700">
+      Katalog belum dapat dimuat. Coba lagi nanti.
+    </p>
     <div v-else class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <ProductCard v-for="product in data?.products" :key="product.id" :product="product" />
     </div>
-    <p v-if="data && !data.products.length" class="py-10 text-stone-500">Tidak ada produk yang sesuai dengan pencarianmu.</p>
+    <p v-if="data && !data.products.length" class="py-10 text-stone-500">
+      Tidak ada produk yang sesuai dengan pencarianmu.
+    </p>
   </section>
 </template>

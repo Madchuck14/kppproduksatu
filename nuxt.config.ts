@@ -31,6 +31,7 @@ export default defineNuxtConfig({
   routeRules: {
     '/admin/**': { headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } },
     '/login': { headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } },
+    '/register': { headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } },
     '/api/**': { headers: { 'Cache-Control': 'no-store' } },
     '/**': {
       headers: {

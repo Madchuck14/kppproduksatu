@@ -13,6 +13,7 @@
     "build:cloudflare": "nuxt build --preset=cloudflare_module",
     "preview": "nuxt preview",
     "start": "node .output/server/index.mjs",
+    "provision:super-accounts": "node scripts/provision-super-accounts.mjs",
     "postinstall": "nuxt prepare",
     "typecheck": "nuxt typecheck",
     "lint": "eslint .",

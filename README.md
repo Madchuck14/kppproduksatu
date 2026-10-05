@@ -16,19 +16,29 @@ Buka http://localhost:3000. `npm.cmd` menghindari pembatasan execution policy Po
 
 Mode awal `NUXT_CATALOG_SOURCE=demo` membaca tiga produk contoh dari fixture lokal. Ini tetap aplikasi SSR dengan API, bukan koneksi database online. Untuk demo dengan database online ikuti [setup Supabase](docs/supabase.md), lalu gunakan `NUXT_CATALOG_SOURCE=supabase`.
 
-Lockfile sudah tersedia. Commit `package-lock.json` dan gunakan `npm ci` untuk instalasi berikutnya. Build lokal Node, Cloudflare, dan Vercel serta typecheck sudah lulus. Lint lulus dengan dua warning `vue/html-self-closing`; pemeriksaan format file konfigurasi dan dokumentasi yang diubah juga lulus. Smoke test bundle Vercel dalam mode demo mencakup beranda, katalog, detail, pencarian/API, produk tidak ditemukan (404), dan health endpoint. Ada warning tooling/dependency saat typecheck dan build; deployment cloud, Docker, serta koneksi/auth/RLS Supabase belum diverifikasi.
+Lockfile sudah tersedia. Commit `package-lock.json` dan gunakan `npm ci` untuk instalasi berikutnya.
+Dashboard Editor telah diuji melalui server lokal dengan Supabase: CRUD, upload, publikasi,
+filter/pencarian, SSR, akses Sales/Editor, dan RLS lintas jenjang. Data uji dibersihkan setelah selesai.
+Build Vercel dan typecheck lulus; lint memiliki warning gaya HTML, tanpa error. Deployment cloud,
+Docker, dan pemeriksaan interaksi browser belum diverifikasi untuk dashboard ini.
 
 ## Yang tersedia
 
 - Halaman beranda, katalog dengan pencarian, dan detail produk.
 - API `GET /api/products` dan `GET /api/products/:slug`, dengan validasi Zod.
 - Pilihan data fixture atau Supabase; kegagalan Supabase tidak diam-diam diganti fixture.
-- Login admin email/password dan guard role di server; halaman admin masih fondasi, belum CRUD.
+- Login email/password dan dashboard Editor `/admin`: ringkasan, pencarian, filter jenjang/status,
+  tambah/edit/hapus buku, publikasi, dan unggah sampul. Akses dibatasi di server dan RLS.
+- Tampilan registrasi Sales/Editor tetap tersedia; pengiriman registrasi mandiri dinonaktifkan.
+- Provisioning akun Sales/Editor super melalui script lokal dan membership RLS; Editor super
+  memiliki SD/SMP/SMA/SMK serta akses admin, Sales tidak memiliki akses admin.
 - Migration kategori/produk/admin membership, RLS, bucket gambar, dan seed demo.
 - Endpoint `/healthz` untuk liveness aplikasi (bukan pemeriksaan database).
 - Konfigurasi Cloudflare Workers, Dockerfile, dan Compose untuk aplikasi Node.
 
-Cart, checkout, Midtrans, wishlist, blog, banner CMS, CRUD admin, pagination, sitemap, dan structured data belum diimplementasikan. Tampilan awal adalah starter, belum reproduksi theme Shopify atau branding final klien.
+Pagination tersedia pada dashboard Editor. Cart, checkout, Midtrans, wishlist, blog, banner CMS,
+pengelolaan kategori, pagination katalog publik, sitemap, dan structured data belum diimplementasikan.
+Materi privat Product Knowledge, flyer, dan dummy belum memiliki unggahan atau endpoint unduhan.
 
 ## Perintah
 

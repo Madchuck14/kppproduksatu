@@ -4,8 +4,9 @@
 
 KPP Produk Satu is an Erlangga product katalogs. It uses
 Nuxt 4, Vue 3, TypeScript, Nitro, Nuxt UI 4, Tailwind CSS 4, Zod 4, and Supabase
-(PostgreSQL, Auth, and Storage). The storefront uses SSR; the admin interface is
-currently a foundation without CRUD.
+(PostgreSQL, Auth, and Storage). The storefront uses SSR. The current starter has
+public catalog pages and admin login/authorization foundations, but not public
+registration, sales features, or catalog CRUD.
 
 Read `README.md` and the relevant files in `docs/` before changing behavior:
 
@@ -17,6 +18,46 @@ Read `README.md` and the relevant files in `docs/` before changing behavior:
 The root Shopify/SvelteKit concept document is historical feature reference;
 `docs/architecture.md` defines the current architecture. Do not treat planned
 commerce features as already implemented.
+
+## Product goals and planned pages
+
+This site is a book catalog that helps sales representatives present products
+to customers. Treat the following as product requirements for future work, not
+as features that already exist:
+
+- **Landing/catalog:** Keep catalog browsing public. Show frequently accessed
+  books when an access-counting approach has been defined, and provide entry
+  points for SD, SMP, SMA, and SMK. Search by book title or book code and filter
+  by education level; preserve the existing catalog API and SSR data-fetching
+  patterns.
+- **Book detail:** Show public catalog information such as cover, title, price,
+  book code, and education level. Product Knowledge, flyers, and dummy files
+  require login. If an anonymous visitor selects locked content, explain that
+  login is required and offer login without losing the destination they wanted
+  to open.
+- **Login and registration:** Provide sign-in and registration for Sales and
+  Editor accounts. Any selected role and education-level scope must be checked
+  and assigned by trusted server-side logic; never grant Editor access based
+  only on client-submitted role data. Define the Editor enrollment/approval
+  policy before enabling self-service Editor registration.
+- **Editor dashboard:** Evolve the existing `/admin` foundation rather than
+  creating a competing admin area without a clear need. Editors can manage only
+  catalogs for education levels they are authorized to manage: list, add,
+  edit, and delete books. Include validated forms, upload feedback, and delete
+  confirmation. Enforce this scope in server endpoints and database policies,
+  not only in navigation or UI.
+- **Connected flows:** Keep catalog search and level selection reflected in
+  navigable catalog URLs where practical; link book cards to their detail pages;
+  provide clear login, logout, access-denied, and not-found states. Add only
+  pages needed to complete these catalog, account, and editor workflows.
+
+Book code is the intended unique catalog identifier and must be searchable.
+The current database instead uses a generated UUID `products.id` primary key
+and has no book-code or education-level columns. Before schema work, reconcile
+that existing model with the requested book-code identity using a versioned
+migration, preserving existing references and documenting whether book code
+becomes the actual primary key or a unique business key. Do not imply these
+fields or flows are already implemented.
 
 ## Setup and commands
 
@@ -78,11 +119,19 @@ Keep the lockfile synchronized when intentionally changing dependencies.
   errors, without silently falling back to demo fixtures.
 - Public catalog queries must restrict results to `published=true`; preserve RLS
   as an additional database access boundary.
-- Every admin endpoint must call `requireAdmin(event)`. Navigation middleware
-  alone is insufficient. Verify users with server-side `auth.getUser()` and roles
-  through `admin_memberships`, not editable user metadata.
+- Every protected endpoint must authenticate and authorize on the server;
+  navigation middleware alone is insufficient. Verify sessions with
+  server-side `auth.getUser()`. The current `requireAdmin(event)` guard and
+  `admin_memberships` table support the existing admin foundation; do not treat
+  them as a complete Sales/Editor role or education-level authorization model.
+  Add role and level-scoped authorization deliberately, including matching RLS
+  policies and migration coverage, before implementing those workflows.
 - Store product image object paths in the database and resolve public URLs through
   the storage helper. The public product-images bucket is for public images.
+- Do not put Product Knowledge, flyers, or dummy files that require login in the
+  public product-images bucket or expose their contents in anonymous SSR/API
+  responses. Use an appropriately private storage/access design and authorize
+  file access server-side; validate uploads and file metadata.
 - Keep secrets and service-role keys server-only; never put them in `PUBLIC`
   runtime configuration, browser code, or committed files. Do not expose local
   `.env` contents in logs or task summaries.

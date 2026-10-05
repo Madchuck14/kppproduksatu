@@ -8,6 +8,8 @@ export interface Product {
   price: number
   imageUrl: string
   featured: boolean
+  bookCode?: string | null
+  educationLevel?: 'SD' | 'SMP' | 'SMA' | 'SMK' | null
 }
 
 export interface ProductList {
