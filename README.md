@@ -16,7 +16,7 @@ Buka http://localhost:3000. `npm.cmd` menghindari pembatasan execution policy Po
 
 Mode awal `NUXT_CATALOG_SOURCE=demo` membaca tiga produk contoh dari fixture lokal. Ini tetap aplikasi SSR dengan API, bukan koneksi database online. Untuk demo dengan database online ikuti [setup Supabase](docs/supabase.md), lalu gunakan `NUXT_CATALOG_SOURCE=supabase`.
 
-Lockfile sudah tersedia. Commit `package-lock.json` dan gunakan `npm ci` untuk instalasi berikutnya. Instalasi dari cache dan development server sudah diverifikasi; beranda, katalog, detail produk, API katalog, dan health endpoint merespons HTTP 200. Build produksi, lint, typecheck, deployment cloud, dan koneksi Supabase belum diverifikasi.
+Lockfile sudah tersedia. Commit `package-lock.json` dan gunakan `npm ci` untuk instalasi berikutnya. Build lokal Node, Cloudflare, dan Vercel serta typecheck sudah lulus. Lint lulus dengan dua warning `vue/html-self-closing`; pemeriksaan format file konfigurasi dan dokumentasi yang diubah juga lulus. Smoke test bundle Vercel dalam mode demo mencakup beranda, katalog, detail, pencarian/API, produk tidak ditemukan (404), dan health endpoint. Ada warning tooling/dependency saat typecheck dan build; deployment cloud, Docker, serta koneksi/auth/RLS Supabase belum diverifikasi.
 
 ## Yang tersedia
 
@@ -37,11 +37,12 @@ npm.cmd run typecheck
 npm.cmd run lint
 npm.cmd run format:check
 npm.cmd run build
+npm.cmd run build:vercel
 npm.cmd run preview
 npm.cmd run build:cloudflare
 ```
 
-`npm run build` menghasilkan server Node. `build:cloudflare` menghasilkan Worker; hasil build terakhir mengganti `.output`, sehingga build Node kembali sebelum menjalankan `preview`/`start` untuk Node. Format awal belum dijalankan; `npm run format` merapikan file setelah dependencies terpasang.
+`npm run build` menghasilkan server Node. `build:vercel` menghasilkan deployment SSR/API di `.vercel/output`. `build:cloudflare` menghasilkan Worker; build Node dan Cloudflare mengganti `.output`, sehingga build Node kembali sebelum menjalankan `preview`/`start` untuk Node. Gunakan Prettier pada file yang diubah; `format:check` memeriksa format seluruh repository.
 
 ## Struktur
 

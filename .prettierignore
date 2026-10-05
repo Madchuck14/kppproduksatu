@@ -1,6 +1,7 @@
 node_modules
 .nuxt
 .output
+.vercel
 .wrangler
 package-lock.json
 https-theme736-book-store-myshopify-com-functional-lampson.md

@@ -1,5 +1,20 @@
 # Staging dan serah-terima
 
+## Vercel
+
+Repository menyertakan `vercel.json` yang menetapkan framework Nuxt, instalasi `npm ci`, dan build `npm run build:vercel`. Build ini memakai preset Nitro `vercel` untuk mempertahankan SSR dan API, dengan output `.vercel/output`. Folder tersebut di-ignore dan tidak perlu di-commit. Build Node untuk Docker tetap memakai `npm run build`.
+
+1. Import repository GitHub ke Vercel. Root Directory harus folder yang berisi `package.json`, `nuxt.config.ts`, dan `vercel.json` (root repository untuk proyek ini).
+2. Pilih Node.js 22.x atau versi lebih baru yang didukung Vercel.
+3. Pastikan Framework Preset adalah Nuxt dan matikan override Output Directory. Jangan isi `dist` atau `.output/public`; `outputDirectory: null` di konfigurasi memakai default framework.
+4. Di Environment Variables, tetapkan `NUXT_CATALOG_SOURCE=demo` untuk katalog fixture dan `NUXT_PUBLIC_SITE_URL` ke URL deployment. Untuk katalog online, ikuti `docs/supabase.md`, gunakan `NUXT_CATALOG_SOURCE=supabase`, lalu tambahkan `NUXT_PUBLIC_SUPABASE_URL` dan `NUXT_PUBLIC_SUPABASE_KEY`. Atur environment Production dan Preview sesuai kebutuhan. File `.env` lokal tidak diunggah.
+5. Commit dan push konfigurasi ini, lalu deploy commit terbaru. Redeploy deployment lama tetap memakai sumber dari commit lama. Setelah perubahan setting dashboard, redeploy commit yang sudah memuat konfigurasi ini; untuk pemeriksaan awal, nonaktifkan Use existing Build Cache.
+6. Setelah status Ready, uji `/`, `/products`, detail produk, produk tidak ditemukan (404), `/api/products` beserta pencarian, `/api/products/:slug`, dan `/healthz`. Login dan admin membutuhkan Supabase yang sudah dikonfigurasi, termasuk Site URL/redirect allowlist domain deployment.
+
+Build lokal tidak membuktikan deployment Vercel atau database/auth/RLS Supabase sudah bekerja. `/healthz` hanya memeriksa liveness aplikasi.
+
+Referensi: https://vercel.com/docs/frameworks/full-stack/nuxt dan https://vercel.com/docs/project-configuration/vercel-json
+
 ## Cloudflare Workers staging
 
 Setelah `npm install` dan setup Supabase selesai:
