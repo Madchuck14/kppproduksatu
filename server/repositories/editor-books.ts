@@ -5,44 +5,46 @@ import { z } from 'zod'
 import type { AccountSession } from '#shared/types/account'
 import type { EditorBook, EditorDashboard } from '#shared/types/editor'
 import type { BookInput, EditorQuery } from '#shared/schemas/editor'
+import { bookSubjectSchema } from '#shared/schemas/editor'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import { assertBookScope } from '../utils/require-editor'
 import { getProductImageUrl } from '../utils/storage'
 
 const columns =
-  'id,book_code,education_level,title,slug,author,description,price,category_id,featured,published,image_path,updated_at'
+  'id,book_code,education_level,subject,title,slug,author,description,price,publication_year,featured,published,image_path,flyer_path,dummy_book_path,product_knowledge_path,updated_at'
 const rowSchema = z.object({
   id: z.string().uuid(),
   book_code: z.string().nullable(),
   education_level: educationLevelSchema.nullable(),
+  subject: bookSubjectSchema.nullable(),
   title: z.string(),
   slug: z.string(),
   author: z.string(),
   description: z.string(),
   price: z.number(),
-  category_id: z.string().uuid().nullable(),
+  publication_year: z.number().int().nullable(),
   featured: z.boolean(),
   published: z.boolean(),
   image_path: z.string().nullable(),
+  flyer_path: z.string().nullable(),
+  dummy_book_path: z.string().nullable(),
+  product_knowledge_path: z.string().nullable(),
   updated_at: z.string(),
 })
 
-function fail(error: { code?: string } | null) {
+function fail(error: { code?: string; message?: string } | null) {
   if (!error) return
   if (error.code === '23505')
     throw createError({
       statusCode: 409,
-      statusMessage: 'Kode buku atau alamat halaman sudah digunakan',
+      statusMessage: error.message?.includes('products_title_unique')
+        ? 'Nama buku telah terpakai'
+        : 'Kode buku atau alamat halaman sudah digunakan',
     })
   if (error.code === '42501')
     throw createError({
       statusCode: 403,
       statusMessage: 'Anda tidak memiliki izin untuk perubahan ini',
-    })
-  if (error.code === '23503')
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Kategori tidak ditemukan. Muat ulang formulir.',
     })
   throw createError({
     statusCode: 503,
@@ -56,39 +58,51 @@ function mapBook(event: H3Event, value: unknown): EditorBook {
     id: row.id,
     bookCode: row.book_code,
     educationLevel: row.education_level,
+    subject: row.subject,
     title: row.title,
     slug: row.slug,
     author: row.author,
     description: row.description,
     price: row.price,
-    categoryId: row.category_id,
+    publicationYear: row.publication_year,
     featured: row.featured,
     published: row.published,
     imageUrl: getProductImageUrl(useRuntimeConfig(event).public.supabase.url, row.image_path),
+    resources: {
+      flyer: Boolean(row.flyer_path),
+      dummy: Boolean(row.dummy_book_path),
+      productKnowledge: Boolean(row.product_knowledge_path),
+    },
     updatedAt: row.updated_at,
   }
+}
+
+function makeSlug(title: string, bookCode: string) {
+  const slug = title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 100)
+    .replace(/-$/g, '')
+  return slug || `buku-${bookCode}`
 }
 
 function toRow(input: BookInput) {
   return {
     book_code: input.bookCode,
     education_level: input.educationLevel,
+    subject: input.subject,
     title: input.title,
-    slug: input.slug,
+    slug: makeSlug(input.title, input.bookCode),
     author: input.author,
     description: input.description,
     price: input.price,
-    category_id: input.categoryId,
+    publication_year: input.publicationYear,
     featured: input.featured,
     published: input.published,
   }
-}
-
-export async function editorCategories(event: H3Event) {
-  const client = await serverSupabaseClient<EditorDatabase>(event)
-  const { data, error } = await client.from('categories').select('id,name').order('name')
-  fail(error)
-  return z.array(z.object({ id: z.string().uuid(), name: z.string() })).parse(data)
 }
 
 export async function listEditorBooks(
@@ -117,19 +131,18 @@ export async function listEditorBooks(
   if (search)
     query = query.or(`title.ilike.%${search}%,book_code.ilike.%${search}%,author.ilike.%${search}%`)
   if (options.level) query = query.eq('education_level', options.level)
+  if (options.subject) query = query.eq('subject', options.subject)
   if (options.status !== 'all') query = query.eq('published', options.status === 'published')
-  const [list, all, published, incomplete, categories] = await Promise.all([
+  const [list, all, published, incomplete] = await Promise.all([
     query,
     count(),
     count().eq('published', true),
     count().or('book_code.is.null,education_level.is.null'),
-    editorCategories(event),
   ])
   for (const result of [list, all, published, incomplete]) fail(result.error)
   return {
     account,
     books: (list.data ?? []).map((row) => mapBook(event, row)),
-    categories,
     total: list.count ?? 0,
     page: options.page,
     pageSize,
@@ -167,6 +180,13 @@ export async function saveEditorBook(
   if (id) await getEditorBook(event, account, id)
   assertBookScope(account, input.educationLevel)
   const client = await serverSupabaseClient<EditorDatabase>(event)
+  const escapedTitle = input.title.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+  let duplicateQuery = client.from('products').select('id,title').ilike('title', escapedTitle)
+  if (id) duplicateQuery = duplicateQuery.neq('id', id)
+  const duplicate = await duplicateQuery.limit(1).maybeSingle()
+  fail(duplicate.error)
+  if (duplicate.data)
+    throw createError({ statusCode: 409, statusMessage: 'Nama buku telah terpakai' })
   const query = id
     ? client.from('products').update(toRow(input)).eq('id', id)
     : client.from('products').insert(toRow(input))
@@ -208,6 +228,38 @@ export async function setEditorBookImage(
   const { data, error } = await client
     .from('products')
     .update({ image_path: path })
+    .eq('id', id)
+    .select(columns)
+    .maybeSingle()
+  fail(error)
+  if (!data)
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Buku sudah dihapus atau akses Anda berubah',
+    })
+  return mapBook(event, data)
+}
+
+type MaterialKind = 'flyer' | 'dummy' | 'product-knowledge'
+
+export async function setEditorBookMaterial(
+  event: H3Event,
+  account: AccountSession,
+  id: string,
+  kind: MaterialKind,
+  path: string,
+) {
+  await getEditorBook(event, account, id)
+  const client = await serverSupabaseClient<EditorDatabase>(event)
+  const update =
+    kind === 'flyer'
+      ? { flyer_path: path }
+      : kind === 'dummy'
+        ? { dummy_book_path: path }
+        : { product_knowledge_path: path }
+  const { data, error } = await client
+    .from('products')
+    .update(update)
     .eq('id', id)
     .select(columns)
     .maybeSingle()

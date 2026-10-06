@@ -102,9 +102,32 @@ Jangan jadikan script ini bagian dari build/deploy Vercel. Gunakan project pengu
 Script provisioning hanya alat lokal. Runtime Node/Cloudflare tidak memerlukan key admin atau
 password akun dari `.env`. Hapus konfigurasi administratif dari environment deployment aplikasi.
 
+## Tahun publikasi dan materi privat
+
+Jalankan `supabase/migrations/202610060001_book_publication_materials.sql` setelah migration Editor.
+Migration menambah tahun publikasi, object path tiga materi privat, aturan kode buku numerik, bucket
+privat `book-materials`, serta kebijakan upload Editor sesuai scope jenjang. Constraint kode baru
+dibuat `NOT VALID`: data lama berkode nonnumerik tetap terbaca, tetapi harus diperbaiki saat row
+tersebut diperbarui. Jangan jalankan aplikasi baru dalam mode Supabase sebelum migration diterapkan.
+
+Flyer dan Dummy Buku menerima PDF maksimal 20 MB. Product Knowledge menerima PDF maksimal 50 MB.
+Bucket tidak memiliki URL publik permanen. Materi buku published dapat dibuka siapa pun lewat
+endpoint server yang membuat signed URL berumur 60 detik. Product Knowledge PPT/PPTX lama harus
+diunggah ulang sebagai PDF agar dapat dirender dalam dialog aplikasi.
+
+Jalankan `supabase/migrations/202610060002_unique_book_title.sql` setelah migration materi privat.
+Migration berhenti tanpa perubahan bila menemukan judul duplikat setelah spasi tepi dan kapital
+dinormalisasi. Ubah judul duplikat lebih dahulu, lalu jalankan ulang migration. Unique index ini
+mencegah dua request bersamaan membuat nama buku yang sama.
+
+Jika migration akses akun pernah dijalankan, lanjutkan dengan
+`supabase/migrations/202610060004_public_book_material_access.sql`. Migration mengganti kebijakan
+baca menjadi publik hanya untuk materi milik buku published. Bucket tetap privat; object path harus
+sama dengan path yang tersimpan pada row produk.
+
 ## Pemeriksaan sebelum showcase
 
-- Anonymous dapat membaca kategori dan produk published.
+- Anonymous dapat membaca produk published.
 - Anonymous tidak dapat membaca produk draft atau menulis data.
 - User biasa tidak dapat menaikkan dirinya menjadi admin atau menulis produk.
 - User admin dapat mengakses `/api/admin/session`; user biasa mendapat 403, anonymous 401.
@@ -116,3 +139,22 @@ Editor super, Editor SD, Sales, dan pengunjung anonim. Sebelum memperluas ke tra
 tambahkan rate limits dan audit perubahan sesuai kebutuhan operasional.
 
 Referensi: https://supabase.com/pricing dan https://supabase.com/docs/guides/database/postgres/row-level-security
+
+## Kategori mata pelajaran
+
+Daftar kategori berasal dari `daftarmapel.md`, disalin secara eksplisit ke
+`shared/utils/book-subjects.ts`: SD 9, SMP 11, SMA 19 mata pelajaran. SMK belum memiliki daftar.
+Setiap buku menyimpan satu mata pelajaran opsional pada `products.subject`; buku lama tetap NULL.
+Form Editor menampilkan pilihan berdasarkan jenjang dan mengosongkan pilihan yang tidak cocok
+ketika jenjang berubah. Validasi server Zod dan CHECK database menolak mapel di luar jenjang.
+RLS published-only dan scope jenjang Editor tetap berlaku tanpa perubahan.
+Dashboard menampilkan kategori dan memfilter berdasarkan parameter URL `subject`.
+Detail publik menampilkan mata pelajaran atau “Belum ditentukan”.
+
+Migration `202610060005_book_subjects.sql` **belum dijalankan**. Terapkan pada sesi berikutnya
+sebelum menjalankan versi aplikasi ini dengan Supabase. Query katalog dan Editor membutuhkan
+kolom baru; database sebelum migration akan mengembalikan error, tanpa fallback ke demo.
+Urutan rollout: backup database, jalankan migration, verifikasi buku lama tetap ada dan subject NULL,
+lalu deploy aplikasi. Deploy aplikasi lama untuk rollback; biarkan kolom tambahan agar kategori yang
+sudah disimpan tetap utuh. Jangan drop kolom subject saat rollback aplikasi.
+Landing page masih menggunakan pencarian teks mata pelajaran; belum memakai filter subject database.

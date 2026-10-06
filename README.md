@@ -32,13 +32,16 @@ Docker, dan pemeriksaan interaksi browser belum diverifikasi untuk dashboard ini
 - Tampilan registrasi Sales/Editor tetap tersedia; pengiriman registrasi mandiri dinonaktifkan.
 - Provisioning akun Sales/Editor super melalui script lokal dan membership RLS; Editor super
   memiliki SD/SMP/SMA/SMK serta akses admin, Sales tidak memiliki akses admin.
-- Migration kategori/produk/admin membership, RLS, bucket gambar, dan seed demo.
+- Migration produk/admin membership, RLS, bucket gambar, dan seed demo. Tabel kategori lama tidak
+  lagi dipakai aplikasi.
 - Endpoint `/healthz` untuk liveness aplikasi (bukan pemeriksaan database).
 - Konfigurasi Cloudflare Workers, Dockerfile, dan Compose untuk aplikasi Node.
 
 Pagination tersedia pada dashboard Editor. Cart, checkout, Midtrans, wishlist, blog, banner CMS,
-pengelolaan kategori, pagination katalog publik, sitemap, dan structured data belum diimplementasikan.
-Materi privat Product Knowledge, flyer, dan dummy belum memiliki unggahan atau endpoint unduhan.
+pagination katalog publik, sitemap, dan structured data belum diimplementasikan.
+Dashboard Editor sudah memiliki unggahan privat Product Knowledge, flyer, dan Dummy Buku. Migration
+`202610060001_book_publication_materials.sql` harus diterapkan sebelum fitur dipakai. Materi buku
+published dapat dibuka publik tanpa login melalui signed URL berumur 60 detik.
 
 ## Perintah
 

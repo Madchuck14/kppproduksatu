@@ -3,16 +3,17 @@ import type { AccountSession } from './account'
 
 export interface EditorBook extends Omit<BookInput, 'bookCode' | 'educationLevel'> {
   id: string
+  slug: string
   bookCode: string | null
   educationLevel: BookInput['educationLevel'] | null
   imageUrl: string
+  resources: { flyer: boolean; dummy: boolean; productKnowledge: boolean }
   updatedAt: string
 }
 
 export interface EditorDashboard {
   account: AccountSession
   books: EditorBook[]
-  categories: { id: string; name: string }[]
   total: number
   page: number
   pageSize: number

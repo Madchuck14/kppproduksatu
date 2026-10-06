@@ -1,7 +1,7 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 const route = useRoute()
 const config = useRuntimeConfig()
-const user = useSupabaseUser()
+type ResourceStatus = { flyer: boolean; dummy: boolean; productKnowledge: boolean }
 const { data: product, error } = await useFetch(
   () => `/api/products/${encodeURIComponent(String(route.params.slug))}`,
 )
@@ -14,56 +14,87 @@ if (error.value || !product.value) {
 }
 
 const { data: catalog, error: relatedError } = await useFetch('/api/products')
+const { data: resourceStatus, error: resourceError } = await useFetch<ResourceStatus>(
+  () => `/api/products/${encodeURIComponent(String(route.params.slug))}/resources`,
+)
 const relatedProducts = computed(() =>
-  (catalog.value?.products ?? [])
-    .filter((item) => item.id !== product.value?.id)
-    .sort(
-      (a, b) =>
-        Number(b.category === product.value?.category) -
-        Number(a.category === product.value?.category),
-    )
-    .slice(0, 3),
+  (catalog.value?.products ?? []).filter((item) => item.id !== product.value?.id).slice(0, 3),
 )
 const activeSection = ref<'description' | 'details'>('description')
 const coverDialog = useTemplateRef<HTMLDialogElement>('cover-dialog')
-const loginDialog = useTemplateRef<HTMLDialogElement>('login-dialog')
-const selectedResource = ref('product-knowledge')
-const resources = [
+const pdfDialog = useTemplateRef<HTMLDialogElement>('pdf-dialog')
+const pdfViewerUrl = ref('')
+const pdfViewerTitle = ref('')
+const pdfViewerKind = ref<'product-knowledge' | 'flyer' | 'dummy'>('flyer')
+let pdfRequest = 0
+const pdfViewerBusy = ref(false)
+const pdfViewerError = ref('')
+const resources: Array<{
+  id: 'product-knowledge' | 'flyer' | 'dummy'
+  statusKey: keyof ResourceStatus
+  title: string
+  description: string
+}> = [
   {
     id: 'product-knowledge',
+    statusKey: 'productKnowledge',
     title: 'Product Knowledge',
     description: 'Materi untuk memahami isi dan keunggulan buku.',
   },
-  { id: 'flyer', title: 'Flyer', description: 'Materi ringkas untuk membantu presentasi produk.' },
+  {
+    id: 'flyer',
+    statusKey: 'flyer',
+    title: 'Flyer',
+    description: 'Materi ringkas untuk membantu presentasi produk.',
+  },
   {
     id: 'dummy',
+    statusKey: 'dummy',
     title: 'Dummy buku',
     description: 'Pratinjau isi buku untuk mengenal materi lebih dekat.',
   },
 ]
-const selectedResourceTitle = computed(
-  () => resources.find((resource) => resource.id === selectedResource.value)?.title,
-)
-const loginDestination = computed(() => ({
-  path: '/login',
-  query: { returnTo: `/products/${product.value?.slug}#${selectedResource.value}` },
-}))
-
-function requestResource(id: string) {
-  selectedResource.value = id
-  loginDialog.value?.showModal()
-}
 const shareMessage = ref('')
 const sections = [
   { id: 'description', label: 'Deskripsi' },
   { id: 'details', label: 'Informasi buku' },
 ] as const
+async function openPdfResource(resource: (typeof resources)[number]) {
+  const request = ++pdfRequest
+  pdfViewerKind.value = resource.id
+  pdfViewerTitle.value = resource.title
+  pdfViewerUrl.value = ''
+  pdfViewerError.value = ''
+  pdfViewerBusy.value = true
+  pdfDialog.value?.showModal()
+  try {
+    const result = await $fetch<{ url: string }>(
+      `/api/products/${encodeURIComponent(product.value!.slug)}/resources/${resource.id}?preview=1`,
+    )
+    if (request === pdfRequest) pdfViewerUrl.value = result.url
+  } catch {
+    if (request === pdfRequest) pdfViewerError.value = 'Materi belum dapat ditampilkan. Coba lagi.'
+  } finally {
+    if (request === pdfRequest) pdfViewerBusy.value = false
+  }
+}
+function closePdfDialog() {
+  pdfDialog.value?.close()
+  resetPdfDialog()
+}
+function resetPdfDialog() {
+  pdfRequest += 1
+  pdfViewerUrl.value = ''
+  pdfViewerError.value = ''
+  pdfViewerBusy.value = false
+}
 const bookDetails = computed(() => [
   { label: 'Judul', value: product.value?.title },
   { label: 'Penulis', value: product.value?.author },
-  { label: 'Kategori', value: product.value?.category },
   { label: 'Kode buku', value: product.value?.bookCode || 'Belum tersedia' },
   { label: 'Jenjang pendidikan', value: product.value?.educationLevel || 'Belum tersedia' },
+  { label: 'Mata pelajaran', value: product.value?.subject || 'Belum ditentukan' },
+  { label: 'Tahun publikasi', value: product.value?.publicationYear || 'Belum tersedia' },
   { label: 'Harga', value: formatPrice(product.value?.price ?? 0) },
 ])
 
@@ -73,7 +104,7 @@ watch(
     activeSection.value = 'description'
     shareMessage.value = ''
     coverDialog.value?.close()
-    loginDialog.value?.close()
+    closePdfDialog()
   },
 )
 
@@ -142,11 +173,6 @@ useSeoMeta({
       <div class="py-2 lg:py-6">
         <p class="text-sm text-stone-500">Oleh {{ product.author }}</p>
         <h1 class="display-heading mt-4 text-4xl leading-tight sm:text-5xl">{{ product.title }}</h1>
-        <p
-          class="mt-5 inline-block rounded-full border border-emerald-800/15 bg-emerald-50 px-3 py-1 text-xs font-medium tracking-wide text-emerald-800"
-        >
-          {{ product.category }}
-        </p>
         <p class="mt-7 text-3xl font-semibold tracking-tight text-emerald-900">
           {{ formatPrice(product.price) }}
         </p>
@@ -159,12 +185,14 @@ useSeoMeta({
         <dl class="mt-7 grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
           <dt class="text-stone-500">Penulis</dt>
           <dd class="font-medium">{{ product.author }}</dd>
-          <dt class="text-stone-500">Kategori</dt>
-          <dd class="font-medium">{{ product.category }}</dd>
           <dt class="text-stone-500">Kode buku</dt>
-          <dd class="font-medium">Belum tersedia</dd>
+          <dd class="font-medium">{{ product.bookCode || 'Belum tersedia' }}</dd>
           <dt class="text-stone-500">Jenjang pendidikan</dt>
-          <dd class="font-medium">Belum tersedia</dd>
+          <dd class="font-medium">{{ product.educationLevel || 'Belum tersedia' }}</dd>
+          <dt class="text-stone-500">Mata pelajaran</dt>
+          <dd class="font-medium">{{ product.subject || 'Belum ditentukan' }}</dd>
+          <dt class="text-stone-500">Tahun publikasi</dt>
+          <dd class="font-medium">{{ product.publicationYear || 'Belum tersedia' }}</dd>
         </dl>
         <div class="mt-8 flex flex-wrap gap-3">
           <NuxtLink
@@ -234,7 +262,10 @@ useSeoMeta({
       </p>
       <h2 id="resources-title" class="display-heading text-3xl">Kenali produk lebih dalam</h2>
       <p class="mt-3 max-w-2xl text-sm leading-relaxed text-stone-600">
-        Product Knowledge, flyer, dan dummy memerlukan login. Berkas untuk buku ini belum tersedia.
+        Product Knowledge, flyer, dan dummy dapat dibuka tanpa login.
+      </p>
+      <p v-if="resourceError" role="alert" class="mt-3 text-sm text-red-700">
+        Status materi belum dapat dimuat. Muat ulang halaman.
       </p>
       <div class="mt-6 grid gap-4 md:grid-cols-3">
         <article
@@ -244,26 +275,87 @@ useSeoMeta({
           tabindex="-1"
           class="scroll-mt-8 rounded-2xl border border-stone-200 bg-white p-6 target:border-emerald-700 target:ring-2 target:ring-emerald-700/20"
         >
-          <p class="text-xs font-semibold text-emerald-800">
-            {{ user ? 'Konten akun' : 'Login diperlukan' }}
-          </p>
+          <p class="text-xs font-semibold text-emerald-800">Akses publik</p>
           <h3 class="mt-3 text-lg font-semibold">{{ resource.title }}</h3>
           <p class="mt-2 text-sm leading-relaxed text-stone-600">{{ resource.description }}</p>
-          <p class="mt-4 text-xs text-stone-500">Berkas belum tersedia</p>
-          <UButton
-            v-if="!user"
-            class="mt-5"
-            variant="outline"
-            :aria-label="`Informasi akses ${resource.title}`"
-            @click="requestResource(resource.id)"
-            >Informasi akses</UButton
-          >
-          <p v-else class="mt-5 text-sm text-stone-600">
-            Materi dapat diakses setelah berkas tersedia dan hak akses Anda diverifikasi.
+          <p v-if="!resourceStatus" class="mt-4 text-xs text-stone-500">Memeriksa berkas...</p>
+          <p v-else-if="!resourceStatus[resource.statusKey]" class="mt-4 text-xs text-stone-500">
+            Berkas belum tersedia
           </p>
+          <div
+            v-else-if="
+              resourceStatus[resource.statusKey] &&
+              (resource.id === 'flyer' || resource.id === 'product-knowledge')
+            "
+            class="mt-5 flex flex-wrap gap-2"
+          >
+            <button
+              type="button"
+              class="inline-flex rounded-lg border border-emerald-700 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50"
+              @click="openPdfResource(resource)"
+            >
+              Lihat materi
+            </button>
+            <a
+              :href="`/api/products/${encodeURIComponent(product.slug)}/resources/${resource.id}?download=1`"
+              class="inline-flex rounded-lg bg-emerald-800 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              Download
+            </a>
+          </div>
+          <button
+            v-else-if="resourceStatus[resource.statusKey]"
+            type="button"
+            class="mt-5 inline-flex rounded-lg border border-emerald-700 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50"
+            @click="openPdfResource(resource)"
+          >
+            Lihat buku
+          </button>
         </article>
       </div>
     </section>
+
+    <dialog
+      ref="pdf-dialog"
+      :aria-label="`Penampil ${pdfViewerTitle}`"
+      class="fixed inset-0 m-auto h-[92dvh] w-[calc(100%_-_1.5rem)] max-w-6xl rounded-2xl border border-stone-200 bg-white p-0 backdrop:bg-stone-950/75"
+      @close="resetPdfDialog"
+    >
+      <div class="flex h-full flex-col">
+        <div class="flex items-center justify-between gap-4 border-b border-stone-200 px-5 py-4">
+          <h2 class="text-lg font-semibold">{{ pdfViewerTitle }}</h2>
+          <button
+            type="button"
+            class="rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium"
+            @click="closePdfDialog"
+          >
+            Tutup
+          </button>
+        </div>
+        <div class="min-h-0 flex-1">
+          <div
+            v-if="pdfViewerBusy"
+            role="status"
+            class="flex h-full items-center justify-center bg-stone-100 text-sm text-stone-600"
+          >
+            Menyiapkan materi...
+          </div>
+          <div
+            v-else-if="pdfViewerError"
+            role="alert"
+            class="flex h-full items-center justify-center bg-stone-100 p-6 text-sm text-red-700"
+          >
+            {{ pdfViewerError }}
+          </div>
+          <PdfFlipbookViewer
+            v-else-if="pdfViewerUrl && pdfViewerKind === 'dummy'"
+            :key="pdfViewerUrl"
+            :url="pdfViewerUrl"
+          />
+          <PdfCanvasViewer v-else-if="pdfViewerUrl" :url="pdfViewerUrl" />
+        </div>
+      </div>
+    </dialog>
 
     <section class="mt-16" aria-labelledby="related-title">
       <div class="mb-7 flex flex-wrap items-end justify-between gap-4">
@@ -285,27 +377,6 @@ useSeoMeta({
       </div>
       <p v-else class="text-sm text-stone-500">Belum ada buku lainnya dalam katalog.</p>
     </section>
-
-    <dialog
-      ref="login-dialog"
-      aria-labelledby="resource-login-title"
-      aria-describedby="resource-login-description"
-      class="fixed inset-0 m-auto w-[calc(100%_-_3rem)] max-w-md rounded-2xl border border-stone-200 bg-white p-6 backdrop:bg-stone-950/60 sm:p-8"
-    >
-      <h2 id="resource-login-title" class="display-heading text-2xl">
-        Login untuk {{ selectedResourceTitle }}
-      </h2>
-      <p id="resource-login-description" class="mt-4 text-sm leading-relaxed text-stone-600">
-        Konten ini memerlukan login. Berkas belum tersedia untuk buku ini. Jika Anda masuk, Anda
-        akan kembali ke bagian {{ selectedResourceTitle }} pada halaman buku ini.
-      </p>
-      <div class="mt-6 flex flex-wrap items-center gap-3">
-        <UButton :to="loginDestination" @click="loginDialog?.close()">Ke halaman login</UButton>
-        <form method="dialog">
-          <UButton type="submit" color="neutral" variant="outline" autofocus>Tutup</UButton>
-        </form>
-      </div>
-    </dialog>
 
     <dialog
       ref="cover-dialog"

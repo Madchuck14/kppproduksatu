@@ -11,13 +11,7 @@ if (error.value?.statusCode === 404)
 </script>
 
 <template>
-  <EditorBookForm
-    v-if="data"
-    :key="data.book.id"
-    :book="data.book"
-    :account="data.account"
-    :categories="data.categories"
-  />
+  <EditorBookForm v-if="data" :key="data.book.id" :book="data.book" :account="data.account" />
   <div v-else-if="error" role="alert" class="rounded-xl border border-red-200 p-6">
     <p>Buku belum dapat dimuat.</p>
     <UButton class="mt-4" @click="refresh()">Coba lagi</UButton>

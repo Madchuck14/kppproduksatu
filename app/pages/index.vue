@@ -1,186 +1,474 @@
 <script setup lang="ts">
+import { educationLevelSchema } from '#shared/schemas/auth'
+
 const config = useRuntimeConfig()
 useSeoMeta({
   title: `Katalog Buku Erlangga | ${config.public.siteName}`,
-  description: 'Jelajahi katalog buku Erlangga untuk mendukung presentasi produk kepada pelanggan.',
+  description: 'Temukan buku pelajaran Erlangga untuk setiap langkah belajar.',
 })
 const search = ref('')
-const { data, error, status, refresh } = await useFetch('/api/products', {
-  query: { featured: 'true' },
-})
-const educationLevels = [
-  {
-    code: 'SD',
-    name: 'Sekolah Dasar',
-    description: 'Awal perjalanan belajar.',
-    color: 'bg-red-50 text-red-800',
-  },
-  {
-    code: 'SMP',
-    name: 'Sekolah Menengah Pertama',
-    description: 'Mengembangkan pengetahuan.',
-    color: 'bg-blue-50 text-blue-800',
-  },
-  {
-    code: 'SMA',
-    name: 'Sekolah Menengah Atas',
-    description: 'Memperdalam pemahaman.',
-    color: 'bg-amber-50 text-amber-800',
-  },
-  {
-    code: 'SMK',
-    name: 'Sekolah Menengah Kejuruan',
-    description: 'Mempersiapkan keterampilan.',
-    color: 'bg-emerald-50 text-emerald-800',
-  },
+const level = ref('')
+const subject = ref('')
+const { data, error, status, refresh } = await useFetch('/api/products')
+const latestBooks = computed(() => data.value?.products.slice(0, 4) ?? [])
+const subjects = [
+  { name: 'Matematika', icon: 'math' },
+  { name: 'Bahasa Indonesia', icon: 'language' },
+  { name: 'Bahasa Inggris', icon: 'english' },
+  { name: 'Informatika', icon: 'code' },
+  { name: 'IPA', icon: 'science' },
+  { name: 'IPS', icon: 'social' },
 ]
-
 async function searchCatalog() {
-  const q = search.value.trim()
-  await navigateTo({ path: '/products', query: q ? { q } : {} })
+  const q = [search.value.trim(), subject.value].filter(Boolean).join(' ')
+  await navigateTo({
+    path: '/products',
+    query: { ...(q ? { q } : {}), ...(level.value ? { level: level.value } : {}) },
+  })
 }
 </script>
 
 <template>
-  <div class="space-y-14 md:space-y-20">
+  <div class="landing-page">
+    <section class="landing-hero" aria-labelledby="landing-title">
+      <div class="hero-content">
+        <h1 id="landing-title">Temukan Buku<br />Favoritmu</h1>
+        <p>
+          Jelajahi berbagai koleksi buku pelajaran untuk menemani rasa ingin tahu dan setiap langkah
+          perjalananmu.
+        </p>
+        <NuxtLink to="/products" class="hero-link"
+          >Jelajahi Buku <span aria-hidden="true">→</span></NuxtLink
+        >
+      </div>
+      <img
+        src="/images/landing/hero-books.png"
+        alt="Buku Grow with English dari Penerbit Erlangga"
+        width="437"
+        height="350"
+        fetchpriority="high"
+        class="hero-books"
+      />
+    </section>
+    <form id="pencarian" class="landing-search" @submit.prevent="searchCatalog">
+      <div class="search-input">
+        <img src="/images/landing/search.svg" alt="" width="20" height="20" />
+        <label for="landing-search" class="sr-only">Cari judul, kode buku, atau penulis</label>
+        <input
+          id="landing-search"
+          v-model="search"
+          name="q"
+          type="search"
+          maxlength="100"
+          placeholder="Cari judul atau kode buku..."
+        />
+      </div>
+      <div class="search-filter">
+        <label for="landing-level">Jenjang</label>
+        <select id="landing-level" v-model="level" name="level">
+          <option value="">Semua Jenjang</option>
+          <option v-for="item in educationLevelSchema.options" :key="item" :value="item">
+            {{ item }}
+          </option>
+        </select>
+      </div>
+      <div class="search-filter">
+        <label for="landing-subject">Mata pelajaran</label>
+        <select id="landing-subject" v-model="subject">
+          <option value="">Semua Pelajaran</option>
+          <option v-for="item in subjects" :key="item.name" :value="item.name">
+            {{ item.name }}
+          </option>
+        </select>
+      </div>
+      <UButton type="submit" class="search-submit">Cari Buku</UButton>
+    </form>
     <section
-      aria-labelledby="landing-title"
-      class="grid items-center gap-10 rounded-3xl bg-[#e6ede5] px-6 py-10 sm:px-10 md:grid-cols-[1.5fr_1fr] md:p-14"
+      class="landing-section"
+      aria-labelledby="latest-title"
+      :aria-busy="status === 'pending'"
     >
-      <div>
-        <p class="mb-5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-800">
-          Katalog buku Erlangga
-        </p>
-        <h1
-          id="landing-title"
-          class="display-heading max-w-xl text-4xl leading-tight sm:text-5xl md:text-6xl"
-        >
-          Temukan buku.<br />Dukung setiap langkah belajar.
-        </h1>
-        <p class="mt-5 max-w-lg leading-relaxed text-stone-600">
-          Jelajahi informasi buku dalam satu tempat untuk membantu Anda memperkenalkan produk kepada
-          pelanggan.
-        </p>
-        <form class="mt-8" @submit.prevent="searchCatalog">
-          <label for="landing-search" class="mb-2 block text-sm font-semibold"
-            >Buku apa yang Anda cari?</label
-          >
-          <div class="flex max-w-xl flex-col gap-2 rounded-xl bg-white p-2 shadow-sm sm:flex-row">
-            <input
-              id="landing-search"
-              v-model="search"
-              name="q"
-              type="search"
-              maxlength="100"
-              placeholder="Masukkan judul atau kode buku"
-              class="min-w-0 flex-1 rounded-lg px-3 py-3 text-base outline-offset-2 focus-visible:outline-2 focus-visible:outline-emerald-700"
-            />
-            <UButton type="submit" size="lg" class="justify-center">Cari buku</UButton>
-          </div>
-        </form>
-        <NuxtLink
-          to="/products"
-          class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 underline-offset-4 hover:underline"
-          >Jelajahi semua buku <span aria-hidden="true">&rarr;</span></NuxtLink
-        >
+      <div class="section-heading">
+        <h2 id="latest-title">Buku Terbaru</h2>
+        <NuxtLink to="/products" class="browse-link"
+          >Lihat buku terbaru <img src="/images/landing/arrow.svg" alt="" width="17" height="17"
+        /></NuxtLink>
       </div>
-      <div class="hidden items-center justify-center md:flex" aria-hidden="true">
-        <div class="relative flex h-80 w-72 items-center justify-center rounded-full bg-white/45">
-          <img
-            src="/images/book-placeholder.svg"
-            alt=""
-            width="220"
-            height="280"
-            class="w-52 -rotate-6 drop-shadow-xl"
-          />
-          <span
-            class="absolute -bottom-2 right-0 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-emerald-800 shadow-sm"
-            >Informasi buku dalam satu tempat</span
-          >
-        </div>
+      <p v-if="data?.source === 'demo'" class="demo-note">Buku dan harga merupakan data contoh.</p>
+      <div v-if="error" role="alert" class="catalog-message">
+        <p>Katalog belum dapat dimuat. Silakan coba lagi.</p>
+        <UButton class="mt-4" variant="outline" @click="refresh()">Coba lagi</UButton>
       </div>
-    </section>
-    <section aria-labelledby="education-title" aria-describedby="education-description">
-      <p class="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-800">
-        Jenjang pendidikan
-      </p>
-      <h2 id="education-title" class="display-heading text-3xl sm:text-4xl">
-        Untuk setiap tahap belajar
-      </h2>
-      <p id="education-description" class="mt-3 max-w-2xl text-sm leading-relaxed text-stone-600">
-        Pilih jenjang untuk menemukan buku yang sesuai dengan kebutuhan belajar.
-      </p>
-      <ul class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <li
-          v-for="level in educationLevels"
-          :key="level.code"
-          class="rounded-2xl border border-stone-200 bg-white p-6"
-        >
-          <span :class="['inline-flex rounded-lg px-3 py-2 text-lg font-bold', level.color]">{{
-            level.code
-          }}</span>
-          <h3 class="mt-5 font-semibold">{{ level.name }}</h3>
-          <p class="mt-2 text-sm text-stone-600">{{ level.description }}</p>
-          <NuxtLink
-            :to="{ path: '/products', query: { level: level.code } }"
-            class="mt-5 inline-block text-sm font-semibold text-emerald-800 hover:underline"
-            >Lihat buku {{ level.code }} →</NuxtLink
-          >
-        </li>
-      </ul>
-    </section>
-    <section aria-labelledby="featured-title" :aria-busy="status === 'pending'">
-      <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p class="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-800">
-            Jelajahi koleksi
-          </p>
-          <h2 id="featured-title" class="display-heading text-3xl sm:text-4xl">Buku pilihan</h2>
-          <p class="mt-3 text-sm text-stone-600">
-            Lihat sampul, informasi buku, dan harga melalui halaman detail.
-          </p>
-        </div>
-        <NuxtLink
-          to="/products"
-          class="text-sm font-semibold text-emerald-800 underline-offset-4 hover:underline"
-          >Lihat semua buku <span aria-hidden="true">&rarr;</span></NuxtLink
-        >
+      <p v-else-if="status === 'pending'" role="status" class="catalog-message">Memuat buku...</p>
+      <div v-else-if="latestBooks.length" class="latest-books">
+        <ProductCard
+          v-for="product in latestBooks"
+          :key="product.id"
+          :product="product"
+          variant="landing"
+        />
       </div>
-      <p
-        v-if="data?.source === 'demo'"
-        class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-      >
-        Buku dan harga yang ditampilkan adalah data contoh.
-      </p>
-      <div v-if="error" role="alert" class="rounded-xl border border-red-200 bg-red-50 p-6">
-        <p class="text-red-800">Katalog belum dapat dimuat. Silakan coba lagi.</p>
-        <UButton class="mt-4" color="neutral" variant="outline" @click="refresh()"
-          >Coba lagi</UButton
-        >
-      </div>
-      <p v-else-if="status === 'pending'" role="status" class="py-10 text-stone-600">
-        Memuat buku pilihan...
-      </p>
-      <div v-else-if="data?.products.length" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <ProductCard v-for="product in data.products" :key="product.id" :product="product" />
-      </div>
-      <div v-else class="rounded-xl border border-dashed border-stone-300 p-8 text-center">
-        <p class="text-stone-600">Belum ada buku pilihan yang tersedia.</p>
-        <UButton to="/products" class="mt-4" variant="outline">Buka katalog umum</UButton>
-      </div>
+      <p v-else class="catalog-message">Belum ada buku yang tersedia.</p>
     </section>
     <section
-      aria-labelledby="browse-title"
-      class="flex flex-wrap items-center justify-between gap-6 rounded-2xl bg-emerald-900 p-7 text-white sm:p-10"
+      id="kategori"
+      class="landing-section subjects-section"
+      aria-labelledby="subjects-title"
     >
-      <div>
-        <h2 id="browse-title" class="display-heading text-3xl">Siapkan presentasi produk Anda.</h2>
-        <p class="mt-3 max-w-xl text-sm leading-relaxed text-emerald-100">
-          Katalog dapat diakses tanpa login. Temukan buku dan buka detailnya untuk melihat informasi
-          produk.
-        </p>
+      <div class="section-heading">
+        <h2 id="subjects-title">Jelajahi Pelajaran</h2>
+        <NuxtLink to="/products" class="browse-link"
+          >Lihat semua buku <img src="/images/landing/arrow.svg" alt="" width="17" height="17"
+        /></NuxtLink>
       </div>
-      <UButton to="/products" color="neutral" size="lg">Buka katalog</UButton>
+      <div class="subject-grid">
+        <NuxtLink
+          v-for="item in subjects"
+          :key="item.name"
+          :to="{ path: '/products', query: { q: item.name } }"
+          :class="['subject-card', item.icon]"
+        >
+          <span class="subject-decoration" aria-hidden="true" />
+          <span class="subject-icon"
+            ><img :src="`/images/landing/${item.icon}.svg`" alt="" width="24" height="24"
+          /></span>
+          <h3>{{ item.name }}</h3>
+          <span class="subject-caption">Jelajahi buku</span>
+        </NuxtLink>
+      </div>
     </section>
   </div>
 </template>
+
+<style scoped>
+.landing-page {
+  color: #242b26;
+}
+.landing-hero {
+  min-height: 420px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 40px;
+  padding: 35px 64px;
+  border-radius: 24px;
+  background: #f7fbf8;
+}
+.hero-content {
+  max-width: 550px;
+  min-height: 280px;
+  padding: 14px;
+  border: 1px solid #dce8e0;
+  border-radius: 20px;
+  background: white;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+.hero-content h1 {
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+}
+.hero-content p {
+  margin-top: 22px;
+  font-size: 20px;
+  line-height: 28px;
+  color: #687169;
+}
+.hero-link {
+  display: inline-flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 50px;
+  color: #2f6b4f;
+}
+.hero-link:hover,
+.browse-link:hover {
+  text-decoration: underline;
+}
+.hero-books {
+  width: 437px;
+  height: 350px;
+  max-width: 100%;
+  object-fit: contain;
+  justify-self: end;
+  margin-right: 24px;
+}
+.landing-search {
+  display: flex;
+  margin-top: 28px;
+  padding: 12px 20px;
+  border: 1px solid #dce8e0;
+  border-radius: 16px;
+  background: #f0f7f2;
+}
+.search-input {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 16px;
+  background: white;
+  border: 1px solid #dce8e0;
+  border-radius: 6px 0 0 6px;
+}
+.search-input input {
+  width: 100%;
+  min-width: 0;
+  font-size: 14px;
+}
+.search-input input::placeholder {
+  color: #82958a;
+}
+.search-filter {
+  width: 220px;
+  padding: 7px 16px;
+  background: white;
+  border-block: 1px solid #dce8e0;
+  border-right: 1px solid #dce8e0;
+}
+.search-filter label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #687169;
+}
+.search-filter select {
+  width: 100%;
+  font-size: 13px;
+  background: white;
+}
+.search-submit {
+  width: 120px;
+  justify-content: center;
+  border-radius: 0 6px 6px 0;
+  background: #2f6b4f;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+.landing-section {
+  margin: 38px 32px 0;
+  scroll-margin-top: 24px;
+}
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.section-heading h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 40px;
+  line-height: 1.2;
+}
+.browse-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 6px;
+  font-size: 13px;
+  color: #344e41;
+}
+.latest-books {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px;
+}
+.demo-note {
+  margin-bottom: 12px;
+  color: #687169;
+  font-size: 13px;
+}
+.catalog-message {
+  padding: 32px;
+  border: 1px solid #dce8e0;
+  border-radius: 12px;
+}
+.subjects-section {
+  margin-top: 38px;
+  margin-bottom: 54px;
+}
+.subject-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 24px;
+}
+.subject-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  overflow: hidden;
+  min-height: 180px;
+  padding: 22px 24px;
+  border-radius: 28px;
+  transition: transform 180ms;
+}
+.subject-card:hover {
+  transform: translateY(-3px);
+}
+.subject-card h3 {
+  position: relative;
+  font:
+    600 24px/1.2 Georgia,
+    'Times New Roman',
+    serif;
+}
+.subject-caption {
+  position: relative;
+  margin-top: 3px;
+  font-size: 13px;
+}
+.subject-icon {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #ffffffb3;
+}
+.subject-decoration {
+  position: absolute;
+  top: -34px;
+  left: -34px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: var(--decoration);
+}
+.math {
+  background: #fde3d8;
+  color: #a9401f;
+  --decoration: #f8c3ac;
+}
+.language {
+  background: #fbe0e0;
+  color: #963838;
+  --decoration: #f1bcbc;
+}
+.english {
+  background: #dcefe5;
+  color: #1d6647;
+  --decoration: #b3dbc5;
+}
+.code {
+  background: #e2e3f8;
+  color: #383c96;
+  --decoration: #c1c4f1;
+}
+.science {
+  background: #e9f1d7;
+  color: #4a6719;
+  --decoration: #cfe0a4;
+}
+.social {
+  background: #fbf0d4;
+  color: #85600f;
+  --decoration: #f3dca1;
+}
+.language .subject-decoration,
+.social .subject-decoration {
+  inset: auto -30px -44px auto;
+}
+.english .subject-decoration {
+  inset: auto auto -50px -40px;
+}
+.code .subject-decoration {
+  inset: -40px -24px auto auto;
+  width: 150px;
+  height: 150px;
+}
+@media (max-width: 1000px) {
+  .landing-hero {
+    padding: 32px;
+    gap: 24px;
+  }
+  .hero-content h1 {
+    font-size: 40px;
+  }
+  .hero-books {
+    margin-right: 0;
+  }
+  .search-filter {
+    width: 170px;
+  }
+  .landing-section {
+    margin-inline: 0;
+  }
+}
+@media (max-width: 700px) {
+  .landing-hero {
+    grid-template-columns: 1fr;
+    padding: 24px;
+  }
+  .hero-content {
+    min-height: auto;
+  }
+  .hero-content h1 {
+    font-size: 36px;
+  }
+  .hero-content p {
+    font-size: 18px;
+  }
+  .hero-link {
+    margin-top: 24px;
+  }
+  .hero-books {
+    width: 300px;
+    height: 240px;
+    justify-self: center;
+  }
+  .landing-search {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+  }
+  .search-input {
+    flex-basis: 100%;
+    border-radius: 6px;
+  }
+  .search-filter {
+    width: calc(50% - 4px);
+    border: 1px solid #dce8e0;
+    border-radius: 6px;
+  }
+  .search-submit {
+    width: 100%;
+    min-height: 44px;
+    border-radius: 6px;
+  }
+  .section-heading h2 {
+    font-size: 30px;
+  }
+  .browse-link {
+    font-size: 12px;
+    gap: 6px;
+  }
+  .latest-books {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 16px;
+  }
+  .subject-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .subject-card {
+    min-height: 160px;
+    padding: 18px;
+    border-radius: 22px;
+  }
+  .subject-card h3 {
+    font-size: 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .subject-card {
+    transition: none;
+  }
+}
+</style>

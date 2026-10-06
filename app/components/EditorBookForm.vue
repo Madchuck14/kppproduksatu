@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { bookInputSchema } from '#shared/schemas/editor'
+import { getSubjectsForLevel } from '#shared/utils/book-subjects'
+import type { BookSubject } from '#shared/utils/book-subjects'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import type { EditorBook } from '#shared/types/editor'
 import type { AccountSession } from '#shared/types/account'
@@ -7,29 +9,40 @@ import type { AccountSession } from '#shared/types/account'
 const props = defineProps<{
   book?: EditorBook
   account: AccountSession
-  categories: { id: string; name: string }[]
 }>()
 const savedId = ref(props.book?.id)
 const form = reactive({
   bookCode: props.book?.bookCode ?? '',
   educationLevel: props.book?.educationLevel ?? '',
+  subject: (props.book?.subject ?? '') as BookSubject | '',
   title: props.book?.title ?? '',
-  slug: props.book?.slug ?? '',
   author: props.book?.author ?? '',
   description: props.book?.description ?? '',
   price: props.book?.price ?? 0,
-  categoryId: props.book?.categoryId ?? '',
+  publicationYear: props.book?.publicationYear ?? null,
   featured: props.book?.featured ?? false,
   published: props.book?.published ?? false,
 })
 const levels = computed(() =>
   props.account.isSuper ? educationLevelSchema.options : props.account.educationLevels,
 )
+const subjectOptions = computed(() => getSubjectsForLevel(form.educationLevel))
+watch(
+  () => form.educationLevel,
+  () => {
+    if (!subjectOptions.value.some((item) => item === form.subject)) form.subject = ''
+  },
+)
 const busy = ref(false)
 const progress = ref('')
 const message = ref('')
 const errors = ref<Record<string, string>>({})
 const file = shallowRef<File | null>(null)
+const materialFiles = reactive<Record<'flyer' | 'dummy' | 'product-knowledge', File | null>>({
+  flyer: null,
+  dummy: null,
+  'product-knowledge': null,
+})
 const imageUrl = ref(props.book?.imageUrl ?? '/images/book-placeholder.svg')
 let localPreview: string | undefined
 function releasePreview() {
@@ -56,22 +69,33 @@ function selectImage(event: Event) {
   localPreview = URL.createObjectURL(selected)
   imageUrl.value = localPreview
 }
-function generateSlug() {
-  if (!savedId.value && !form.slug)
-    form.slug = form.title
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 100)
-      .replace(/-$/g, '')
+function selectMaterial(kind: keyof typeof materialFiles, event: Event) {
+  const input = event.target as HTMLInputElement
+  const selected = input.files?.[0] ?? null
+  message.value = ''
+  materialFiles[kind] = null
+  if (!selected) return
+  const isPdf = selected.type === 'application/pdf'
+  const maxSize = kind === 'product-knowledge' ? 50 * 1024 * 1024 : 20 * 1024 * 1024
+  if (!isPdf || selected.size > maxSize) {
+    message.value =
+      kind === 'product-knowledge'
+        ? 'Pilih Product Knowledge PDF maksimal 50 MB.'
+        : 'Pilih berkas PDF maksimal 20 MB.'
+    input.value = ''
+    return
+  }
+  materialFiles[kind] = selected
 }
 async function save() {
   if (busy.value) return
   message.value = ''
   errors.value = {}
-  const parsed = bookInputSchema.safeParse({ ...form, categoryId: form.categoryId || null })
+  const parsed = bookInputSchema.safeParse({
+    ...form,
+    publicationYear: form.publicationYear || null,
+    subject: form.subject || null,
+  })
   if (!parsed.success) {
     for (const issue of parsed.error.issues) errors.value[String(issue.path[0])] ??= issue.message
     message.value = 'Periksa kembali kolom yang ditandai.'
@@ -98,11 +122,26 @@ async function save() {
       })
       file.value = null
     }
+    for (const kind of ['flyer', 'dummy', 'product-knowledge'] as const) {
+      const material = materialFiles[kind]
+      if (!material) continue
+      const label =
+        kind === 'dummy' ? 'Dummy Buku' : kind === 'flyer' ? 'flyer' : 'Product Knowledge'
+      progress.value = `Mengunggah ${label}...`
+      await $fetch(`/api/admin/books/${book.id}/materials/${kind}`, {
+        method: 'POST',
+        body: material,
+        headers: { 'Content-Type': material.type },
+      })
+      materialFiles[kind] = null
+    }
     await navigateTo('/admin?notice=saved')
   } catch (error) {
     const detail = (error as { data?: { statusMessage?: string } }).data?.statusMessage
+    if (!metadataSaved && detail === 'Nama buku telah terpakai')
+      window.alert('Nama buku telah terpakai.')
     message.value = metadataSaved
-      ? 'Informasi buku sudah tersimpan, tetapi sampul gagal diunggah. Coba simpan kembali untuk mengulang unggahan.'
+      ? 'Informasi buku sudah tersimpan, tetapi satu atau lebih berkas gagal diunggah. Coba simpan kembali untuk mengulang unggahan.'
       : (detail ?? 'Buku gagal disimpan. Silakan coba lagi.')
   } finally {
     busy.value = false
@@ -144,8 +183,10 @@ const fieldClass =
             maxlength="200"
             :class="fieldClass"
             :aria-invalid="!!errors.title"
-            @blur="generateSlug"
           />
+          <p class="mt-1.5 text-xs text-stone-500">
+            Tambahkan tahun publikasi di akhir seri buku dengan nama yang sama.
+          </p>
           <p v-if="errors.title" class="mt-1 text-sm text-red-700">{{ errors.title }}</p>
         </div>
         <div class="grid gap-5 sm:grid-cols-2">
@@ -156,11 +197,13 @@ const fieldClass =
               v-model="form.bookCode"
               required
               maxlength="50"
-              placeholder="Contoh: ERL-SD-001"
+              inputmode="numeric"
+              pattern="[0-9]+"
+              placeholder="Contoh: 123456"
               :class="fieldClass"
               :aria-invalid="!!errors.bookCode"
             />
-            <p class="mt-1.5 text-xs text-stone-500">Kode unik; huruf otomatis menjadi kapital.</p>
+            <p class="mt-1.5 text-xs text-stone-500">Kode unik; hanya angka.</p>
             <p v-if="errors.bookCode" class="mt-1 text-sm text-red-700">{{ errors.bookCode }}</p>
           </div>
           <div>
@@ -181,54 +224,68 @@ const fieldClass =
           </div>
         </div>
         <div>
-          <label for="book-slug" class="text-sm font-medium">Alamat halaman *</label
-          ><input
-            id="book-slug"
-            v-model="form.slug"
-            required
-            maxlength="100"
-            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+          <label for="book-subject" class="text-sm font-medium">Mata pelajaran</label>
+          <select
+            id="book-subject"
+            v-model="form.subject"
             :class="fieldClass"
-            :aria-invalid="!!errors.slug"
-          />
-          <p class="mt-1.5 break-all text-xs text-stone-500">
-            /products/{{ form.slug || 'judul-buku' }} · Gunakan huruf kecil, angka, dan tanda
-            hubung.
+            :disabled="!subjectOptions.length"
+            :aria-invalid="!!errors.subject"
+            aria-describedby="book-subject-help"
+          >
+            <option value="">Belum ditentukan</option>
+            <option v-for="item in subjectOptions" :key="item" :value="item">{{ item }}</option>
+          </select>
+          <p id="book-subject-help" class="mt-1.5 text-xs text-stone-500">
+            {{
+              form.educationLevel === 'SMK'
+                ? 'Daftar mata pelajaran SMK belum tersedia.'
+                : !form.educationLevel
+                  ? 'Pilih jenjang untuk menampilkan mata pelajaran.'
+                  : 'Kategori mengikuti daftar mata pelajaran untuk jenjang yang dipilih.'
+            }}
           </p>
-          <p v-if="book" class="mt-1 text-xs text-amber-800">
-            Mengubah alamat membuat tautan lama tidak berlaku.
-          </p>
-          <p v-if="errors.slug" class="mt-1 text-sm text-red-700">{{ errors.slug }}</p>
+          <p v-if="errors.subject" class="mt-1 text-sm text-red-700">{{ errors.subject }}</p>
         </div>
         <div class="grid gap-5 sm:grid-cols-2">
           <div>
             <label for="book-author" class="text-sm font-medium">Penulis</label
             ><input id="book-author" v-model="form.author" maxlength="200" :class="fieldClass" />
           </div>
-          <div>
-            <label for="book-category" class="text-sm font-medium">Kategori</label
-            ><select id="book-category" v-model="form.categoryId" :class="fieldClass">
-              <option value="">Tanpa kategori</option>
-              <option v-for="category in categories" :key="category.id" :value="category.id">
-                {{ category.name }}
-              </option>
-            </select>
-          </div>
         </div>
-        <div>
-          <label for="book-price" class="text-sm font-medium">Harga (Rp) *</label
-          ><input
-            id="book-price"
-            v-model.number="form.price"
-            type="number"
-            required
-            min="0"
-            max="2147483647"
-            step="1"
-            :class="fieldClass"
-            :aria-invalid="!!errors.price"
-          />
-          <p v-if="errors.price" class="mt-1 text-sm text-red-700">{{ errors.price }}</p>
+        <div class="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label for="book-price" class="text-sm font-medium">Harga (Rp) *</label
+            ><input
+              id="book-price"
+              v-model.number="form.price"
+              type="number"
+              required
+              min="0"
+              max="2147483647"
+              step="1"
+              :class="fieldClass"
+              :aria-invalid="!!errors.price"
+            />
+            <p v-if="errors.price" class="mt-1 text-sm text-red-700">{{ errors.price }}</p>
+          </div>
+          <div>
+            <label for="book-publication-year" class="text-sm font-medium">Tahun Publikasi</label>
+            <input
+              id="book-publication-year"
+              v-model.number="form.publicationYear"
+              type="number"
+              min="1000"
+              max="9999"
+              step="1"
+              placeholder="Contoh: 2026"
+              :class="fieldClass"
+              :aria-invalid="!!errors.publicationYear"
+            />
+            <p v-if="errors.publicationYear" class="mt-1 text-sm text-red-700">
+              {{ errors.publicationYear }}
+            </p>
+          </div>
         </div>
         <div>
           <label for="book-description" class="text-sm font-medium">Deskripsi</label
@@ -239,7 +296,7 @@ const fieldClass =
             maxlength="20000"
             :class="fieldClass"
             placeholder="Jelaskan isi, manfaat, dan keunggulan buku."
-          ></textarea>
+          />
           <p class="mt-1 text-right text-xs text-stone-400">
             {{ form.description.length }} / 20.000
           </p>
@@ -275,6 +332,56 @@ const fieldClass =
           </p>
           <p v-if="file" class="mt-2 break-all text-xs text-emerald-800">
             {{ file.name }} · Siap diunggah saat disimpan
+          </p>
+        </div>
+        <div class="space-y-4 rounded-2xl border border-stone-200 bg-white p-6">
+          <h2 class="font-semibold">Materi privat</h2>
+          <div
+            v-for="item in [
+              {
+                kind: 'flyer',
+                label: 'Flyer',
+                accept: 'application/pdf',
+                help: 'PDF, maksimal 20 MB',
+              },
+              {
+                kind: 'dummy',
+                label: 'Dummy Buku',
+                accept: 'application/pdf',
+                help: 'PDF, maksimal 20 MB',
+              },
+              {
+                kind: 'product-knowledge',
+                label: 'Product Knowledge',
+                accept: 'application/pdf',
+                help: 'PDF, maksimal 50 MB',
+              },
+            ] as const"
+            :key="item.kind"
+          >
+            <label :for="`book-${item.kind}`" class="text-sm font-medium">{{ item.label }}</label>
+            <input
+              :id="`book-${item.kind}`"
+              type="file"
+              :accept="item.accept"
+              class="mt-2 block w-full text-xs text-stone-600 file:mr-2 file:rounded file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:text-emerald-800"
+              @change="selectMaterial(item.kind, $event)"
+            />
+            <p class="mt-1 text-xs text-stone-500">{{ item.help }}</p>
+            <p v-if="materialFiles[item.kind]" class="mt-1 break-all text-xs text-emerald-800">
+              {{ materialFiles[item.kind]?.name }} · Siap diunggah
+            </p>
+            <p
+              v-else-if="
+                book?.resources[item.kind === 'product-knowledge' ? 'productKnowledge' : item.kind]
+              "
+              class="mt-1 text-xs text-emerald-800"
+            >
+              Berkas sudah tersedia. Pilih berkas baru untuk mengganti.
+            </p>
+          </div>
+          <p class="text-xs leading-relaxed text-stone-500">
+            Materi disimpan privat dan tidak masuk bucket sampul publik.
           </p>
         </div>
         <div class="space-y-4 rounded-2xl border border-stone-200 bg-white p-6">

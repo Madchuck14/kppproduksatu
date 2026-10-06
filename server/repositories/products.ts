@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import { z } from 'zod'
+import { bookSubjectSchema } from '#shared/schemas/editor'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import type { Product, ProductList } from '#shared/types/product'
 import { demoProducts } from '../data/products'
@@ -17,10 +18,11 @@ const rowSchema = z.object({
   featured: z.boolean(),
   book_code: z.string().nullable(),
   education_level: educationLevelSchema.nullable(),
-  category: z.object({ name: z.string() }).nullable(),
+  subject: bookSubjectSchema.nullable(),
+  publication_year: z.number().int().nullable(),
 })
 const columns =
-  'id,slug,title,author,description,price,image_path,featured,book_code,education_level,category:categories(name)'
+  'id,slug,title,author,description,price,image_path,featured,book_code,education_level,subject,publication_year'
 
 function sourceFor(event: H3Event): ProductList['source'] {
   const source = useRuntimeConfig(event).catalogSource
@@ -42,7 +44,8 @@ function mapRow(event: H3Event, value: unknown): Product {
     featured: row.featured,
     bookCode: row.book_code,
     educationLevel: row.education_level,
-    category: row.category?.name ?? 'Lainnya',
+    subject: row.subject,
+    publicationYear: row.publication_year,
     imageUrl: getProductImageUrl(useRuntimeConfig(event).public.supabase.url, row.image_path),
   }
 }

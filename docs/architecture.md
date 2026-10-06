@@ -14,31 +14,38 @@ Katalog sekarang khusus buku sesuai PRD awal, namun penamaan entitas `products` 
 
 ## Beranda dan pencarian katalog
 
-Beranda menampilkan pencarian judul, buku pilihan dari flag `featured`, dan pengenalan jenjang SD,
-SMP, SMA, serta SMK. Buku pilihan belum memakai statistik akses. Kartu jenjang menuju filter katalog
-`/products?level=SD` dan seterusnya. Migration Editor menambahkan kode buku serta jenjang tanpa
-mengubah UUID atau referensi lama; kode buku menjadi business key unik, UUID tetap primary key.
+Beranda mengikuti desain Figma dengan hero Grow with English, logo Erlangga dan Phibeta,
+pencarian, empat buku terbaru dari API publik, dan enam kartu mata pelajaran. Sampul, judul,
+penulis, jenjang, dan harga berasal dari katalog; jumlah kartu mengikuti data yang tersedia.
+Daftar Supabase sudah diurutkan berdasarkan `created_at` terbaru. Mode demo memakai urutan fixture.
+Belum ada statistik popularitas atau wishlist. Aset desain disimpan lokal di `public/images/landing`,
+logo di `public/images/erlangga.png` dan `public/images/phibeta.png`.
 
-Pencarian beranda menuju `/products?q=...`. Halaman katalog membaca parameter `q` pada SSR dan
-menyinkronkan pencarian dan jenjang dengan URL, termasuk navigasi kembali/maju. API mencari judul,
-kode buku, atau penulis. Mode demo ditandai pada bagian buku pilihan beranda.
+Pencarian beranda membawa `q` dan filter jenjang SD/SMP/SMA/SMK ke URL `/products`.
+Pilihan mata pelajaran dan kartu pelajaran memakai pencarian teks yang sama, bukan kategori database.
+Jika judul dan mata pelajaran diisi bersamaan, keduanya digabung dalam frasa pencarian.
+Halaman katalog membaca parameter pada SSR dan menyinkronkannya dengan URL, termasuk navigasi
+kembali/maju. API mencari judul, kode buku, atau penulis. Mode demo ditandai pada bagian buku terbaru.
+Migration Editor menambahkan kode buku serta jenjang tanpa mengubah UUID atau referensi lama;
+kode buku menjadi business key unik, UUID tetap primary key.
 
 ## Detail buku dan tujuan login
 
 Halaman detail tetap publik dan memakai API SSR yang sama. Sampul, judul, harga, penulis,
-kategori, deskripsi, kode buku, dan jenjang tersedia. Buku lama dengan identitas kosong ditandai
-belum tersedia sampai dilengkapi Editor super. Product Knowledge, flyer, serta dummy ditampilkan sebagai konten
-yang memerlukan login, dengan keterangan bahwa berkas belum tersedia.
+deskripsi, kode buku, dan jenjang tersedia. Buku lama dengan identitas kosong ditandai
+belum tersedia sampai dilengkapi Editor super. Product Knowledge, flyer, serta dummy untuk buku
+published dapat dibuka publik tanpa login.
 
 Pengunjung anonim dapat membuka penjelasan akses lalu menuju login dengan parameter `returnTo`.
 Setelah login berhasil, tujuan dikembalikan ke halaman buku dan bagian konten yang dipilih.
 Tujuan divalidasi dengan schema yang hanya menerima route detail buku lokal dan anchor konten
 yang dikenal, serta `/products`. Login tanpa tujuan mengarahkan semua akun ke landing page `/`.
 Login dari registrasi tanpa tujuan buku kembali ke katalog publik `/products`.
-Indikator akun pada UI tidak memberikan otorisasi berkas. Belum ada endpoint unduhan atau berkas
-privat; implementasinya membutuhkan storage privat dan pemeriksaan `auth.getUser()` serta hak
-akses di server. Role Sales/Editor kini dibaca dari membership tepercaya, tetapi materi privat
-belum tersedia. CRUD katalog per jenjang tersedia pada dashboard Editor.
+Endpoint status dan unduhan materi bersifat publik untuk buku published. Endpoint membuat signed URL
+berumur 60 detik tanpa membuka bucket secara langsung. Dashboard Editor mengunggah flyer, Dummy
+Buku, dan Product Knowledge berformat PDF ke bucket privat `book-materials`. Endpoint upload tetap
+memeriksa session, scope jenjang, MIME, signature, dan ukuran.
+CRUD katalog per jenjang tersedia pada dashboard Editor.
 
 Halaman `/login` memakai formulir email/kata sandi dengan validasi Zod, tombol tampil/sembunyikan
 kata sandi, status pemrosesan, dan pesan kegagalan. Konfigurasi demo menonaktifkan formulir dan
@@ -84,6 +91,10 @@ Key admin hanya diperlukan untuk script provisioning lokal, bukan runtime aplika
 
 Query katalog berada di `server/repositories/products.ts`. Endpoint menerima input yang divalidasi Zod. Katalog memakai anonymous Supabase client dan selalu membatasi ke `published=true`; RLS juga menerapkan pembatasan ini. Hasil list saat ini dibatasi 60 produk; pagination adalah pekerjaan fase berikutnya.
 
+Katalog hanya menjual buku pendidikan. UI, API, dan form Editor tidak memakai kategori produk.
+Tabel `categories` serta `products.category_id` lama dipertahankan sementara untuk kompatibilitas
+schema dan rollback, tetapi tidak dibaca atau ditulis aplikasi.
+
 Session diverifikasi dengan `auth.getUser()` pada server. Endpoint lama `/api/admin/session`
 tetap memakai `requireAdmin`. Dashboard dan endpoint buku memakai `requireEditor` serta membership
 tepercaya dan scope, bukan metadata pengguna. RLS memeriksa jenjang asal dan tujuan perubahan.
@@ -94,9 +105,11 @@ filter jenjang/status, tambah/edit buku, publikasi, dan konfirmasi hapus dengan 
 Endpoint `/api/admin/books` memakai GET/POST; `/api/admin/books/:id` memakai GET/PUT/DELETE.
 `POST /api/admin/books/:id/image` menerima bytes gambar dengan Content-Type yang sesuai.
 Semua input metadata divalidasi Zod; duplicate kode atau slug mengembalikan 409.
-Kode disimpan kapital. Buku lama tetap memiliki kode/jenjang NULL sampai dilengkapi Editor super.
-Form menyimpan metadata sebelum sampul; jika unggahan gagal, UI memberi tahu bahwa metadata telah
-tersimpan dan dapat mengulang unggahan tanpa membuat buku duplikat.
+Kode buku baru hanya menerima 1–50 digit. Buku lama tetap memiliki kode/jenjang NULL sampai
+dilengkapi Editor super. Form menyimpan metadata, termasuk tahun publikasi opsional, sebelum sampul
+dan materi privat. Alamat halaman dibuat server-side dari judul dan tidak dapat diubah langsung.
+Judul diperiksa ke database tanpa membedakan kapital; unique index mengamankan request bersamaan.
+Jika unggahan gagal, UI dapat mengulang unggahan tanpa membuat buku duplikat.
 
 Image disimpan sebagai object path pada database, lalu URL dibuat lewat helper storage. Bucket hanya
 untuk gambar publik, termasuk sampul draf; jangan gunakan untuk dokumen pribadi. Upload dibatasi
@@ -104,6 +117,15 @@ untuk gambar publik, termasuk sampul draf; jangan gunakan untuk dokumen pribadi.
 Object baru memakai `books/{product UUID}/{random UUID}.{extension}`; RLS Storage memeriksa akses
 ke buku tersebut. Tidak ada overwrite object. File lama tidak otomatis dihapus saat sampul diganti
 atau buku dihapus; pembersihan aset tak terpakai dilakukan terpisah oleh pengelola.
+
+Flyer dan Dummy Buku dibatasi PDF 20 MB. Product Knowledge dibatasi PDF 50 MB. Flyer dan Product
+Knowledge dirender oleh PDF.js ke canvas dalam dialog aplikasi. Dummy Buku memakai PDF.js dan
+StPageFlip (`page-flip`) dalam popup flipbook: dua halaman pada layar lebar, satu halaman pada layar
+sempit, dengan sampul, swipe/drag, tombol navigasi, dan panah keyboard. PDF diambil sekali sebelum
+halaman disiapkan agar navigasi tidak bergantung pada masa berlaku signed URL. Penampil hanya
+dijalankan di browser dan tidak mengubah schema database. Object path disimpan pada produk dan
+tidak dikirim melalui API katalog publik. Penggantian materi memakai path unik baru; file lama tidak
+otomatis dihapus.
 
 ## Portabilitas
 
@@ -118,3 +140,22 @@ Client dapat mempertahankan managed Supabase atau menjalankan self-hosted Supaba
 - https://supabase.nuxtjs.org/
 - https://ui.nuxt.com/
 - https://supabase.com/docs/guides/self-hosting/docker
+
+## Kategori mata pelajaran
+
+Daftar kategori berasal dari `daftarmapel.md`, disalin secara eksplisit ke
+`shared/utils/book-subjects.ts`: SD 9, SMP 11, SMA 19 mata pelajaran. SMK belum memiliki daftar.
+Setiap buku menyimpan satu mata pelajaran opsional pada `products.subject`; buku lama tetap NULL.
+Form Editor menampilkan pilihan berdasarkan jenjang dan mengosongkan pilihan yang tidak cocok
+ketika jenjang berubah. Validasi server Zod dan CHECK database menolak mapel di luar jenjang.
+RLS published-only dan scope jenjang Editor tetap berlaku tanpa perubahan.
+Dashboard menampilkan kategori dan memfilter berdasarkan parameter URL `subject`.
+Detail publik menampilkan mata pelajaran atau “Belum ditentukan”.
+
+Migration `202610060005_book_subjects.sql` **belum dijalankan**. Terapkan pada sesi berikutnya
+sebelum menjalankan versi aplikasi ini dengan Supabase. Query katalog dan Editor membutuhkan
+kolom baru; database sebelum migration akan mengembalikan error, tanpa fallback ke demo.
+Urutan rollout: backup database, jalankan migration, verifikasi buku lama tetap ada dan subject NULL,
+lalu deploy aplikasi. Deploy aplikasi lama untuk rollback; biarkan kolom tambahan agar kategori yang
+sudah disimpan tetap utuh. Jangan drop kolom subject saat rollback aplikasi.
+Landing page masih menggunakan pencarian teks mata pelajaran; belum memakai filter subject database.

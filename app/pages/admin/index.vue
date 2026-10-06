@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { editorQuerySchema } from '#shared/schemas/editor'
+import { getSubjectsForLevel, type BookSubject } from '#shared/utils/book-subjects'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import type { EditorBook } from '#shared/types/editor'
 
@@ -12,11 +13,13 @@ const filters = computed(() => {
 })
 const search = ref(filters.value.q)
 const level = ref(filters.value.level ?? '')
+const subject = ref<BookSubject | ''>(filters.value.subject ?? '')
 const publication = ref(filters.value.status)
 watch(filters, (value) => {
   search.value = value.q
   level.value = value.level ?? ''
   publication.value = value.status
+  subject.value = value.subject ?? ''
 })
 const { data, error, status, refresh } = await useFetch('/api/admin/books', { query: filters })
 const levels = computed(() =>
@@ -24,6 +27,13 @@ const levels = computed(() =>
     ? educationLevelSchema.options
     : (data.value?.account.educationLevels ?? []),
 )
+const subjectOptions = computed(() => {
+  const selectedLevels = level.value ? [level.value] : levels.value
+  return [...new Set(selectedLevels.flatMap((item) => getSubjectsForLevel(item)))]
+})
+watch(level, () => {
+  if (!subjectOptions.value.some((item) => item === subject.value)) subject.value = ''
+})
 const totalPages = computed(() =>
   Math.max(1, Math.ceil((data.value?.total ?? 0) / (data.value?.pageSize ?? 12))),
 )
@@ -33,6 +43,7 @@ async function applyFilters(page = 1) {
     query: {
       ...(search.value.trim() ? { q: search.value.trim() } : {}),
       ...(level.value ? { level: level.value } : {}),
+      ...(subject.value ? { subject: subject.value } : {}),
       ...(publication.value !== 'all' ? { status: publication.value } : {}),
       ...(page > 1 ? { page } : {}),
     },
@@ -68,7 +79,7 @@ async function removeBook() {
   }
 }
 const fieldClass =
-  'w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm focus:outline-2 focus:outline-emerald-700'
+  'w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 caret-emerald-800 placeholder:text-stone-500 focus:outline-2 focus:outline-emerald-700'
 </script>
 
 <template>
@@ -153,7 +164,7 @@ const fieldClass =
         <div class="border-b border-stone-200 p-5 sm:p-6">
           <h2 class="text-xl font-semibold">Koleksi buku</h2>
           <form
-            class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_150px_170px_auto]"
+            class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_130px_240px_160px_auto]"
             @submit.prevent="applyFilters()"
           >
             <div>
@@ -174,6 +185,15 @@ const fieldClass =
               ><select id="editor-level" v-model="level" :class="fieldClass">
                 <option value="">Semua jenjang</option>
                 <option v-for="item in levels" :key="item" :value="item">{{ item }}</option>
+              </select>
+            </div>
+            <div>
+              <label for="editor-subject" class="mb-1.5 block text-xs font-medium text-stone-600"
+                >Mata pelajaran</label
+              >
+              <select id="editor-subject" v-model="subject" :class="fieldClass">
+                <option value="">Semua mata pelajaran</option>
+                <option v-for="item in subjectOptions" :key="item" :value="item">{{ item }}</option>
               </select>
             </div>
             <div>
@@ -200,6 +220,7 @@ const fieldClass =
               <tr>
                 <th scope="col" class="px-6 py-4">Buku</th>
                 <th scope="col" class="px-4 py-4">Jenjang</th>
+                <th scope="col" class="px-4 py-4">Mata pelajaran</th>
                 <th scope="col" class="px-4 py-4">Harga</th>
                 <th scope="col" class="px-4 py-4">Status</th>
                 <th scope="col" class="px-6 py-4 text-right">Tindakan</th>
@@ -231,6 +252,7 @@ const fieldClass =
                   </div>
                 </td>
                 <td class="px-4 py-5">{{ book.educationLevel || 'Belum diisi' }}</td>
+                <td class="px-4 py-5">{{ book.subject || 'Belum ditentukan' }}</td>
                 <td class="whitespace-nowrap px-4 py-5">{{ formatPrice(book.price) }}</td>
                 <td class="px-4 py-5">
                   <span
@@ -299,7 +321,8 @@ const fieldClass =
     <dialog
       ref="deleteDialog"
       aria-labelledby="delete-title"
-      class="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl backdrop:bg-stone-950/40"
+      aria-describedby="delete-instructions"
+      class="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-stone-200 bg-white p-6 text-stone-900 shadow-xl [color-scheme:light] backdrop:bg-stone-950/40"
       @cancel="deleting ? $event.preventDefault() : null"
       @close="deleteTarget = null"
     >
@@ -309,15 +332,40 @@ const fieldClass =
           Buku <strong>{{ deleteTarget?.title }}</strong> akan dihapus dari katalog. Tindakan ini
           tidak dapat dibatalkan.
         </p>
-        <label for="delete-confirm" class="mb-2 mt-5 block text-sm"
-          >Ketik judul buku untuk mengonfirmasi</label
+        <p id="delete-instructions" class="mt-5 text-sm leading-relaxed text-stone-700">
+          Untuk menghapus buku, ketik judul berikut dengan tepat. Huruf besar, huruf kecil, tanda
+          baca, dan spasi harus sama. Tombol Hapus buku aktif setelah judul cocok.
+        </p>
+        <p
+          class="mt-3 select-text break-words rounded-lg bg-stone-100 px-3 py-2 text-sm font-semibold text-stone-900"
+        >
+          {{ deleteTarget?.title }}
+        </p>
+        <label for="delete-confirm" class="mb-2 mt-4 block text-sm font-medium"
+          >Ketik judul buku di atas</label
         ><input
           id="delete-confirm"
           v-model="confirmation"
+          placeholder="Ketik judul buku dengan tepat"
+          aria-describedby="delete-instructions delete-match"
           autocomplete="off"
           :disabled="deleting"
           :class="fieldClass"
         />
+        <p
+          id="delete-match"
+          role="status"
+          class="mt-2 text-sm"
+          :class="confirmation === deleteTarget?.title ? 'text-emerald-800' : 'text-stone-600'"
+        >
+          {{
+            confirmation
+              ? confirmation === deleteTarget?.title
+                ? 'Judul cocok. Buku siap dihapus setelah Anda menekan Hapus buku.'
+                : 'Judul belum cocok. Periksa kembali penulisan judul.'
+              : 'Masukkan judul untuk mengaktifkan tombol Hapus buku.'
+          }}
+        </p>
         <p v-if="message" role="alert" class="mt-3 text-sm text-red-700">{{ message }}</p>
         <div class="mt-6 flex justify-end gap-3">
           <UButton

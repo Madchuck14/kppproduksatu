@@ -1,5 +1,23 @@
 # Repository guidance
 
+## Default response style: caveman
+
+For every prompt in this repository, use the `caveman` skill when available,
+without requiring the user to repeat `$caveman`. Otherwise, follow the rules below.
+
+- Respond in the user's language. Lead with the answer or outcome.
+- Keep responses concise and clear; omit greetings, filler, and repeated recaps.
+- Preserve technical facts, exact commands, paths, errors, numbers, and negations.
+- Keep progress updates brief. Report verification results and limitations honestly.
+- Use full explanations when needed for safety, destructive actions, or clarity.
+- Do not compress code, documentation, or other persisted artifacts into caveman prose.
+- If the user says `stop caveman` or `normal mode`, use normal prose for the rest
+  of that conversation unless they enable caveman again. New conversations default
+  to caveman. Explicit user requests for detail take precedence over brevity.
+
+This is a response-style preference only. Do not configure Caveman Cloud, proxy
+LLM requests, add dependencies, or change application behavior for this preference.
+
 ## Project context
 
 KPP Produk Satu is an Erlangga product katalogs. It uses

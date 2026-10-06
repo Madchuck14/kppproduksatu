@@ -4,20 +4,22 @@ type BookRow = {
   id: string
   book_code: string | null
   education_level: 'SD' | 'SMP' | 'SMA' | 'SMK' | null
+  subject: string | null
   title: string
   slug: string
   author: string
   description: string
   price: number
-  category_id: string | null
   featured: boolean
   published: boolean
   image_path: string | null
+  publication_year: number | null
+  flyer_path: string | null
+  dummy_book_path: string | null
+  product_knowledge_path: string | null
   created_at: string
   updated_at: string
 }
-
-type CategoryRow = { id: string; name: string; slug: string; created_at: string }
 
 export type EditorDatabase = {
   public: {
@@ -26,12 +28,6 @@ export type EditorDatabase = {
         Row: BookRow
         Insert: Partial<BookRow> & Pick<BookRow, 'title' | 'slug'>
         Update: Partial<BookRow>
-        Relationships: []
-      }
-      categories: {
-        Row: CategoryRow
-        Insert: Partial<CategoryRow> & Pick<CategoryRow, 'name' | 'slug'>
-        Update: Partial<CategoryRow>
         Relationships: []
       }
     }
