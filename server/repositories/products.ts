@@ -2,6 +2,7 @@ import type { H3Event } from 'h3'
 import { z } from 'zod'
 import { bookSubjectSchema } from '#shared/schemas/editor'
 import { educationLevelSchema } from '#shared/schemas/auth'
+import { landingSubjects } from '#shared/utils/landing-subjects'
 import type { Product, ProductList } from '#shared/types/product'
 import { demoProducts } from '../data/products'
 import { getCatalogClient } from '../utils/catalog-client'
@@ -21,7 +22,7 @@ const rowSchema = z.object({
   subject: bookSubjectSchema.nullable(),
   publication_year: z.number().int().nullable(),
 })
-const columns =
+export const productColumns =
   'id,slug,title,author,description,price,image_path,featured,book_code,education_level,subject,publication_year'
 
 function sourceFor(event: H3Event): ProductList['source'] {
@@ -32,7 +33,7 @@ function sourceFor(event: H3Event): ProductList['source'] {
   return source
 }
 
-function mapRow(event: H3Event, value: unknown): Product {
+export function mapProductRow(event: H3Event, value: unknown): Product {
   const row = rowSchema.parse(value)
   return {
     id: row.id,
@@ -52,7 +53,7 @@ function mapRow(event: H3Event, value: unknown): Product {
 
 export async function listProducts(
   event: H3Event,
-  options: { q: string; featured?: string; level?: string },
+  options: { q: string; featured?: string; level?: string; subject?: string },
 ): Promise<ProductList> {
   const source = sourceFor(event)
   // Strip PostgREST filter punctuation; never interpolate raw query input.
@@ -65,7 +66,8 @@ export async function listProducts(
         (product) =>
           (featured === undefined || product.featured === featured) &&
           (!options.level || product.educationLevel === options.level) &&
-          `${product.title} ${product.author} ${product.bookCode ?? ''}`
+          (!options.subject || product.subject === options.subject) &&
+          `${product.title} ${product.author} ${product.bookCode ?? ''} ${product.subject ?? ''}`
             .toLocaleLowerCase('id-ID')
             .includes(search.toLocaleLowerCase('id-ID')),
       ),
@@ -73,17 +75,20 @@ export async function listProducts(
   }
   let query = getCatalogClient(event)
     .from('products')
-    .select(columns)
+    .select(productColumns)
     .eq('published', true)
     .order('created_at', { ascending: false })
     .limit(60)
   if (featured !== undefined) query = query.eq('featured', featured)
   if (options.level) query = query.eq('education_level', options.level)
+  if (options.subject) query = query.eq('subject', options.subject)
   if (search)
-    query = query.or(`title.ilike.%${search}%,author.ilike.%${search}%,book_code.ilike.%${search}%`)
+    query = query.or(
+      `title.ilike.%${search}%,author.ilike.%${search}%,book_code.ilike.%${search}%,subject.ilike.%${search}%`,
+    )
   const { data, error } = await query
   if (error) throw createError({ statusCode: 503, statusMessage: 'Katalog tidak tersedia' })
-  return { source, products: (data ?? []).map((row) => mapRow(event, row)) }
+  return { source, products: (data ?? []).map((row) => mapProductRow(event, row)) }
 }
 
 export async function getProduct(event: H3Event, slug: string): Promise<Product> {
@@ -94,11 +99,34 @@ export async function getProduct(event: H3Event, slug: string): Promise<Product>
   }
   const { data, error } = await getCatalogClient(event)
     .from('products')
-    .select(columns)
+    .select(productColumns)
     .eq('published', true)
     .eq('slug', slug)
     .maybeSingle()
   if (error) throw createError({ statusCode: 503, statusMessage: 'Katalog tidak tersedia' })
   if (!data) throw createError({ statusCode: 404, statusMessage: 'Produk tidak ditemukan' })
-  return mapRow(event, data)
+  return mapProductRow(event, data)
+}
+
+// Count the same search results used by category links, without the list's 60-row cap.
+export async function getLandingSubjectCounts(event: H3Event) {
+  const source = sourceFor(event)
+  const entries = await Promise.all(
+    landingSubjects.map(async ({ name }) => {
+      if (source === 'demo') {
+        const result = await listProducts(event, { q: name })
+        return [name, result.products.length] as const
+      }
+      const { count, error } = await getCatalogClient(event)
+        .from('products')
+        .select('id', { count: 'exact', head: true })
+        .eq('published', true)
+        .or(
+          `title.ilike.%${name}%,author.ilike.%${name}%,book_code.ilike.%${name}%,subject.ilike.%${name}%`,
+        )
+      if (error) throw createError({ statusCode: 503, statusMessage: 'Jumlah buku belum tersedia' })
+      return [name, count ?? 0] as const
+    }),
+  )
+  return Object.fromEntries(entries)
 }

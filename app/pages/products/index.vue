@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { educationLevelSchema } from '#shared/schemas/auth'
+import { bookSubjectSchema } from '#shared/schemas/editor'
+import { getSubjectsForLevel, subjectsByLevel, type BookSubject } from '#shared/utils/book-subjects'
 const config = useRuntimeConfig()
 useSeoMeta({
   title: `Katalog | ${config.public.siteName}`,
@@ -15,6 +17,24 @@ const appliedLevel = computed(() => {
   return parsed.success ? parsed.data : ''
 })
 const level = ref(appliedLevel.value)
+const appliedSubject = computed<BookSubject | ''>(() => {
+  const parsed = bookSubjectSchema.safeParse(route.query.subject)
+  return parsed.success ? parsed.data : ''
+})
+const subject = ref<BookSubject | ''>(appliedSubject.value)
+const subjectSearch = ref('')
+const subjectOpen = ref(false)
+const subjectOptions = computed(() =>
+  level.value
+    ? getSubjectsForLevel(level.value)
+    : [...new Set(Object.values(subjectsByLevel).flat())],
+)
+watch(level, () => {
+  if (!subjectOptions.value.some((item) => item === subject.value)) subject.value = ''
+})
+watch(appliedSubject, (value) => {
+  subject.value = value
+})
 watch(appliedLevel, (value) => {
   level.value = value
 })
@@ -25,11 +45,19 @@ async function searchCatalog() {
   const q = search.value.trim()
   await navigateTo({
     path: '/products',
-    query: { ...(q ? { q } : {}), ...(level.value ? { level: level.value } : {}) },
+    query: {
+      ...(q ? { q } : {}),
+      ...(level.value ? { level: level.value } : {}),
+      ...(subject.value ? { subject: subject.value } : {}),
+    },
   })
 }
 const { data, error, status } = await useFetch('/api/products', {
-  query: computed(() => ({ q: appliedSearch.value, level: appliedLevel.value || undefined })),
+  query: computed(() => ({
+    q: appliedSearch.value,
+    level: appliedLevel.value || undefined,
+    subject: appliedSubject.value || undefined,
+  })),
 })
 </script>
 
@@ -58,6 +86,26 @@ const { data, error, status } = await useFetch('/api/products', {
           {{ item }}
         </option>
       </select>
+      <label for="catalog-subject" class="sr-only">Mata pelajaran</label>
+      <UInputMenu
+        id="catalog-subject"
+        v-model:search-term="subjectSearch"
+        :model-value="subject || undefined"
+        :open="subjectOpen && !!subjectSearch.trim()"
+        :items="[...subjectOptions]"
+        placeholder="Ketik mata pelajaran..."
+        :trailing="false"
+        :open-on-focus="false"
+        :open-on-click="false"
+        :reset-model-value-on-clear="true"
+        size="xl"
+        class="w-full min-w-0 sm:w-72"
+        :ui="{ base: 'min-h-12', content: 'w-80 max-w-[calc(100vw-2rem)]' }"
+        @update:model-value="subject = $event ?? ''"
+        @update:open="subjectOpen = $event"
+      >
+        <template #empty>Tidak ada mapel yang cocok.</template>
+      </UInputMenu>
       <UButton type="submit" :loading="status === 'pending'">Cari</UButton>
     </form>
     <p v-if="error" role="alert" class="text-red-700">

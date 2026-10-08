@@ -29,6 +29,10 @@ export default defineNuxtConfig({
     },
   },
   routeRules: {
+    '/': { headers: { 'Cache-Control': 'no-store' } },
+    '/products': { headers: { 'Cache-Control': 'no-store' } },
+    '/products/**': { headers: { 'Cache-Control': 'no-store' } },
+    '/favorites': { headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } },
     '/admin/**': { headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } },
     '/login': { headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } },
     '/register': { headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } },

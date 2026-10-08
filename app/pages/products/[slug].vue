@@ -195,6 +195,7 @@ useSeoMeta({
           <dd class="font-medium">{{ product.publicationYear || 'Belum tersedia' }}</dd>
         </dl>
         <div class="mt-8 flex flex-wrap gap-3">
+          <FavoriteButton :product="product" />
           <NuxtLink
             to="/products"
             class="inline-flex items-center justify-center rounded-lg bg-emerald-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-emerald-800"

@@ -15,17 +15,32 @@ Katalog sekarang khusus buku sesuai PRD awal, namun penamaan entitas `products` 
 ## Beranda dan pencarian katalog
 
 Beranda mengikuti desain Figma dengan hero Grow with English, logo Erlangga dan Phibeta,
-pencarian, empat buku terbaru dari API publik, dan enam kartu mata pelajaran. Sampul, judul,
-penulis, jenjang, dan harga berasal dari katalog; jumlah kartu mengikuti data yang tersedia.
+pencarian, maksimal empat buku terbaru dari API publik, dan enam kartu mata pelajaran.
+Layout desktop mengacu node Figma `39:21` pada ukuran 1440 px: hero 1344×420 px, rak buku
+1280 px, dan grid kategori tiga kolom. Variable font Lora dan Inter berformat WOFF2 Latin
+disimpan lokal di `public/fonts` dengan lisensi OFL; font landing tidak mengubah tipografi
+halaman lainnya. Aset hero, logo, dan ikon berasal dari Figma dan disimpan lokal. Layout
+beradaptasi untuk tablet dan mobile.
+Sampul, judul, penulis, serta jenjang berasal dari katalog; jumlah kartu mengikuti data yang tersedia.
+Judul panjang dipotong satu baris pada rak landing; judul lengkap tersedia pada tautan dan detail.
+Harga tetap tersedia di katalog dan detail. Tombol favorit landing berbentuk ikon 28 px di sudut
+sampul; navigasi menyediakan ikon favorit beserta jumlah buku milik akun aktif.
 Daftar Supabase sudah diurutkan berdasarkan `created_at` terbaru. Mode demo memakai urutan fixture.
-Belum ada statistik popularitas atau wishlist. Aset desain disimpan lokal di `public/images/landing`,
+Belum ada statistik popularitas. Favorit pribadi dijelaskan di bagian Favorit buku.
+Aset desain disimpan lokal di `public/images/landing`,
 logo di `public/images/erlangga.png` dan `public/images/phibeta.png`.
 
 Pencarian beranda membawa `q` dan filter jenjang SD/SMP/SMA/SMK ke URL `/products`.
-Pilihan mata pelajaran dan kartu pelajaran memakai pencarian teks yang sama, bukan kategori database.
-Jika judul dan mata pelajaran diisi bersamaan, keduanya digabung dalam frasa pencarian.
+Pilihan mata pelajaran memakai filter `subject` yang terpisah dari teks pencarian `q`;
+judul dan mapel dapat difilter bersamaan. Kartu kategori memakai pencarian teks.
 Halaman katalog membaca parameter pada SSR dan menyinkronkannya dengan URL, termasuk navigasi
-kembali/maju. API mencari judul, kode buku, atau penulis. Mode demo ditandai pada bagian buku terbaru.
+kembali/maju. API mencari judul, kode buku, penulis, atau mata pelajaran. Mode demo ditandai pada bagian buku terbaru.
+`GET /api/catalog/subject-counts` mengembalikan jumlah buku published untuk enam pencarian kategori
+landing. Query count tidak dibatasi 60 row sehingga jumlah tetap sesuai dengan pencarian kategori
+pada katalog. Angka contoh desain tidak dipakai sebagai data produksi. Bila count gagal, caption
+menampilkan “Jelajahi buku”; error katalog tetap ditampilkan dan tidak diganti fixture.
+Footer landing mengarahkan tautan informasi penerbit ke situs eksternal; tidak menambahkan halaman
+Blog atau Tentang pada aplikasi ini. “Kategori Populer” mengikuti judul desain, bukan statistik akses.
 Migration Editor menambahkan kode buku serta jenjang tanpa mengubah UUID atau referensi lama;
 kode buku menjadi business key unik, UUID tetap primary key.
 
@@ -39,7 +54,7 @@ published dapat dibuka publik tanpa login.
 Pengunjung anonim dapat membuka penjelasan akses lalu menuju login dengan parameter `returnTo`.
 Setelah login berhasil, tujuan dikembalikan ke halaman buku dan bagian konten yang dipilih.
 Tujuan divalidasi dengan schema yang hanya menerima route detail buku lokal dan anchor konten
-yang dikenal, serta `/products`. Login tanpa tujuan mengarahkan semua akun ke landing page `/`.
+yang dikenal, serta `/products` dan `/favorites`. Login tanpa tujuan mengarahkan semua akun ke landing page `/`.
 Login dari registrasi tanpa tujuan buku kembali ke katalog publik `/products`.
 Endpoint status dan unduhan materi bersifat publik untuk buku published. Endpoint membuat signed URL
 berumur 60 detik tanpa membuka bucket secara langsung. Dashboard Editor mengunggah flyer, Dummy
@@ -144,7 +159,7 @@ Client dapat mempertahankan managed Supabase atau menjalankan self-hosted Supaba
 ## Kategori mata pelajaran
 
 Daftar kategori berasal dari `daftarmapel.md`, disalin secara eksplisit ke
-`shared/utils/book-subjects.ts`: SD 9, SMP 11, SMA 19 mata pelajaran. SMK belum memiliki daftar.
+`shared/utils/book-subjects.ts`: SD 9, SMP 11, SMA 19 mata pelajaran. SMK memakai 19 mata pelajaran yang sama dengan SMA.
 Setiap buku menyimpan satu mata pelajaran opsional pada `products.subject`; buku lama tetap NULL.
 Form Editor menampilkan pilihan berdasarkan jenjang dan mengosongkan pilihan yang tidak cocok
 ketika jenjang berubah. Validasi server Zod dan CHECK database menolak mapel di luar jenjang.
@@ -158,4 +173,46 @@ kolom baru; database sebelum migration akan mengembalikan error, tanpa fallback 
 Urutan rollout: backup database, jalankan migration, verifikasi buku lama tetap ada dan subject NULL,
 lalu deploy aplikasi. Deploy aplikasi lama untuk rollback; biarkan kolom tambahan agar kategori yang
 sudah disimpan tetap utuh. Jangan drop kolom subject saat rollback aplikasi.
-Landing page masih menggunakan pencarian teks mata pelajaran; belum memakai filter subject database.
+Input autocomplete mata pelajaran pada pencarian landing dan katalog memakai daftar lengkap
+sesuai jenjang. Tidak ada tombol dropdown; saran hanya muncul setelah mengetik, bukan saat input
+diklik atau mendapat fokus. Mengetik menyaring saran dan pemilihan memakai nama mapel terdaftar.
+Mengosongkan input mengembalikan pencarian ke semua mapel. Pilihan dapat dipilih dengan keyboard.
+Tanpa jenjang,
+semua nama unik ditampilkan. Pilihan yang tidak cocok dihapus ketika jenjang berubah. Filter mapel
+dikirim sebagai parameter `subject` dan dicocokkan persis dengan `products.subject`, terpisah dari `q`.
+Enam kartu kategori landing tetap memakai pencarian teks seperti desain.
+
+Terapkan migration `202610070002_smk_subjects.sql` setelah migration mapel awal dan sebelum
+memakai mapel SMK. Migration memperluas CHECK agar SMK menerima daftar SMA, tanpa mengubah
+data atau RLS. Migration ini belum dijalankan pada database live dalam tugas ini.
+Rollback aplikasi dapat memakai versi sebelumnya; biarkan CHECK yang diperluas dan kolom subject
+agar mapel SMK yang sudah disimpan tidak hilang. Jangan mengembalikan CHECK lama sebelum
+memastikan tidak ada buku SMK dengan subject terisi.
+
+## Favorit buku
+
+Semua user terautentikasi dapat menyimpan favorit, termasuk Sales, Editor, dan akun tanpa
+membership. Favorit tidak memberikan hak Editor. Pengunjung anonim mendapat penjelasan login
+dan tautan kembali ke detail buku atau `/favorites`; penyimpanan dilakukan setelah pengguna
+memilih Favorit saat sudah login. Mode demo tidak menyimpan favorit.
+
+`product_favorites` menyimpan pasangan UUID user/produk unik beserta waktu penyimpanan. UUID
+produk tetap primary key; kode buku tetap business key unik dan dapat dicari. FK menghapus favorit
+ketika user atau buku dihapus. RLS hanya mengizinkan membaca, menambah, dan menghapus favorit
+sendiri; insert memerlukan buku published. Tidak ada izin UPDATE untuk authenticated.
+
+`GET /api/favorites` menerima `q`, `level`, dan `page`, mengembalikan `ownerId`, `products`,
+`total`, `page`, dan `pageSize` (24). Hasil diurutkan dari favorit terbaru. Pencarian mencakup judul,
+kode buku, dan penulis. `GET /api/favorites/ids` memuat UUID favorit published untuk status tombol,
+dengan pembacaan bertahap agar batas response Supabase tidak memotong status buku lama.
+`PUT /api/favorites/:id` dan `DELETE /api/favorites/:id` bersifat idempotent. Server memperoleh
+identitas pemilik melalui `auth.getUser()`, tanpa menerima user ID dari klien. Query berada di
+`server/repositories/favorites.ts` dan memakai sesi user/public key; key admin tidak dipakai runtime.
+
+Daftar dan status tombol selalu membatasi produk ke published, termasuk untuk Editor yang dapat
+membaca draft melalui RLS produk. Favorit buku yang di-unpublish disembunyikan dan muncul kembali
+saat republish; favoritnya tetap tersimpan. State browser diikat ke UUID akun, sehingga logout atau
+pergantian akun tidak menampilkan koleksi akun sebelumnya. Halaman katalog dan favorit memakai
+`Cache-Control: no-store` karena SSR/payload berisi status favorit pribadi.
+
+Deployment memerlukan migration `202610070001_product_favorites.sql`; lihat panduan Supabase.

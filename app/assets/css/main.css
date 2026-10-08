@@ -1,6 +1,26 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
 
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/lora-latin.woff2') format('woff2');
+}
+
+:root {
+  --font-landing-sans: 'Inter', Arial, sans-serif;
+  --font-landing-serif: 'Lora', Georgia, serif;
+}
+
 @theme {
   --font-sans: 'Segoe UI', Arial, sans-serif;
 }

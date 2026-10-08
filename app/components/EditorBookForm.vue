@@ -238,11 +238,9 @@ const fieldClass =
           </select>
           <p id="book-subject-help" class="mt-1.5 text-xs text-stone-500">
             {{
-              form.educationLevel === 'SMK'
-                ? 'Daftar mata pelajaran SMK belum tersedia.'
-                : !form.educationLevel
-                  ? 'Pilih jenjang untuk menampilkan mata pelajaran.'
-                  : 'Kategori mengikuti daftar mata pelajaran untuk jenjang yang dipilih.'
+              !form.educationLevel
+                ? 'Pilih jenjang untuk menampilkan mata pelajaran.'
+                : 'Kategori mengikuti daftar mata pelajaran untuk jenjang yang dipilih.'
             }}
           </p>
           <p v-if="errors.subject" class="mt-1 text-sm text-red-700">{{ errors.subject }}</p>

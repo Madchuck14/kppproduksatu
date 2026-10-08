@@ -37,7 +37,12 @@ Docker, dan pemeriksaan interaksi browser belum diverifikasi untuk dashboard ini
 - Endpoint `/healthz` untuk liveness aplikasi (bukan pemeriksaan database).
 - Konfigurasi Cloudflare Workers, Dockerfile, dan Compose untuk aplikasi Node.
 
-Pagination tersedia pada dashboard Editor. Cart, checkout, Midtrans, wishlist, blog, banner CMS,
+Favorit pribadi tersedia untuk semua akun yang sudah login, termasuk Sales dan Editor: tombol
+di kartu/detail buku serta halaman `/favorites` dengan pencarian, filter jenjang, dan pagination.
+Terapkan migration `202610070001_product_favorites.sql` sebelum memakai favorit dengan Supabase.
+Pengunjung anonim diarahkan login; mode demo tidak menyimpan favorit.
+
+Pagination tersedia pada dashboard Editor. Cart, checkout, Midtrans, blog, banner CMS,
 pagination katalog publik, sitemap, dan structured data belum diimplementasikan.
 Dashboard Editor sudah memiliki unggahan privat Product Knowledge, flyer, dan Dummy Buku. Migration
 `202610060001_book_publication_materials.sql` harus diterapkan sebelum fitur dipakai. Materi buku

@@ -7,84 +7,109 @@ withDefaults(defineProps<{ product: Product; variant?: 'default' | 'landing' }>(
 </script>
 
 <template>
-  <NuxtLink
-    :to="`/products/${product.slug}`"
-    :class="{ 'landing-book': variant === 'landing' }"
-    class="group block rounded-xl border border-stone-200 bg-white p-5 transition hover:border-emerald-700 focus-visible:outline-2 focus-visible:outline-emerald-700"
-  >
-    <div class="mb-5 flex aspect-[4/3] items-center justify-center rounded-lg bg-stone-100">
-      <img
-        :src="product.imageUrl"
-        :alt="product.title"
-        width="200"
-        height="240"
-        loading="lazy"
-        class="h-48 max-w-full object-contain transition group-hover:-translate-y-1"
-      />
+  <article v-if="variant === 'landing'" class="landing-book">
+    <div class="cover-display">
+      <NuxtLink :to="`/products/${product.slug}`" class="cover-link" :aria-label="product.title">
+        <img :src="product.imageUrl" :alt="product.title" width="166" height="244" loading="lazy" />
+      </NuxtLink>
+      <FavoriteButton :product="product" icon-only />
     </div>
-    <p v-if="variant === 'landing'" class="book-level">
-      {{ product.educationLevel || 'Buku Erlangga' }}
-    </p>
-    <h2 class="text-lg font-semibold">{{ product.title }}</h2>
-    <p class="mt-1 text-sm text-stone-500">{{ product.author }}</p>
-    <p class="mt-4 font-semibold">{{ formatPrice(product.price) }}</p>
-  </NuxtLink>
+    <div class="book-details">
+      <p class="book-level">{{ product.educationLevel || 'Buku Erlangga' }}</p>
+      <NuxtLink :to="`/products/${product.slug}`" :title="product.title"
+        ><h2>{{ product.title }}</h2></NuxtLink
+      >
+      <p class="book-author">{{ product.author }}</p>
+    </div>
+  </article>
+  <article v-else>
+    <NuxtLink
+      :to="`/products/${product.slug}`"
+      class="group block rounded-xl border border-stone-200 bg-white p-5 transition hover:border-emerald-700 focus-visible:outline-2 focus-visible:outline-emerald-700"
+    >
+      <div class="mb-5 flex aspect-[4/3] items-center justify-center rounded-lg bg-stone-100">
+        <img
+          :src="product.imageUrl"
+          :alt="product.title"
+          width="200"
+          height="240"
+          loading="lazy"
+          class="h-48 max-w-full object-contain transition group-hover:-translate-y-1"
+        />
+      </div>
+      <h2 class="text-lg font-semibold">{{ product.title }}</h2>
+      <p class="mt-1 text-sm text-stone-500">{{ product.author }}</p>
+      <p class="mt-4 font-semibold">{{ formatPrice(product.price) }}</p>
+    </NuxtLink>
+    <FavoriteButton :product="product" class="mt-3" />
+  </article>
 </template>
 
 <style scoped>
 .landing-book {
-  border: 0;
-  border-radius: 0;
-  padding: 0;
-  background: transparent;
+  min-width: 0;
+  color: #242b26;
+  font-family: var(--font-landing-sans);
 }
-.landing-book > div {
+.cover-display {
+  position: relative;
+  display: flex;
   height: 302px;
-  aspect-ratio: auto;
-  border-radius: 0;
+  align-items: center;
+  justify-content: center;
   background: #f6f5f0;
-  margin-bottom: 16px;
-  padding: 28px;
 }
-.landing-book img {
+.cover-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cover-link img {
+  width: 166px;
   height: 244px;
-  width: auto;
   max-width: 100%;
   object-fit: contain;
   filter: drop-shadow(5px 8px 7px #242b261c);
 }
-.landing-book h2 {
-  font:
-    21px/1.3 Georgia,
-    'Times New Roman',
-    serif;
-  color: #242b26;
+.cover-link:focus-visible,
+.book-details a:focus-visible {
+  outline: 2px solid #2f6b4f;
+  outline-offset: 4px;
 }
-.landing-book .book-level {
+.book-details {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+}
+.book-level {
   font-size: 9px;
+  line-height: 11px;
   text-transform: uppercase;
   color: #687169;
-  margin-bottom: 7px;
 }
-.landing-book h2 + p {
+.book-details h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 21px/27px var(--font-landing-serif);
+}
+.book-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
+  line-height: 14px;
   color: #687169;
-  margin-top: 7px;
-}
-.landing-book > p:last-child {
-  font-size: 13px;
-  margin-top: 8px;
-  color: #344e41;
 }
 @media (max-width: 700px) {
-  .landing-book > div {
+  .cover-display {
     height: 220px;
-    padding: 20px;
   }
-  .landing-book img {
+  .cover-link img {
+    width: 123px;
     height: 180px;
   }
-  .landing-book h2 {
+  .book-details h2 {
     font-size: 18px;
   }
 }

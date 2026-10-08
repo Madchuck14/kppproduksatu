@@ -143,7 +143,7 @@ Referensi: https://supabase.com/pricing dan https://supabase.com/docs/guides/dat
 ## Kategori mata pelajaran
 
 Daftar kategori berasal dari `daftarmapel.md`, disalin secara eksplisit ke
-`shared/utils/book-subjects.ts`: SD 9, SMP 11, SMA 19 mata pelajaran. SMK belum memiliki daftar.
+`shared/utils/book-subjects.ts`: SD 9, SMP 11, SMA 19 mata pelajaran. SMK memakai 19 mata pelajaran yang sama dengan SMA.
 Setiap buku menyimpan satu mata pelajaran opsional pada `products.subject`; buku lama tetap NULL.
 Form Editor menampilkan pilihan berdasarkan jenjang dan mengosongkan pilihan yang tidak cocok
 ketika jenjang berubah. Validasi server Zod dan CHECK database menolak mapel di luar jenjang.
@@ -157,4 +157,43 @@ kolom baru; database sebelum migration akan mengembalikan error, tanpa fallback 
 Urutan rollout: backup database, jalankan migration, verifikasi buku lama tetap ada dan subject NULL,
 lalu deploy aplikasi. Deploy aplikasi lama untuk rollback; biarkan kolom tambahan agar kategori yang
 sudah disimpan tetap utuh. Jangan drop kolom subject saat rollback aplikasi.
-Landing page masih menggunakan pencarian teks mata pelajaran; belum memakai filter subject database.
+Input autocomplete mata pelajaran pada pencarian landing dan katalog memakai daftar lengkap
+sesuai jenjang. Tidak ada tombol dropdown; saran hanya muncul setelah mengetik, bukan saat input
+diklik atau mendapat fokus. Mengetik menyaring saran dan pemilihan memakai nama mapel terdaftar.
+Mengosongkan input mengembalikan pencarian ke semua mapel. Pilihan dapat dipilih dengan keyboard.
+Tanpa jenjang,
+semua nama unik ditampilkan. Pilihan yang tidak cocok dihapus ketika jenjang berubah. Filter mapel
+dikirim sebagai parameter `subject` dan dicocokkan persis dengan `products.subject`, terpisah dari `q`.
+Enam kartu kategori landing tetap memakai pencarian teks seperti desain.
+
+Terapkan migration `202610070002_smk_subjects.sql` setelah migration mapel awal dan sebelum
+memakai mapel SMK. Migration memperluas CHECK agar SMK menerima daftar SMA, tanpa mengubah
+data atau RLS. Migration ini belum dijalankan pada database live dalam tugas ini.
+Rollback aplikasi dapat memakai versi sebelumnya; biarkan CHECK yang diperluas dan kolom subject
+agar mapel SMK yang sudah disimpan tidak hilang. Jangan mengembalikan CHECK lama sebelum
+memastikan tidak ada buku SMK dengan subject terisi.
+
+## Favorit per akun
+
+Jalankan `supabase/migrations/202610070001_product_favorites.sql` pada project tujuan sebelum
+menjalankan aplikasi yang memakai favorit. Migration dibungkus transaksi dan menambahkan tabel,
+index, FK cascade, grant, serta RLS pemilik tanpa mengubah produk atau membership lama. Jalankan
+migration satu kali melalui mekanisme migration yang mencatat versinya; bila transaksi gagal,
+perbaiki penyebab lalu jalankan ulang. Jangan membuat tabel melalui dashboard tanpa kebijakan RLS.
+
+Semua user Auth dapat memakai favorit, termasuk Sales dan Editor. User tidak dapat menulis
+favorit akun lain, memfavoritkan draft, atau mengubah pemilik/produk pada row favorit. Runtime
+menggunakan public key dengan sesi user. Tidak ada kebutuhan secret key untuk fitur favorit.
+
+Urutan rollout: backup, terapkan migration pada project tujuan, verifikasi RLS/API, lalu deploy
+aplikasi. Rollback dengan deploy aplikasi sebelumnya dan biarkan tabel favorit beserta datanya.
+Jangan drop tabel untuk rollback tampilan. UUID dan referensi produk lama tetap utuh.
+
+Jalankan `node scripts/verify-favorites.mjs` dengan server lokal di port 3000 memakai Supabase
+dan `.env` lokal yang memiliki public URL/key serta `SUPABASE_SECRET_KEY` untuk pengujian.
+Gunakan project pengujian: script membuat tiga user dan tiga buku sementara, lalu membersihkannya
+di `finally`. Variabel `FAVORITES_TEST_BASE_URL` dapat mengganti URL server bila diperlukan.
+Script menguji Sales/Editor/user tanpa membership, idempotensi, pencarian kode/filter/pagination,
+SSR, akses anonim, pembatasan draft, isolasi akun melalui API dan RLS langsung, serta FK cascade.
+Script berhenti sebelum membuat data bila tabel favorit belum tersedia atau katalog bukan Supabase.
+Verifikasi browser tetap diperlukan untuk interaksi tombol, login, pergantian akun, dan layout mobile.

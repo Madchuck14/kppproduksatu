@@ -1,7 +1,28 @@
 import type { z } from 'zod'
 import type { educationLevelSchema } from '../schemas/auth'
 
-// Canonical subject names from daftarmapel.md. SMK has no supplied list yet.
+// Canonical subject names from daftarmapel.md. SMK uses the SMA list.
+const upperSecondarySubjects = [
+  'Pendidikan Agama dan Budi Pekerti',
+  'Pendidikan Pancasila',
+  'Bahasa Indonesia',
+  'Matematika',
+  'Bahasa Inggris',
+  'Sejarah',
+  'Seni dan Budaya',
+  'Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)',
+  'Informatika',
+  'Biologi',
+  'Fisika',
+  'Kimia',
+  'Matematika Lanjutan',
+  'Ekonomi',
+  'Sosiologi',
+  'Geografi',
+  'Antropologi',
+  'Bahasa dan Sastra Indonesia',
+  'Bahasa dan Sastra Inggris',
+] as const
 export const subjectsByLevel = {
   SD: [
     'Pendidikan Agama dan Budi Pekerti',
@@ -27,28 +48,8 @@ export const subjectsByLevel = {
     'Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)',
     'Muatan Lokal (Bahasa Daerah)',
   ],
-  SMA: [
-    'Pendidikan Agama dan Budi Pekerti',
-    'Pendidikan Pancasila',
-    'Bahasa Indonesia',
-    'Matematika',
-    'Bahasa Inggris',
-    'Sejarah',
-    'Seni dan Budaya',
-    'Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)',
-    'Informatika',
-    'Biologi',
-    'Fisika',
-    'Kimia',
-    'Matematika Lanjutan',
-    'Ekonomi',
-    'Sosiologi',
-    'Geografi',
-    'Antropologi',
-    'Bahasa dan Sastra Indonesia',
-    'Bahasa dan Sastra Inggris',
-  ],
-  SMK: [],
+  SMA: upperSecondarySubjects,
+  SMK: upperSecondarySubjects,
 } as const
 
 export type EducationLevel = z.infer<typeof educationLevelSchema>

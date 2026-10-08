@@ -6,4 +6,8 @@ export const bookReturnToSchema = z
   .max(200)
   .regex(/^\/products\/[a-z0-9]+(?:-[a-z0-9]+)*(?:#(?:product-knowledge|flyer|dummy))?$/)
 
-export const loginReturnToSchema = z.union([bookReturnToSchema, z.literal('/products')])
+export const loginReturnToSchema = z.union([
+  bookReturnToSchema,
+  z.literal('/products'),
+  z.literal('/favorites'),
+])
