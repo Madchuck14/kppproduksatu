@@ -30,7 +30,10 @@ const level = ref('')
 const subject = ref<BookSubject | ''>('')
 const subjectSearch = ref('')
 const subjectOpen = ref(false)
-const { data, error, status, refresh } = await useFetch('/api/products')
+const [{ data, error, status, refresh }, { data: levelCounts }] = await Promise.all([
+  useFetch('/api/products'),
+  useFetch('/api/catalog/level-counts'),
+])
 const latestBooks = computed(() => data.value?.products.slice(0, 4) ?? [])
 const schoolLevels = educationLevelSchema.options
 const subjectOptions = computed(() =>
@@ -41,7 +44,6 @@ const subjectOptions = computed(() =>
 watch(level, () => {
   if (!subjectOptions.value.some((item) => item === subject.value)) subject.value = ''
 })
-const { data: levelCounts } = await useFetch('/api/catalog/level-counts')
 async function searchCatalog() {
   const q = search.value.trim()
   await navigateTo({

@@ -237,3 +237,41 @@ pertahankan kolom, fungsi validasi, constraint, dan data. Client lama yang mengh
 tidak menghapus keunggulan tersimpan. Pengguna mengonfirmasi migration telah dijalankan pada database live. Agent belum
 memverifikasi constraint atau persistensi live karena environment ini tidak menyediakan
 koneksi PostgreSQL atau alat migration Supabase.
+
+## Optimasi count katalog
+
+Terapkan `supabase/migrations/202610100002_catalog_aggregate_counts.sql` melalui mekanisme
+migration yang mencatat versinya. Migration menambahkan dua fungsi SQL `SECURITY INVOKER`
+dengan search path kosong; RLS tetap berlaku dan kedua fungsi membatasi `published=true`.
+Tidak ada perubahan data, tabel, indeks, atau kebijakan akses.
+
+`catalog_level_counts()` mengelompokkan jumlah per jenjang dalam satu request, menggantikan
+empat count terpisah. `catalog_subject_counts()` menghitung mapel di database tanpa mengunduh
+semua row metadata. Filter pencarian, jenjang, kelas, dan featured tetap berlaku; pilihan mapel
+aktif sengaja tidak membatasi facet, sesuai perilaku sebelumnya. Jenjang tanpa hasil tetap nol.
+
+Aplikasi memakai query lama hanya jika PostgREST mengembalikan `PGRST202` (fungsi belum tersedia).
+Error izin, jaringan, dan database tetap menjadi error; tidak diganti data demo. Deploy aplikasi
+dan migration dapat dilakukan bertahap. Untuk rollback, deploy aplikasi sebelumnya dan biarkan
+fungsi tersimpan; tidak perlu menghapus data atau objek database.
+
+Setelah migration, bandingkan count dengan query published yang sama, termasuk hasil kosong,
+pencarian, featured false, kelas, serta multi-mapel. Periksa sebagai anon dan akun Editor:
+draft harus tetap tidak masuk count. Migration dan RLS live belum diverifikasi oleh agent.
+
+Jalankan `supabase/diagnostics/catalog-performance.sql` di SQL Editor untuk melihat indeks dan
+`EXPLAIN (ANALYZE, BUFFERS)` dengan role anon. Script tidak mengubah data. Gunakan data dan kata
+pencarian representatif; query count seluruh tabel wajar memakai sequential scan pada tabel kecil.
+Bandingkan waktu database dengan waktu API untuk membedakan query lambat dari jaringan/auth.
+
+Indeks published/created_at, education_level/grade, subject, serta primary key membership/scope
+sudah didefinisikan migration lama. Policy membership/scope sudah memakai `(select auth.uid())`.
+Jangan menambah indeks duplikat atau membungkus fungsi scope yang bergantung pada jenjang row
+seolah hasilnya konstan. Kandidat berikutnya hanya setelah plan membuktikan kebutuhan:
+indeks partial `(created_at desc, id)` atau `(title, id)` untuk urutan katalog; indeks trigram
+untuk pencarian substring yang lambat. Indeks trigram harus mencakup kolom pencarian OR yang
+relevan dan tetap mempertahankan semantics ILIKE. Catat ukuran indeks dan biaya tulis sebelum rollout.
+
+Referensi: [Database functions](https://supabase.com/docs/guides/database/functions),
+[Query optimization](https://supabase.com/docs/guides/database/query-optimization), dan
+[RLS performance](https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv).

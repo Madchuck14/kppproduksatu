@@ -24,7 +24,7 @@ const user = useSupabaseUser()
 const client = useSupabaseClient()
 const requestFetch = useRequestFetch()
 const favorites = useFavorites()
-await useAsyncData<FavoriteIds>(
+const favoritesRequest = useAsyncData<FavoriteIds>(
   'favorite-ids',
   async () => {
     const ownerId = user.value?.sub ?? null
@@ -35,9 +35,9 @@ await useAsyncData<FavoriteIds>(
       return { ownerId, ids: [], unavailable: true }
     }
   },
-  { watch: [() => user.value?.sub], default: () => ({ ownerId: null, ids: [] }) },
+  { server: false, watch: [() => user.value?.sub], default: () => ({ ownerId: null, ids: [] }) },
 )
-const { data: navigationAccount } = await useAsyncData(
+const accountRequest = useAsyncData(
   'navigation-account',
   async () => {
     if (!user.value) return null
@@ -47,8 +47,9 @@ const { data: navigationAccount } = await useAsyncData(
       return null
     }
   },
-  { watch: [user] },
+  { server: false, watch: [() => user.value?.sub] },
 )
+const [, { data: navigationAccount }] = await Promise.all([favoritesRequest, accountRequest])
 const loggingOut = ref(false)
 const logoutMessage = ref('')
 
@@ -157,7 +158,11 @@ async function logout() {
             v-if="isShowcase"
             to="/favorites"
             class="favorites-link"
-            :aria-label="`Favorit: ${favorites.ids.value.length} buku`"
+            :aria-label="
+              user && !favorites.ready.value
+                ? 'Memuat favorit'
+                : `Favorit: ${favorites.ids.value.length} buku`
+            "
           >
             <img
               :src="isCatalog ? '/images/catalog/favorite.svg' : '/images/landing/favorite.svg'"
@@ -165,7 +170,7 @@ async function logout() {
               width="20"
               height="20"
             />
-            <span>({{ favorites.ids.value.length }})</span>
+            <span>({{ user && !favorites.ready.value ? '?' : favorites.ids.value.length }})</span>
           </NuxtLink>
         </div>
         <div v-if="isShowcase" class="header-rule" aria-hidden="true">

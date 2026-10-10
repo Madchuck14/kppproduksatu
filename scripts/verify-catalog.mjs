@@ -164,6 +164,7 @@ assert.deepEqual(mapProductRow({}, { ...row, highlights: ['Point A', 'Point B'] 
   'Point B',
 ])
 client = {
+  rpc: async () => ({ data: null, error: { code: 'PGRST202' } }),
   from() {
     const operations = []
     calls.push(operations)
@@ -197,6 +198,52 @@ assert.ok(
 )
 assert.ok(calls[0].some((op) => op[0] === 'range' && op[1] === 60 && op[2] === 74))
 assert.ok(calls[0].some((op) => op[0] === 'order' && op[1] === 'title' && op[2].ascending))
+const rpcCalls = []
+client.rpc = async (name, args) => {
+  rpcCalls.push([name, args])
+  return {
+    data:
+      name === 'catalog_level_counts'
+        ? [{ education_level: 'SD', book_count: 1070 }]
+        : [
+            { subject: 'Matematika', book_count: 700 },
+            { subject: 'Bahasa Indonesia', book_count: 370 },
+          ],
+    error: null,
+  }
+}
+calls.length = 0
+result = await list({
+  q: 'Book,(123)',
+  level: 'SD',
+  grade: 1,
+  featured: 'false',
+  page: 1,
+  subject: 'Matematika',
+})
+assert.equal(calls.length, 1, 'Aggregated facets avoid subject-row downloads')
+assert.deepEqual(result.subjectCounts, { Matematika: 700, 'Bahasa Indonesia': 370 })
+assert.deepEqual(rpcCalls[0], [
+  'catalog_subject_counts',
+  {
+    search_text: 'Book123',
+    filter_level: 'SD',
+    filter_grade: 1,
+    filter_featured: false,
+  },
+])
+assert.deepEqual(await getLandingLevelCounts({}), { SD: 1070, SMP: 0, SMA: 0, SMK: 0 })
+assert.equal(calls.length, 1, 'Level counts use one RPC without individual count queries')
+client.rpc = async () => ({ data: null, error: { code: '42501' } })
+await assert.rejects(getLandingLevelCounts({}), /Jumlah buku belum tersedia/)
+await assert.rejects(list({ page: 1 }), /Jumlah buku belum tersedia/)
+client.rpc = async () => ({ data: null, error: { code: 'PGRST202' } })
+calls.length = 0
+assert.equal((await getLandingLevelCounts({})).SD, 70)
+assert.equal(calls.length, 4, 'Missing migration preserves the previous count path')
+console.log(
+  'PASS: grouped count RPCs, sanitized facet filters, zero counts, rollout compatibility, and RPC failure propagation.',
+)
 client.from = () => {
   throw new Error('database unavailable')
 }

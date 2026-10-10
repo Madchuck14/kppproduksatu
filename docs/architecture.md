@@ -356,3 +356,14 @@ Halaman `/register` memakai kartu, branding lokal, warna, font, field, dan tombo
 dengan login. Pilihan Sales/Editor dan jenjang tetap tersedia sebagai tampilan; tombol
 Daftar akun tetap nonaktif dan handler tidak mengirim kredensial. Login mempertahankan
 returnTo tervalidasi; bantuan akun menuju Kontak.
+
+## Waktu pemuatan halaman
+
+Query buku terbaru dan jumlah per jenjang pada beranda dijalankan paralel; SSR tetap
+menunggu keduanya agar konten awal lengkap. Layout menjalankan favorit dan akun navigasi
+paralel setelah hydration browser (`server: false`), sehingga data header tidak menahan HTML
+awal. Jumlah favorit menampilkan indikator sementara sampai data akun siap. Session dan scope
+tetap diverifikasi server-side pada endpoint dan halaman terproteksi. Tidak ada cache global
+untuk data akun dan setiap respons tetap terikat pengguna aktif. Nuxt DevTools dinonaktifkan
+untuk mengurangi overhead development; Vite/HMR tetap tersedia. Latensi Supabase tetap
+mempengaruhi SSR dan hasil pengukuran lokal bukan jaminan performa deployment produksi.

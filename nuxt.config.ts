@@ -1,6 +1,6 @@
 export default defineNuxtConfig({
   compatibilityDate: '2026-10-04',
-  devtools: { enabled: true },
+  devtools: { enabled: false },
   modules: ['@nuxt/ui', '@nuxtjs/supabase', '@nuxt/eslint'],
   css: ['~/assets/css/main.css'],
   supabase: {

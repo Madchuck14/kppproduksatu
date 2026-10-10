@@ -133,6 +133,31 @@ export async function listProducts(
   const total = count ?? 0
   const page = Math.min(options.page, Math.max(1, Math.ceil(total / pageSize)))
   if (page !== options.page) return listProducts(event, { ...options, page })
+  const { data: facetRows, error: aggregateError } = await getCatalogClient(event).rpc(
+    'catalog_subject_counts',
+    {
+      search_text: search,
+      filter_level: options.level ?? null,
+      filter_grade: options.grade ?? null,
+      filter_featured: featured ?? null,
+    },
+  )
+  if (!aggregateError) {
+    const rows = z
+      .array(z.object({ subject: z.string(), book_count: z.number().int().nonnegative() }))
+      .parse(facetRows)
+    return {
+      source,
+      products,
+      total,
+      page,
+      pageSize,
+      subjectCounts: Object.fromEntries(rows.map((row) => [row.subject, row.book_count])),
+    }
+  }
+  // During rollout only a missing RPC may use the previous database query path.
+  if (aggregateError.code !== 'PGRST202')
+    throw createError({ statusCode: 503, statusMessage: 'Jumlah buku belum tersedia' })
   // Read only subject metadata in batches, without the product list's row cap.
   const subjectCounts: Record<string, number> = {}
   for (let offset = 0; ; offset += 1000) {
@@ -177,6 +202,27 @@ export async function getProduct(event: H3Event, slug: string): Promise<Product>
 // Count the same search results used by category links, without the list's 60-row cap.
 export async function getLandingLevelCounts(event: H3Event) {
   const source = sourceFor(event)
+  if (source === 'supabase') {
+    const { data, error } = await getCatalogClient(event).rpc('catalog_level_counts')
+    if (!error) {
+      const rows = z
+        .array(
+          z.object({
+            education_level: educationLevelSchema,
+            book_count: z.number().int().nonnegative(),
+          }),
+        )
+        .parse(data)
+      return Object.fromEntries(
+        educationLevelSchema.options.map((level) => [
+          level,
+          rows.find((row) => row.education_level === level)?.book_count ?? 0,
+        ]),
+      )
+    }
+    if (error.code !== 'PGRST202')
+      throw createError({ statusCode: 503, statusMessage: 'Jumlah buku belum tersedia' })
+  }
   const entries = await Promise.all(
     educationLevelSchema.options.map(async (level) => {
       if (source === 'demo') {
