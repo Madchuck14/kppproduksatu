@@ -5,6 +5,7 @@ type BookRow = {
   book_code: string | null
   education_level: 'SD' | 'SMP' | 'SMA' | 'SMK' | null
   subject: string | null
+  grade: number | null
   title: string
   slug: string
   author: string

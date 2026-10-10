@@ -164,7 +164,8 @@ Mengosongkan input mengembalikan pencarian ke semua mapel. Pilihan dapat dipilih
 Tanpa jenjang,
 semua nama unik ditampilkan. Pilihan yang tidak cocok dihapus ketika jenjang berubah. Filter mapel
 dikirim sebagai parameter `subject` dan dicocokkan persis dengan `products.subject`, terpisah dari `q`.
-Enam kartu kategori landing tetap memakai pencarian teks seperti desain.
+Empat kartu kategori landing memakai filter jenjang SD/SMP/SMA/SMK melalui `products.education_level`.
+Jumlah buku per jenjang hanya menghitung buku published. Perubahan kategori ini tidak memerlukan migration baru.
 
 Terapkan migration `202610070002_smk_subjects.sql` setelah migration mapel awal dan sebelum
 memakai mapel SMK. Migration memperluas CHECK agar SMK menerima daftar SMA, tanpa mengubah
@@ -197,3 +198,26 @@ Script menguji Sales/Editor/user tanpa membership, idempotensi, pencarian kode/f
 SSR, akses anonim, pembatasan draft, isolasi akun melalui API dan RLS langsung, serta FK cascade.
 Script berhenti sebelum membuat data bila tabel favorit belum tersedia atau katalog bukan Supabase.
 Verifikasi browser tetap diperlukan untuk interaksi tombol, login, pergantian akun, dan layout mobile.
+
+## Kelas buku dan katalog berpaginasi
+
+Terapkan `supabase/migrations/202610090001_book_grades.sql` sebelum deploy katalog baru.
+Migration ini belum dijalankan oleh agent dalam pekerjaan ini: koneksi PostgreSQL
+atau akses migration Supabase tidak tersedia pada environment lokal. Pemeriksaan baca pada
+9 Oktober 2026 menunjukkan kolom `grade` sudah tersedia di project terkonfigurasi, tetapi
+constraint dan riwayat migration belum diverifikasi. Tinjau schema sebelum rollout.
+
+1. Siapkan backup database dan catat jumlah/UUID buku sebelum migration.
+2. Jalankan migration melalui mekanisme migration yang mencatat versinya. Migration
+   transaksional dapat diulang; kolom/index memakai `IF NOT EXISTS` dan constraint dipasang ulang.
+3. Verifikasi jumlah/UUID tetap sama, buku lama mempunyai `grade IS NULL`, kelas SD 1–6,
+   SMP 7–9, SMA/SMK 10–12 diterima, dan pasangan lain ditolak.
+4. Deploy aplikasi lalu isi kelas buku melalui dashboard Editor. Periksa filter kelas,
+   pagination, draft yang tidak terbaca publik, dan scope Editor menggunakan akun pengujian.
+
+Kolom opsional menjaga buku lama tetap terbaca tanpa menebak kelas dari judul. Input Editor
+lama yang tidak mengirim `grade` mempertahankan nilai tersimpan; input baru dapat mengirim
+`null` untuk mengosongkannya. Rollback dengan deploy versi sebelumnya dan pertahankan kolom,
+index, serta constraint. Pada aplikasi lama, perpindahan jenjang buku yang sudah memiliki
+kelas dapat ditolak constraint; kosongkan kelas melalui versi baru sebelum perpindahan.
+Jangan drop kolom kelas saat rollback agar metadata yang sudah diisi tidak hilang.

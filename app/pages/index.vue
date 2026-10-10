@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { educationLevelSchema } from '#shared/schemas/auth'
-import { landingSubjects } from '#shared/utils/landing-subjects'
 import { getSubjectsForLevel, subjectsByLevel, type BookSubject } from '#shared/utils/book-subjects'
 
 const config = useRuntimeConfig()
@@ -33,7 +32,7 @@ const subjectSearch = ref('')
 const subjectOpen = ref(false)
 const { data, error, status, refresh } = await useFetch('/api/products')
 const latestBooks = computed(() => data.value?.products.slice(0, 4) ?? [])
-const subjects = landingSubjects
+const schoolLevels = educationLevelSchema.options
 const subjectOptions = computed(() =>
   level.value
     ? getSubjectsForLevel(level.value)
@@ -42,7 +41,7 @@ const subjectOptions = computed(() =>
 watch(level, () => {
   if (!subjectOptions.value.some((item) => item === subject.value)) subject.value = ''
 })
-const { data: subjectCounts } = await useFetch('/api/catalog/subject-counts')
+const { data: levelCounts } = await useFetch('/api/catalog/level-counts')
 async function searchCatalog() {
   const q = search.value.trim()
   await navigateTo({
@@ -163,26 +162,26 @@ async function searchCatalog() {
       aria-labelledby="subjects-title"
     >
       <div class="section-heading">
-        <h2 id="subjects-title">Kategori Populer</h2>
+        <h2 id="subjects-title">Jenjang Sekolah</h2>
         <NuxtLink to="/products" class="browse-link"
-          >Lihat semua kategori
+          >Lihat semua buku
           <img src="/images/landing/category-arrow.svg" alt="" width="17" height="17"
         /></NuxtLink>
       </div>
       <div class="subject-grid">
         <NuxtLink
-          v-for="item in subjects"
-          :key="item.name"
-          :to="{ path: '/products', query: { q: item.name } }"
-          :class="['subject-card', item.icon]"
+          v-for="item in schoolLevels"
+          :key="item"
+          :to="{ path: '/products', query: { level: item } }"
+          :class="['subject-card', item.toLowerCase()]"
         >
           <span class="subject-decoration" aria-hidden="true" />
           <span class="subject-icon"
-            ><img :src="`/images/landing/${item.icon}.svg`" alt="" width="24" height="24"
+            ><UIcon name="i-lucide-school" class="size-6" aria-hidden="true"
           /></span>
-          <h3>{{ item.name }}</h3>
+          <h3>{{ item }}</h3>
           <span class="subject-caption">{{
-            subjectCounts ? `${subjectCounts[item.name]} buku` : 'Jelajahi buku'
+            levelCounts ? `${levelCounts[item]} buku` : 'Jelajahi buku'
           }}</span>
         </NuxtLink>
       </div>
@@ -392,7 +391,7 @@ async function searchCatalog() {
 }
 .subject-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 25px;
   margin-top: 27px;
 }
@@ -441,51 +440,33 @@ async function searchCatalog() {
   border-radius: 50%;
   background: var(--decoration);
 }
-.math {
+.sd {
   background: #fde3d8;
   color: #a9401f;
   --decoration: #f8c3ac;
 }
-.language {
+.smp {
   background: #fbe0e0;
   color: #963838;
   --decoration: #f1bcbc;
 }
-.english {
+.sma {
   background: #dcefe5;
   color: #1d6647;
   --decoration: #b3dbc5;
 }
-.code {
+.smk {
   background: #e2e3f8;
   color: #383c96;
   --decoration: #c1c4f1;
 }
-.science {
-  background: #e9f1d7;
-  color: #4a6719;
-  --decoration: #cfe0a4;
-}
-.social {
-  background: #fbf0d4;
-  color: #85600f;
-  --decoration: #f3dca1;
-}
-.language .subject-decoration,
-.social .subject-decoration {
+.smp .subject-decoration {
   inset: auto -30px -44px auto;
 }
-.social .subject-decoration {
-  inset: auto -36px -46px auto;
-}
-.science .subject-decoration {
-  top: -44px;
-  left: -30px;
-}
-.english .subject-decoration {
+.sma .subject-decoration {
   inset: auto auto -50px -40px;
 }
-.code .subject-decoration {
+.smk .subject-decoration {
   inset: -40px -24px auto auto;
   width: 150px;
   height: 150px;

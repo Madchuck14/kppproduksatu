@@ -1,25 +1,40 @@
 <script setup lang="ts">
 import type { Product } from '#shared/types/product'
 
-withDefaults(defineProps<{ product: Product; variant?: 'default' | 'landing' }>(), {
+withDefaults(defineProps<{ product: Product; variant?: 'default' | 'landing' | 'catalog' }>(), {
   variant: 'default',
 })
 </script>
 
 <template>
-  <article v-if="variant === 'landing'" class="landing-book">
+  <article
+    v-if="variant === 'landing' || variant === 'catalog'"
+    :class="['landing-book', { 'catalog-book': variant === 'catalog' }]"
+  >
     <div class="cover-display">
       <NuxtLink :to="`/products/${product.slug}`" class="cover-link" :aria-label="product.title">
         <img :src="product.imageUrl" :alt="product.title" width="166" height="244" loading="lazy" />
       </NuxtLink>
-      <FavoriteButton :product="product" icon-only />
+      <FavoriteButton :product="product" icon-only :catalog="variant === 'catalog'" />
     </div>
     <div class="book-details">
-      <p class="book-level">{{ product.educationLevel || 'Buku Erlangga' }}</p>
+      <p class="book-level">
+        {{
+          variant === 'catalog'
+            ? product.subject || product.educationLevel || 'Buku Erlangga'
+            : product.educationLevel || 'Buku Erlangga'
+        }}
+      </p>
       <NuxtLink :to="`/products/${product.slug}`" :title="product.title"
         ><h2>{{ product.title }}</h2></NuxtLink
       >
-      <p class="book-author">{{ product.author }}</p>
+      <p class="book-author">
+        {{ product.author
+        }}<template v-if="variant === 'catalog' && product.educationLevel">
+          · {{ product.educationLevel
+          }}<template v-if="product.grade"> Kelas {{ product.grade }}</template></template
+        >
+      </p>
     </div>
   </article>
   <article v-else>
@@ -111,6 +126,55 @@ withDefaults(defineProps<{ product: Product; variant?: 'default' | 'landing' }>(
   }
   .book-details h2 {
     font-size: 18px;
+  }
+}
+.catalog-book {
+  color: #222;
+}
+.catalog-book .cover-display {
+  height: auto;
+  aspect-ratio: 1;
+  background: #f6f3ee;
+}
+.catalog-book .cover-link {
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+}
+.catalog-book .cover-link img {
+  width: auto;
+  height: 100%;
+  max-height: 242px;
+  max-width: 100%;
+  object-fit: contain;
+}
+.catalog-book .book-details {
+  margin-top: 14px;
+  gap: 2px;
+}
+.catalog-book .book-level {
+  font-size: 10px;
+  line-height: 16px;
+  letter-spacing: 0.6px;
+  color: #6b6f6b;
+}
+.catalog-book .book-details h2 {
+  white-space: normal;
+  overflow: visible;
+  font: 500 19px/22.8px var(--font-landing-serif);
+}
+.catalog-book .book-author {
+  white-space: normal;
+  font-size: 13px;
+  line-height: 20.8px;
+  color: #6b6f6b;
+}
+@media (max-width: 700px) {
+  .catalog-book .cover-link {
+    padding: 16px;
+  }
+  .catalog-book .book-details h2 {
+    font-size: 17px;
   }
 }
 </style>

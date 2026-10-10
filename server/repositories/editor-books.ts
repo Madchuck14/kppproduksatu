@@ -11,12 +11,13 @@ import { assertBookScope } from '../utils/require-editor'
 import { getProductImageUrl } from '../utils/storage'
 
 const columns =
-  'id,book_code,education_level,subject,title,slug,author,description,price,publication_year,featured,published,image_path,flyer_path,dummy_book_path,product_knowledge_path,updated_at'
+  'id,book_code,education_level,grade,subject,title,slug,author,description,price,publication_year,featured,published,image_path,flyer_path,dummy_book_path,product_knowledge_path,updated_at'
 const rowSchema = z.object({
   id: z.string().uuid(),
   book_code: z.string().nullable(),
   education_level: educationLevelSchema.nullable(),
   subject: bookSubjectSchema.nullable(),
+  grade: z.number().int().min(1).max(12).nullable(),
   title: z.string(),
   slug: z.string(),
   author: z.string(),
@@ -59,6 +60,7 @@ function mapBook(event: H3Event, value: unknown): EditorBook {
     bookCode: row.book_code,
     educationLevel: row.education_level,
     subject: row.subject,
+    grade: row.grade,
     title: row.title,
     slug: row.slug,
     author: row.author,
@@ -94,6 +96,7 @@ function toRow(input: BookInput) {
     book_code: input.bookCode,
     education_level: input.educationLevel,
     subject: input.subject,
+    ...(input.grade !== undefined ? { grade: input.grade } : {}),
     title: input.title,
     slug: makeSlug(input.title, input.bookCode),
     author: input.author,

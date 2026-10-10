@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import type { Product } from '#shared/types/product'
 
-const props = defineProps<{ product: Product; iconOnly?: boolean }>()
+const props = defineProps<{
+  product: Product
+  iconOnly?: boolean
+  catalog?: boolean
+  detail?: boolean
+}>()
 const favorites = useFavorites()
 const saved = computed(() => favorites.ids.value.includes(props.product.id))
 const busy = computed(() => favorites.isPending(props.product.id))
@@ -35,7 +40,13 @@ async function toggle() {
 </script>
 
 <template>
-  <div :class="{ 'favorite-control--icon': iconOnly }">
+  <div
+    :class="{
+      'favorite-control--icon': iconOnly,
+      'favorite-control--catalog': catalog,
+      'favorite-control--detail': detail,
+    }"
+  >
     <button
       type="button"
       :aria-pressed="saved"
@@ -50,7 +61,7 @@ async function toggle() {
       @click="toggle"
     >
       <svg
-        v-if="!iconOnly"
+        v-if="!iconOnly && !detail"
         viewBox="0 0 24 24"
         width="18"
         height="18"
@@ -61,8 +72,17 @@ async function toggle() {
       >
         <path d="M12 21s-9-5.4-9-12a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.6-9 12-9 12Z" />
       </svg>
-      <img v-else src="/images/landing/heart.svg" alt="" width="14" height="14" />
-      <span v-if="!iconOnly">{{ busy ? 'Menyimpan...' : saved ? 'Tersimpan' : 'Favorit' }}</span>
+      <img
+        v-else-if="iconOnly && catalog"
+        src="/images/catalog/heart.svg"
+        alt=""
+        width="16"
+        height="16"
+      />
+      <img v-else-if="iconOnly" src="/images/landing/heart.svg" alt="" width="14" height="14" />
+      <span v-if="!iconOnly">{{
+        busy ? 'Menyimpan...' : saved ? 'Tersimpan' : detail ? 'Simpan ke favorit' : 'Favorit'
+      }}</span>
     </button>
     <div v-if="message" :class="{ 'favorite-feedback': iconOnly }">
       <p role="status" class="mt-2 text-sm text-stone-600">{{ message }}</p>
@@ -78,6 +98,19 @@ async function toggle() {
 </template>
 
 <style scoped>
+.favorite-control--detail > button {
+  min-height: 44px;
+  padding: 8px 22px;
+  border: 1px solid #1f5c3f;
+  border-radius: 12px;
+  background: #1f5c3f;
+  color: white;
+  font-size: 15px;
+  line-height: 24px;
+}
+.favorite-control--detail > button:hover {
+  background: #17462f;
+}
 .favorite-icon-button {
   display: grid;
   place-items: center;
@@ -118,5 +151,13 @@ async function toggle() {
   border-radius: 10px;
   background: white;
   box-shadow: 0 4px 16px #242b261c;
+}
+.favorite-control--catalog {
+  top: 12px;
+  right: 12px;
+}
+.favorite-control--catalog .favorite-icon-button {
+  width: 32px;
+  height: 32px;
 }
 </style>

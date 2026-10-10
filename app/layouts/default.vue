@@ -1,8 +1,23 @@
 <script setup lang="ts">
 import type { FavoriteIds } from '#shared/types/favorite'
+import { educationLevelSchema } from '#shared/schemas/auth'
 const config = useRuntimeConfig()
 const route = useRoute()
 const isLanding = computed(() => route.path === '/')
+const isCatalog = computed(() => route.path === '/products')
+const isBookDetail = computed(() => /^\/products\/[^/]+$/.test(route.path))
+const isBookForm = computed(() => /^\/admin\/books\/[^/]+$/.test(route.path))
+const isContact = computed(() => route.path === '/contact')
+const isDashboard = computed(() => route.path === '/admin')
+const isShowcase = computed(
+  () =>
+    isLanding.value ||
+    isCatalog.value ||
+    isBookDetail.value ||
+    isBookForm.value ||
+    isDashboard.value ||
+    isContact.value,
+)
 const user = useSupabaseUser()
 const client = useSupabaseClient()
 const requestFetch = useRequestFetch()
@@ -55,27 +70,36 @@ async function logout() {
 </script>
 
 <template>
-  <div :class="['min-h-screen', { 'landing-shell': isLanding }]">
+  <div :class="['min-h-screen', { 'landing-shell': isShowcase }]">
     <a href="#main-content" class="sr-only focus:not-sr-only focus:p-4">Lewati ke konten</a>
     <header class="site-header">
       <div
         class="header-inner"
-        :class="{ 'editor-navigation': user && navigationAccount?.role === 'editor' }"
+        :class="{
+          'editor-navigation':
+            !isBookForm && !isDashboard && user && navigationAccount?.role === 'editor',
+        }"
       >
         <NuxtLink to="/" :aria-label="config.public.siteName"><PublisherLogos /></NuxtLink>
         <nav aria-label="Navigasi utama" class="main-nav">
           <NuxtLink to="/" exact-active-class="nav-active">Beranda</NuxtLink>
           <NuxtLink to="/products" active-class="nav-active">Katalog</NuxtLink>
-          <NuxtLink v-if="!isLanding" to="/favorites" active-class="nav-active">Favorit</NuxtLink>
+          <NuxtLink v-if="!isShowcase" to="/favorites" active-class="nav-active">Favorit</NuxtLink>
           <NuxtLink to="/#kategori">Kategori</NuxtLink>
-          <NuxtLink to="/#kontak">Kontak</NuxtLink>
+          <NuxtLink to="/contact">Kontak</NuxtLink>
         </nav>
         <div class="account-nav">
-          <NuxtLink to="/#pencarian" aria-label="Cari buku"
-            ><img src="/images/landing/search.svg" alt="" width="20" height="20"
+          <NuxtLink
+            :to="isCatalog ? '/products#catalog-search' : '/#pencarian'"
+            aria-label="Cari buku"
+            ><img
+              :src="isCatalog ? '/images/catalog/search.svg' : '/images/landing/search.svg'"
+              alt=""
+              width="20"
+              height="20"
           /></NuxtLink>
           <NuxtLink
-            v-if="user && navigationAccount?.role === 'editor'"
+            v-if="!isBookForm && !isDashboard && user && navigationAccount?.role === 'editor'"
             to="/admin"
             class="editor-dashboard-link"
             >Dashboard Editor</NuxtLink
@@ -90,7 +114,15 @@ async function logout() {
             :title="loggingOut ? 'Sedang keluar' : 'Keluar'"
             @click="logout"
           >
+            <img
+              v-if="isBookForm || isDashboard"
+              src="/images/editor/logout.svg"
+              alt=""
+              width="20"
+              height="20"
+            />
             <svg
+              v-else
               width="20"
               height="20"
               viewBox="0 0 24 24"
@@ -106,30 +138,57 @@ async function logout() {
             </svg>
           </button>
           <NuxtLink v-else to="/login" class="login-link"
-            ><img src="/images/landing/user.svg" alt="" width="20" height="20" /><span
-              class="sr-only"
-              >Login</span
-            ></NuxtLink
+            ><img
+              :src="
+                isCatalog
+                  ? route.query.q
+                    ? '/images/catalog/user-search.svg'
+                    : '/images/catalog/user.svg'
+                  : '/images/landing/user.svg'
+              "
+              alt=""
+              width="20"
+              height="20"
+            /><span class="sr-only">Login</span></NuxtLink
           >
           <NuxtLink
-            v-if="isLanding"
+            v-if="isShowcase"
             to="/favorites"
             class="favorites-link"
             :aria-label="`Favorit: ${favorites.ids.value.length} buku`"
           >
-            <img src="/images/landing/favorite.svg" alt="" width="20" height="20" />
+            <img
+              :src="isCatalog ? '/images/catalog/favorite.svg' : '/images/landing/favorite.svg'"
+              alt=""
+              width="20"
+              height="20"
+            />
             <span>({{ favorites.ids.value.length }})</span>
           </NuxtLink>
         </div>
-        <div v-if="isLanding" class="header-rule" aria-hidden="true">
-          <img src="/images/landing/header-line.svg" alt="" width="1440" height="1" />
+        <div v-if="isShowcase" class="header-rule" aria-hidden="true">
+          <img
+            :src="isCatalog ? '/images/catalog/header-line.svg' : '/images/landing/header-line.svg'"
+            alt=""
+            width="1440"
+            height="1"
+          />
         </div>
       </div>
       <p v-if="logoutMessage" role="alert" class="mx-auto max-w-6xl px-6 pb-4 text-sm text-red-700">
         {{ logoutMessage }}
       </p>
     </header>
-    <main id="main-content" :class="isLanding ? 'landing-main' : 'mx-auto max-w-6xl px-6 py-12'">
+    <main
+      id="main-content"
+      :class="
+        isLanding
+          ? 'landing-main'
+          : isCatalog || isBookDetail || isBookForm || isDashboard || isContact
+            ? 'catalog-main'
+            : 'mx-auto max-w-6xl px-6 py-12'
+      "
+    >
       <slot />
     </main>
     <footer id="kontak" class="site-footer">
@@ -144,26 +203,16 @@ async function logout() {
           </div>
           <div class="footer-links">
             <div>
-              <h2>{{ isLanding ? 'Kategori' : 'Jenjang' }}</h2>
-              <template v-if="isLanding">
-                <NuxtLink
-                  v-for="item in ['Matematika', 'Bahasa Indonesia', 'Informatika', 'IPA']"
-                  :key="item"
-                  :to="{ path: '/products', query: { q: item } }"
-                  >{{ item }}</NuxtLink
-                >
-              </template>
-              <template v-else>
-                <NuxtLink
-                  v-for="item in ['SD', 'SMP', 'SMA', 'SMK']"
-                  :key="item"
-                  :to="{ path: '/products', query: { level: item } }"
-                  >{{ item }}</NuxtLink
-                >
-              </template>
+              <h2>Jenjang Sekolah</h2>
+              <NuxtLink
+                v-for="item in educationLevelSchema.options"
+                :key="item"
+                :to="{ path: '/products', query: { level: item } }"
+                >{{ item }}</NuxtLink
+              >
             </div>
             <div>
-              <template v-if="isLanding">
+              <template v-if="isShowcase">
                 <h2>Tentang</h2>
                 <a
                   href="https://erlangga.co.id/tentang-kami/lini-bisnis"
@@ -177,23 +226,28 @@ async function logout() {
                   rel="noopener noreferrer"
                   >Blog</a
                 >
-                <NuxtLink to="/#kontak">Kontak</NuxtLink>
+                <NuxtLink to="/contact">Kontak</NuxtLink>
               </template>
               <template v-else>
                 <h2>Jelajahi</h2>
                 <NuxtLink to="/products">Katalog Buku</NuxtLink>
-                <NuxtLink to="/#kategori">Mata Pelajaran</NuxtLink>
+                <NuxtLink to="/#kategori">Jenjang Sekolah</NuxtLink>
                 <NuxtLink to="/login">Akun</NuxtLink>
               </template>
             </div>
           </div>
         </div>
-        <div v-if="isLanding" class="footer-rule" aria-hidden="true">
-          <img src="/images/landing/footer-line.svg" alt="" width="1280" height="1" />
+        <div v-if="isShowcase" class="footer-rule" aria-hidden="true">
+          <img
+            :src="isCatalog ? '/images/catalog/footer-line.svg' : '/images/landing/footer-line.svg'"
+            alt=""
+            width="1280"
+            height="1"
+          />
         </div>
         <div class="footer-bottom">
           <p>© {{ new Date().getFullYear() }} Penerbit Erlangga. Semua hak cipta dilindungi.</p>
-          <div v-if="isLanding" class="social-links">
+          <div v-if="isShowcase" class="social-links">
             <a
               href="https://www.instagram.com/bukuerlangga/"
               target="_blank"
@@ -221,6 +275,16 @@ async function logout() {
 </template>
 
 <style scoped>
+.catalog-main {
+  max-width: 1280px;
+  margin: auto;
+  padding: 0 32px 72px;
+}
+@media (max-width: 700px) {
+  .catalog-main {
+    padding: 0 16px 40px;
+  }
+}
 .landing-shell {
   background: white;
   font-family: var(--font-landing-sans);

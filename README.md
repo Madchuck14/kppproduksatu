@@ -42,8 +42,8 @@ di kartu/detail buku serta halaman `/favorites` dengan pencarian, filter jenjang
 Terapkan migration `202610070001_product_favorites.sql` sebelum memakai favorit dengan Supabase.
 Pengunjung anonim diarahkan login; mode demo tidak menyimpan favorit.
 
-Pagination tersedia pada dashboard Editor. Cart, checkout, Midtrans, blog, banner CMS,
-pagination katalog publik, sitemap, dan structured data belum diimplementasikan.
+Pagination tersedia pada dashboard Editor dan katalog publik. Cart, checkout, Midtrans, blog,
+banner CMS, sitemap, dan structured data belum diimplementasikan.
 Dashboard Editor sudah memiliki unggahan privat Product Knowledge, flyer, dan Dummy Buku. Migration
 `202610060001_book_publication_materials.sql` harus diterapkan sebelum fitur dipakai. Materi buku
 published dapat dibuka publik tanpa login melalui signed URL berumur 60 detik.

@@ -15,9 +15,9 @@ Katalog sekarang khusus buku sesuai PRD awal, namun penamaan entitas `products` 
 ## Beranda dan pencarian katalog
 
 Beranda mengikuti desain Figma dengan hero Grow with English, logo Erlangga dan Phibeta,
-pencarian, maksimal empat buku terbaru dari API publik, dan enam kartu mata pelajaran.
+pencarian, maksimal empat buku terbaru dari API publik, dan empat kartu jenjang sekolah.
 Layout desktop mengacu node Figma `39:21` pada ukuran 1440 px: hero 1344×420 px, rak buku
-1280 px, dan grid kategori tiga kolom. Variable font Lora dan Inter berformat WOFF2 Latin
+1280 px, dan grid jenjang empat kolom (dua kolom pada mobile). Variable font Lora dan Inter berformat WOFF2 Latin
 disimpan lokal di `public/fonts` dengan lisensi OFL; font landing tidak mengubah tipografi
 halaman lainnya. Aset hero, logo, dan ikon berasal dari Figma dan disimpan lokal. Layout
 beradaptasi untuk tablet dan mobile.
@@ -32,19 +32,47 @@ logo di `public/images/erlangga.png` dan `public/images/phibeta.png`.
 
 Pencarian beranda membawa `q` dan filter jenjang SD/SMP/SMA/SMK ke URL `/products`.
 Pilihan mata pelajaran memakai filter `subject` yang terpisah dari teks pencarian `q`;
-judul dan mapel dapat difilter bersamaan. Kartu kategori memakai pencarian teks.
+judul dan mapel dapat difilter bersamaan. Kartu kategori dan tautan footer memakai filter
+`level` SD/SMP/SMA/SMK yang cocok persis dengan `products.education_level`.
 Halaman katalog membaca parameter pada SSR dan menyinkronkannya dengan URL, termasuk navigasi
 kembali/maju. API mencari judul, kode buku, penulis, atau mata pelajaran. Mode demo ditandai pada bagian buku terbaru.
-`GET /api/catalog/subject-counts` mengembalikan jumlah buku published untuk enam pencarian kategori
-landing. Query count tidak dibatasi 60 row sehingga jumlah tetap sesuai dengan pencarian kategori
+`GET /api/catalog/level-counts` mengembalikan jumlah buku published per jenjang sekolah untuk
+landing. Query count tidak dibatasi 60 row sehingga jumlah tetap sesuai dengan filter jenjang
 pada katalog. Angka contoh desain tidak dipakai sebagai data produksi. Bila count gagal, caption
 menampilkan “Jelajahi buku”; error katalog tetap ditampilkan dan tidak diganti fixture.
 Footer landing mengarahkan tautan informasi penerbit ke situs eksternal; tidak menambahkan halaman
-Blog atau Tentang pada aplikasi ini. “Kategori Populer” mengikuti judul desain, bukan statistik akses.
+Blog atau Tentang pada aplikasi ini. Bagian kategori berjudul “Jenjang Sekolah”.
+Endpoint `GET /api/catalog/subject-counts` lama tetap tersedia untuk kompatibilitas konsumen API.
 Migration Editor menambahkan kode buku serta jenjang tanpa mengubah UUID atau referensi lama;
 kode buku menjadi business key unik, UUID tetap primary key.
 
 ## Detail buku dan tujuan login
+
+Detail buku mengikuti Figma `37:7908`: breadcrumb, sampul 480×504 px, ringkasan,
+tabel identitas, tiga kolom informasi, dan maksimal empat buku terkait. Header/footer,
+font lokal Lora/Inter, kartu katalog, serta kontrol favorit memakai komponen yang ada.
+Layout menjadi satu kolom pada mobile. Sampul dan informasi memakai data API SSR;
+kurikulum belum ditampilkan karena belum tersimpan, sementara ISBN, manfaat, dan
+keunggulan ditandai belum tersedia. Isi buku menggunakan deskripsi yang tersedia.
+Bagian Materi Promosi mengikuti ekspor lokal Figma `37:8192` dan hanya ditampilkan
+kepada pengguna yang sudah login. Panel hijau berisi kartu Flyer Promosi, Presentasi Buku,
+dan Buku Dummy, dengan pratinjau, status berkas, serta tombol Unduh PDF dan Lihat.
+Aset flyer dan ikon unduh disimpan di `public/images/book-detail`; pratinjau dummy memakai
+sampul katalog. Semua materi tersimpan sebagai PDF, sehingga label PPT/PPTX contoh desain
+disesuaikan dengan berkas nyata. Jumlah halaman dan ukuran contoh tidak ditampilkan karena
+metadata tersebut belum tersedia. Endpoint materi tetap publik dengan penampil PDF yang sudah ada.
+Pratinjau dummy mengikuti ekspor `figmatocode/previewdummy`: dialog putih beradius 20 px,
+toolbar nama PDF, tombol tutup/unduh, zoom 50–200%, area baca abu-abu, dan navigasi halaman
+mengambang. Isi serta jumlah halaman berasal dari PDF nyata; pembalikan halaman memakai
+StPageFlip yang sudah tersedia. Zoom dapat diganti lewat tombol atau pilihan persentase;
+halaman dapat digeser saat diperbesar. Tombol panah keyboard, Escape, dan fokus dialog
+tetap berfungsi. Aset toolbar disimpan lokal di `public/images/dummy-preview`.
+Flyer dan Presentasi Buku memakai dialog dan viewer yang sama, termasuk toolbar,
+zoom, unduhan, serta navigasi halaman. Nama berkas dan tujuan unduhan mengikuti jenis
+materi yang dipilih. Presentasi PPT/PPTX lama menampilkan penjelasan format dan tetap
+menyediakan unduhan; pratinjau memerlukan berkas PDF.
+Favorit anonim menawarkan login
+dengan tujuan kembali ke buku. Tombol pemesanan menuju kontak pada footer beranda.
 
 Halaman detail tetap publik dan memakai API SSR yang sama. Sampul, judul, harga, penulis,
 deskripsi, kode buku, dan jenjang tersedia. Buku lama dengan identitas kosong ditandai
@@ -104,7 +132,7 @@ Key admin hanya diperlukan untuk script provisioning lokal, bukan runtime aplika
 
 ## Boundary dan akses
 
-Query katalog berada di `server/repositories/products.ts`. Endpoint menerima input yang divalidasi Zod. Katalog memakai anonymous Supabase client dan selalu membatasi ke `published=true`; RLS juga menerapkan pembatasan ini. Hasil list saat ini dibatasi 60 produk; pagination adalah pekerjaan fase berikutnya.
+Query katalog berada di `server/repositories/products.ts`. Endpoint menerima input yang divalidasi Zod. Katalog memakai anonymous Supabase client dan selalu membatasi ke `published=true`; RLS juga menerapkan pembatasan ini. Request tanpa `page` mempertahankan batas 60 produk Supabase. Request berpaginasi dapat menjangkau seluruh hasil.
 
 Katalog hanya menjual buku pendidikan. UI, API, dan form Editor tidak memakai kategori produk.
 Tabel `categories` serta `products.category_id` lama dipertahankan sementara untuk kompatibilitas
@@ -117,6 +145,13 @@ Daftar Editor tidak mencakup buku di luar scope meskipun buku published dapat di
 
 Dashboard `/admin` menyediakan ringkasan, daftar berpaginasi 12 buku, pencarian judul/kode/penulis,
 filter jenjang/status, tambah/edit buku, publikasi, dan konfirmasi hapus dengan mengetik judul.
+Tampilan dashboard mengikuti ekspor `figmatocode/dashboard`, memakai header/footer dan font
+Lora/Inter yang sama dengan katalog. Panel akses hijau muda, empat kartu statistik, serta
+form filter memakai data dan scope akun nyata. Tabel HTML dengan tujuh kolom tetap menyelaraskan
+header dan baris yang salah diterjemahkan Codia; kolom Materi menunjukkan ketersediaan Flyer,
+Presentasi, dan Dummy dengan indikator serta teks aksesibel. Pada layar sempit hanya tabel
+yang bergeser horizontal; panel dan filter mengikuti lebar layar. Konfirmasi hapus tetap
+memerlukan judul yang cocok persis dan tidak berubah menjadi tindakan langsung.
 Endpoint `/api/admin/books` memakai GET/POST; `/api/admin/books/:id` memakai GET/PUT/DELETE.
 `POST /api/admin/books/:id/image` menerima bytes gambar dengan Content-Type yang sesuai.
 Semua input metadata divalidasi Zod; duplicate kode atau slug mengembalikan 409.
@@ -180,7 +215,7 @@ Mengosongkan input mengembalikan pencarian ke semua mapel. Pilihan dapat dipilih
 Tanpa jenjang,
 semua nama unik ditampilkan. Pilihan yang tidak cocok dihapus ketika jenjang berubah. Filter mapel
 dikirim sebagai parameter `subject` dan dicocokkan persis dengan `products.subject`, terpisah dari `q`.
-Enam kartu kategori landing tetap memakai pencarian teks seperti desain.
+Empat kartu kategori landing memakai filter jenjang sekolah, terpisah dari filter mata pelajaran.
 
 Terapkan migration `202610070002_smk_subjects.sql` setelah migration mapel awal dan sebelum
 memakai mapel SMK. Migration memperluas CHECK agar SMK menerima daftar SMA, tanpa mengubah
@@ -216,3 +251,74 @@ pergantian akun tidak menampilkan koleksi akun sebelumnya. Halaman katalog dan f
 `Cache-Control: no-store` karena SSR/payload berisi status favorit pribadi.
 
 Deployment memerlukan migration `202610070001_product_favorites.sql`; lihat panduan Supabase.
+
+## Tampilan tambah buku
+
+Halaman `/admin/books/new` mengikuti Figma `97:5388`, dengan kartu Identitas buku,
+Klasifikasi, Deskripsi buku, Sampul buku, Materi privat, dan Publikasi. Desktop memakai
+kontainer 1280 px dengan padding 32 px, kolom kanan 380 px, dan jarak antarkolom 24 px.
+Font Lora/Inter, logo, header/footer, dan aset ikon lokal dipakai kembali. Halaman edit memakai layout dan kartu yang sama, dengan metadata, sampul, serta status materi
+yang sudah tersimpan. Penulis, tahun, kelas, dan mapel tetap opsional saat edit; deskripsi lama
+tetap menerima 20.000 karakter. Guard Editor dan scope jenjang tidak berubah.
+
+ISBN, kurikulum, isi buku, manfaat, dan maksimal enam keunggulan merupakan state UI sementara.
+Kolom tersebut belum dikirim ke API atau disimpan ke database. Jika salah satunya diisi,
+Simpan buku menampilkan pemberitahuan dan tidak mengirim request agar data tidak dibuang
+diam-diam. Isian hilang ketika meninggalkan halaman. Kolom lama masih memakai kontrak API
+yang ada. Form tambah menandai penulis, tahun terbit, kelas, dan mata pelajaran wajib sesuai
+desain; kurikulum masih pratinjau dan belum divalidasi sebagai kolom wajib saat menyimpan.
+Deskripsi singkat memakai `description` yang sudah tersedia, dibatasi 300 karakter pada UI
+tambah. Edit mempertahankan batas 20.000 karakter. Isi buku dan manfaat memiliki penghitung 2.000 dan 1.000 karakter.
+
+Migrasi dan integrasi penyimpanan kolom baru ditunda ke sesi berikutnya. Sesi ini tidak
+mengubah schema, repository, API, RLS, atau kebijakan akses materi. Teks materi privat pada
+desain belum membuktikan pembatasan akses login pada backend; kebijakan akses yang berjalan
+tetap dijelaskan pada bagian Detail buku dan tujuan login.
+
+## Katalog publik dan kelas buku
+
+Halaman `/products` mengikuti Figma `19:89`: header/footer bersama landing, breadcrumb,
+pencarian, sidebar jenjang/kelas/mata pelajaran, grid tiga kolom, urutan, dan pagination.
+Desktop memakai kontainer 1280 px, padding 32 px, sidebar 250 px, gap 44 px, dan sampul
+persegi 290 px pada viewport 1440 px. Font Lora/Inter serta komponen logo dan favorit
+menggunakan aset lokal. Ikon katalog berasal dari Figma di `public/images/catalog`.
+Sampul, judul, penulis, kelas, dan jumlah hasil memakai data katalog, bukan contoh Figma.
+Label tetap berbahasa Indonesia; jenjang SMK dan footer sekolah mengikuti kebutuhan produk.
+
+Pencarian dengan `q` mengikuti Figma `46:9061`: breadcrumb Pencarian, judul
+`Hasil untuk “kata kunci”`, jumlah hasil aktual, dan chip kata kunci di atas grid.
+Tombol hapus pada chip menghapus `q`, kembali ke halaman pertama, mempertahankan filter
+jenjang/kelas/mapel/urutan, serta mengembalikan fokus ke input pencarian. Browser back/forward
+memulihkan kata kunci, judul, chip, dan hasil. Loading/error tidak menampilkan jumlah keberhasilan palsu.
+
+`GET /api/products` menerima `q`, `level`, `grade`, `subject` (satu atau berulang), `sort`
+(`newest`, `title-asc`, `title-desc`), `page`, dan `pageSize` (15/30/60). `grade` memerlukan
+jenjang yang sesuai. Beberapa mata pelajaran digabung dengan OR, sedangkan jenjang, kelas,
+dan pencarian digabung dengan AND. Semua state tersimpan di URL dan mengikuti back/forward.
+Filter dan urutan mengembalikan halaman pertama. Halaman di luar hasil dijepit ke halaman terakhir.
+
+Dengan `page`, respons menambah `total`, `page`, `pageSize`, dan `subjectCounts`. Jumlah mapel
+mengikuti pencarian/jenjang/kelas sebelum filter mapel, membaca metadata subject bertahap
+1000 row tanpa batas 60 produk. Urutan hasil memiliki UUID sebagai penentu urutan kedua.
+Request lama tanpa `page` mempertahankan kontrak `products`/`source`.
+
+Migration `202610090001_book_grades.sql` menambah `products.grade` nullable; SD 1–6, SMP 7–9,
+SMA/SMK 10–12. Editor mengisi kelas opsional; pergantian jenjang mengosongkan kelas yang
+sudah tidak cocok. Zod dan CHECK database memvalidasi pasangan jenjang/kelas. Tidak ada
+perubahan UUID, kode buku, membership, atau RLS. Terapkan migration sebelum deploy aplikasi.
+
+`node scripts/verify-catalog.mjs` memeriksa validasi kelas, kompatibilitas input lama,
+pagination melewati 60 buku, filter gabungan, urutan, facet, dan pembatasan published pada
+query. Pengujian repository menggunakan fixture serta query stub; bukan bukti live RLS.
+
+## Halaman kontak
+
+Route publik `/contact` mengikuti ekspor `figmatocode/kontak`: kartu saluran komunikasi,
+ilustrasi lokasi kantor pusat, tautan Google Maps, dan jam operasional. Header/footer bersama
+menghubungkan Kontak dari dashboard dan halaman lainnya. Ikon serta lapisan peta desain
+disimpan lokal di `public/images/contact`; ilustrasi bukan peta navigasi interaktif.
+Alamat, telepon (021) 8717006, fax (021) 87794609, hotline 1500-885, dan WhatsApp
+08191-1500-885 mengikuti [kontak kantor pusat resmi](https://www2.erlangga.co.id/kontak/kantor-pusat.html).
+Email info@erlangga.co.id mengikuti [situs Erlangga saat ini](https://erlangga.co.id/).
+Tautan email, telepon, hotline, dan WhatsApp memakai tujuan nyata. Jam operasional masih
+mengikuti desain dan belum dikonfirmasi sumber resmi. Halaman tidak mengirim pesan atau menyimpan data.
