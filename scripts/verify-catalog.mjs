@@ -17,6 +17,8 @@ function load(relative) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText
   const resolve = (id) => {
+    if (id === '#supabase/server') return { serverSupabaseClient: async () => client }
+    if (id.endsWith('/require-editor')) return { assertBookScope: () => {} }
     if (id.endsWith('/catalog-client')) return { getCatalogClient: () => client }
     if (id.endsWith('/storage')) return { getProductImageUrl: () => '/images/book-placeholder.svg' }
     if (id.startsWith('#shared/')) return load('shared/' + id.slice(8) + '.ts')
@@ -35,7 +37,9 @@ function load(relative) {
 const { catalogQuerySchema } = load('shared/schemas/catalog.ts')
 const { bookInputSchema } = load('shared/schemas/editor.ts')
 const { demoProducts } = load('server/data/products.ts')
-const { listProducts, getLandingLevelCounts } = load('server/repositories/products.ts')
+const { listProducts, getLandingLevelCounts, mapProductRow } = load(
+  'server/repositories/products.ts',
+)
 const input = {
   bookCode: '123',
   educationLevel: 'SD',
@@ -48,6 +52,26 @@ const input = {
   featured: false,
   published: false,
 }
+assert.equal(bookInputSchema.parse(input).highlights, undefined, 'Legacy writes omit highlights')
+assert.deepEqual(bookInputSchema.parse({ ...input, highlights: [] }).highlights, [])
+assert.deepEqual(
+  bookInputSchema.parse({ ...input, highlights: [' Latihan bertingkat '] }).highlights,
+  ['Latihan bertingkat'],
+)
+for (const highlights of [
+  null,
+  'Point',
+  [''],
+  ['   '],
+  [null],
+  ['a'.repeat(201)],
+  Array(7).fill('Point'),
+])
+  assert.equal(bookInputSchema.safeParse({ ...input, highlights }).success, false)
+assert.equal(
+  bookInputSchema.safeParse({ ...input, highlights: Array(6).fill('a'.repeat(200)) }).success,
+  true,
+)
 for (const [level, grades] of Object.entries({
   SD: [1, 6],
   SMP: [7, 9],
@@ -134,6 +158,11 @@ const row = {
   subject: 'Matematika',
   publication_year: 2026,
 }
+assert.deepEqual(mapProductRow({}, row).highlights, [], 'Legacy row mapping defaults empty')
+assert.deepEqual(mapProductRow({}, { ...row, highlights: ['Point A', 'Point B'] }).highlights, [
+  'Point A',
+  'Point B',
+])
 client = {
   from() {
     const operations = []
@@ -172,6 +201,75 @@ client.from = () => {
   throw new Error('database unavailable')
 }
 await assert.rejects(list(), /database unavailable/, 'Database failure must not fall back to demo')
+const { saveEditorBook } = load('server/repositories/editor-books.ts')
+let editorRow = {
+  ...row,
+  highlights: ['Existing point'],
+  published: true,
+  flyer_path: null,
+  dummy_book_path: null,
+  product_knowledge_path: null,
+  updated_at: '2026-10-10T00:00:00Z',
+}
+const writes = []
+client = {
+  from() {
+    let duplicate = false
+    const query = {}
+    for (const method of ['select', 'eq', 'in', 'neq', 'limit']) query[method] = () => query
+    query.ilike = () => {
+      duplicate = true
+      return query
+    }
+    for (const method of ['insert', 'update'])
+      query[method] = (value) => {
+        writes.push(value)
+        editorRow = { ...editorRow, ...value }
+        return query
+      }
+    query.maybeSingle = async () => ({ data: duplicate ? null : editorRow, error: null })
+    return query
+  },
+}
+const account = { role: 'editor', isSuper: true, educationLevels: ['SD'] }
+assert.deepEqual(
+  (await saveEditorBook({}, account, bookInputSchema.parse(input), row.id)).highlights,
+  ['Existing point'],
+)
+assert.equal(
+  Object.hasOwn(writes.at(-1), 'highlights'),
+  false,
+  'Legacy update must not overwrite highlights',
+)
+assert.deepEqual(
+  (
+    await saveEditorBook(
+      {},
+      account,
+      bookInputSchema.parse({ ...input, highlights: [' Point A ', 'Point B'] }),
+      row.id,
+    )
+  ).highlights,
+  ['Point A', 'Point B'],
+)
+assert.deepEqual(
+  (await saveEditorBook({}, account, bookInputSchema.parse({ ...input, highlights: [] }), row.id))
+    .highlights,
+  [],
+)
+assert.deepEqual(
+  (
+    await saveEditorBook(
+      {},
+      account,
+      bookInputSchema.parse({ ...input, highlights: ['New book point'] }),
+    )
+  ).highlights,
+  ['New book point'],
+)
+console.log(
+  'PASS: highlights validation, public mapping, create/update roundtrip, empty-list clearing, and legacy-write preservation (repository stub).',
+)
 console.log(
   'PASS: grade validation, legacy input, pagination beyond 60, sorting, multi-subject filters, facets, empty results, school counts, published-only query constraints, and database failure propagation.',
 )

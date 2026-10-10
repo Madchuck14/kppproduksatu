@@ -17,6 +17,8 @@ export const editorQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(100000).default(1),
 })
 
+export const bookHighlightsSchema = z.array(z.string().trim().min(1).max(200)).max(6)
+
 export const bookInputSchema = z
   .object({
     bookCode: z
@@ -29,6 +31,7 @@ export const bookInputSchema = z
     title: z.string().trim().min(1, 'Judul wajib diisi.').max(200),
     author: z.string().trim().max(200),
     description: z.string().trim().max(20000),
+    highlights: bookHighlightsSchema.optional(),
     price: z.number().int().min(0, 'Harga tidak boleh negatif.').max(2147483647),
     publicationYear: z.number().int().min(1000).max(9999).nullable(),
     featured: z.boolean(),

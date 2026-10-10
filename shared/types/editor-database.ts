@@ -10,6 +10,7 @@ type BookRow = {
   slug: string
   author: string
   description: string
+  highlights: string[]
   price: number
   featured: boolean
   published: boolean

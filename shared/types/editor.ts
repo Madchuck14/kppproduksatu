@@ -1,7 +1,8 @@
 import type { BookInput } from '../schemas/editor'
 import type { AccountSession } from './account'
 
-export interface EditorBook extends Omit<BookInput, 'bookCode' | 'educationLevel'> {
+export interface EditorBook extends Omit<BookInput, 'bookCode' | 'educationLevel' | 'highlights'> {
+  highlights: string[]
   id: string
   slug: string
   bookCode: string | null

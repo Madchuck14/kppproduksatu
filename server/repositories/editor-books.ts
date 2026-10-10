@@ -5,13 +5,13 @@ import { z } from 'zod'
 import type { AccountSession } from '#shared/types/account'
 import type { EditorBook, EditorDashboard } from '#shared/types/editor'
 import type { BookInput, EditorQuery } from '#shared/schemas/editor'
-import { bookSubjectSchema } from '#shared/schemas/editor'
+import { bookSubjectSchema, bookHighlightsSchema } from '#shared/schemas/editor'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import { assertBookScope } from '../utils/require-editor'
 import { getProductImageUrl } from '../utils/storage'
 
 const columns =
-  'id,book_code,education_level,grade,subject,title,slug,author,description,price,publication_year,featured,published,image_path,flyer_path,dummy_book_path,product_knowledge_path,updated_at'
+  'id,book_code,education_level,grade,subject,title,slug,author,description,highlights,price,publication_year,featured,published,image_path,flyer_path,dummy_book_path,product_knowledge_path,updated_at'
 const rowSchema = z.object({
   id: z.string().uuid(),
   book_code: z.string().nullable(),
@@ -22,6 +22,7 @@ const rowSchema = z.object({
   slug: z.string(),
   author: z.string(),
   description: z.string(),
+  highlights: bookHighlightsSchema.default([]),
   price: z.number(),
   publication_year: z.number().int().nullable(),
   featured: z.boolean(),
@@ -65,6 +66,7 @@ function mapBook(event: H3Event, value: unknown): EditorBook {
     slug: row.slug,
     author: row.author,
     description: row.description,
+    highlights: row.highlights,
     price: row.price,
     publicationYear: row.publication_year,
     featured: row.featured,
@@ -101,6 +103,7 @@ function toRow(input: BookInput) {
     slug: makeSlug(input.title, input.bookCode),
     author: input.author,
     description: input.description,
+    ...(input.highlights !== undefined ? { highlights: input.highlights } : {}),
     price: input.price,
     publication_year: input.publicationYear,
     featured: input.featured,

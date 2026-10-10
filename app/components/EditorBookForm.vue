@@ -18,7 +18,6 @@ const draftDetails = reactive({
   curriculum: '',
   contents: '',
   benefits: '',
-  highlights: ['', ''],
 })
 const materials = [
   { kind: 'flyer', label: 'Flyer', help: 'PDF, maksimal 20 MB' },
@@ -33,6 +32,7 @@ const form = reactive({
   title: props.book?.title ?? '',
   author: props.book?.author ?? '',
   description: props.book?.description ?? '',
+  highlights: props.book?.highlights?.length ? [...props.book.highlights] : ['', ''],
   price: props.book?.price ?? 0,
   publicationYear: props.book?.publicationYear ?? null,
   featured: props.book?.featured ?? false,
@@ -112,15 +112,15 @@ async function save() {
     draftDetails.isbn.trim() ||
     draftDetails.curriculum.trim() ||
     draftDetails.contents.trim() ||
-    draftDetails.benefits.trim() ||
-    draftDetails.highlights.some((item) => item.trim())
+    draftDetails.benefits.trim()
   ) {
     message.value =
-      'ISBN, kurikulum, isi buku, manfaat, dan keunggulan belum dapat disimpan. Penyimpanan kolom baru menunggu pembaruan database. Isian tetap tersedia selama halaman ini terbuka.'
+      'ISBN, kurikulum, isi buku, dan manfaat belum dapat disimpan. Penyimpanan kolom baru menunggu pembaruan database. Isian tetap tersedia selama halaman ini terbuka.'
     return
   }
   const parsed = bookInputSchema.safeParse({
     ...form,
+    highlights: form.highlights.map((item) => item.trim()).filter(Boolean),
     publicationYear: form.publicationYear || null,
     subject: form.subject || null,
   })
@@ -406,19 +406,19 @@ async function save() {
           </div>
           <div class="form-field highlights-field">
             <span class="field-label">Keunggulan</span>
-            <div v-for="(_, index) in draftDetails.highlights" :key="index" class="highlight-row">
+            <p v-if="errors.highlights" class="field-error">{{ errors.highlights }}</p>
+            <div v-for="(_, index) in form.highlights" :key="index" class="highlight-row">
               <input
-                v-model="draftDetails.highlights[index]"
+                v-model="form.highlights[index]"
                 :aria-label="`Keunggulan ${index + 1}`"
                 maxlength="200"
                 placeholder="Contoh: Latihan bertingkat di setiap bab"
-                aria-describedby="new-fields-note"
               />
               <button
                 type="button"
                 class="remove-highlight"
                 :aria-label="`Hapus keunggulan ${index + 1}`"
-                @click="draftDetails.highlights.splice(index, 1)"
+                @click="form.highlights.splice(index, 1)"
               >
                 ×
               </button>
@@ -426,8 +426,8 @@ async function save() {
             <button
               type="button"
               class="add-highlight"
-              :disabled="draftDetails.highlights.length >= 6"
-              @click="draftDetails.highlights.push('')"
+              :disabled="form.highlights.length >= 6"
+              @click="form.highlights.push('')"
             >
               + Tambah poin
             </button>
@@ -520,9 +520,8 @@ async function save() {
           >
           <p v-if="progress" role="status">{{ progress }}</p>
           <p id="new-fields-note" class="field-help">
-            ISBN, kurikulum, isi buku, manfaat, dan keunggulan masih pratinjau. Isian belum
-            tersimpan dan akan hilang saat meninggalkan halaman; penyimpanan tersedia setelah
-            pembaruan database.
+            ISBN, kurikulum, isi buku, dan manfaat masih pratinjau. Isian belum tersimpan dan akan
+            hilang saat meninggalkan halaman; penyimpanan tersedia setelah pembaruan database.
           </p>
         </div>
       </aside>

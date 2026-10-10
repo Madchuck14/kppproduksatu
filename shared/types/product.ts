@@ -6,6 +6,7 @@ export interface Product {
   title: string
   author: string
   description: string
+  highlights?: string[]
   price: number
   imageUrl: string
   featured: boolean

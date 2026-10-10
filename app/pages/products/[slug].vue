@@ -172,7 +172,10 @@ useSeoMeta({
       </div>
       <div>
         <h2>Keunggulan</h2>
-        <p>Informasi keunggulan buku belum tersedia.</p>
+        <ul v-if="product.highlights?.length" class="detail-highlights">
+          <li v-for="(item, index) in product.highlights" :key="index">{{ item }}</li>
+        </ul>
+        <p v-else>Informasi keunggulan buku belum tersedia.</p>
       </div>
     </section>
 
@@ -336,6 +339,16 @@ useSeoMeta({
 </template>
 
 <style scoped>
+.detail-highlights {
+  list-style: disc;
+  padding-left: 20px;
+  color: #6b6f6b;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.detail-highlights li + li {
+  margin-top: 8px;
+}
 .dummy-preview-dialog {
   inset: 40px 56px auto;
   margin: 0 auto;

@@ -52,8 +52,7 @@ Detail buku mengikuti Figma `37:7908`: breadcrumb, sampul 480×504 px, ringkasan
 tabel identitas, tiga kolom informasi, dan maksimal empat buku terkait. Header/footer,
 font lokal Lora/Inter, kartu katalog, serta kontrol favorit memakai komponen yang ada.
 Layout menjadi satu kolom pada mobile. Sampul dan informasi memakai data API SSR;
-kurikulum belum ditampilkan karena belum tersimpan, sementara ISBN, manfaat, dan
-keunggulan ditandai belum tersedia. Isi buku menggunakan deskripsi yang tersedia.
+kurikulum belum ditampilkan karena belum tersimpan, sementara ISBN dan manfaat ditandai belum tersedia; keunggulan memakai daftar yang tersimpan. Isi buku menggunakan deskripsi yang tersedia.
 Bagian Materi Promosi mengikuti ekspor lokal Figma `37:8192` dan hanya ditampilkan
 kepada pengguna yang sudah login. Panel hijau berisi kartu Flyer Promosi, Presentasi Buku,
 dan Buku Dummy, dengan pratinjau, status berkas, serta tombol Unduh PDF dan Lihat.
@@ -261,7 +260,7 @@ Font Lora/Inter, logo, header/footer, dan aset ikon lokal dipakai kembali. Halam
 yang sudah tersimpan. Penulis, tahun, kelas, dan mapel tetap opsional saat edit; deskripsi lama
 tetap menerima 20.000 karakter. Guard Editor dan scope jenjang tidak berubah.
 
-ISBN, kurikulum, isi buku, manfaat, dan maksimal enam keunggulan merupakan state UI sementara.
+ISBN, kurikulum, isi buku, dan manfaat merupakan state UI sementara.
 Kolom tersebut belum dikirim ke API atau disimpan ke database. Jika salah satunya diisi,
 Simpan buku menampilkan pemberitahuan dan tidak mengirim request agar data tidak dibuang
 diam-diam. Isian hilang ketika meninggalkan halaman. Kolom lama masih memakai kontrak API
@@ -322,3 +321,14 @@ Alamat, telepon (021) 8717006, fax (021) 87794609, hotline 1500-885, dan WhatsAp
 Email info@erlangga.co.id mengikuti [situs Erlangga saat ini](https://erlangga.co.id/).
 Tautan email, telepon, hotline, dan WhatsApp memakai tujuan nyata. Jam operasional masih
 mengikuti desain dan belum dikonfirmasi sumber resmi. Halaman tidak mengirim pesan atau menyimpan data.
+
+## Keunggulan buku
+
+Keunggulan disimpan sebagai `products.highlights` (`text[]`, NOT NULL, default daftar kosong)
+melalui migration `202610100001_book_highlights.sql`. Tambah/edit buku mengirim maksimal enam
+poin sepanjang 1?200 karakter; kolom kosong UI diabaikan dan urutan dipertahankan. API dan
+CHECK database memvalidasi daftar. Detail publik menampilkan daftar atau status belum tersedia.
+Client lama yang tidak mengirim highlights mempertahankan nilai saat edit; daftar kosong
+menghapus seluruh poin. UUID, kode buku, dan RLS tidak berubah. Terapkan migration sebelum
+menjalankan aplikasi baru; rollback aplikasi mempertahankan kolom dan data. Pengguna mengonfirmasi migration telah diterapkan pada database live; agent belum
+memverifikasi constraint atau persistensi live.

@@ -221,3 +221,19 @@ lama yang tidak mengirim `grade` mempertahankan nilai tersimpan; input baru dapa
 index, serta constraint. Pada aplikasi lama, perpindahan jenjang buku yang sudah memiliki
 kelas dapat ditolak constraint; kosongkan kelas melalui versi baru sebelum perpindahan.
 Jangan drop kolom kelas saat rollback agar metadata yang sudah diisi tidak hilang.
+
+## Keunggulan buku
+
+Terapkan `supabase/migrations/202610100001_book_highlights.sql` sebelum deploy versi ini.
+Migration transaksional menambah `products.highlights` bertipe `text[]` dengan default kosong
+dan validasi maksimal enam poin, masing-masing 1?200 karakter nonblank, tanpa NULL atau array
+multidimensi. Tidak ada perubahan RLS, UUID, atau referensi produk.
+
+Catat jumlah/UUID sebelum migration, jalankan melalui mekanisme migration yang mencatat
+versinya, lalu pastikan jumlah/UUID tetap sama dan buku lama memiliki daftar kosong.
+Verifikasi simpan, muat ulang, edit, hapus poin, detail publik, scope Editor, dan penolakan
+input lebih dari enam poin atau lebih dari 200 karakter. Rollback dengan aplikasi sebelumnya;
+pertahankan kolom, fungsi validasi, constraint, dan data. Client lama yang menghilangkan field
+tidak menghapus keunggulan tersimpan. Pengguna mengonfirmasi migration telah dijalankan pada database live. Agent belum
+memverifikasi constraint atau persistensi live karena environment ini tidak menyediakan
+koneksi PostgreSQL atau alat migration Supabase.
