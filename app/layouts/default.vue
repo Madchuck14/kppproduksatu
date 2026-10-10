@@ -7,6 +7,7 @@ const isLanding = computed(() => route.path === '/')
 const isCatalog = computed(() => route.path === '/products')
 const isBookDetail = computed(() => /^\/products\/[^/]+$/.test(route.path))
 const isBookForm = computed(() => /^\/admin\/books\/[^/]+$/.test(route.path))
+const isAuthPage = computed(() => route.path === '/login' || route.path === '/register')
 const isContact = computed(() => route.path === '/contact')
 const isDashboard = computed(() => route.path === '/admin')
 const isShowcase = computed(
@@ -16,7 +17,8 @@ const isShowcase = computed(
     isBookDetail.value ||
     isBookForm.value ||
     isDashboard.value ||
-    isContact.value,
+    isContact.value ||
+    isAuthPage.value,
 )
 const user = useSupabaseUser()
 const client = useSupabaseClient()
@@ -184,9 +186,11 @@ async function logout() {
       :class="
         isLanding
           ? 'landing-main'
-          : isCatalog || isBookDetail || isBookForm || isDashboard || isContact
-            ? 'catalog-main'
-            : 'mx-auto max-w-6xl px-6 py-12'
+          : isAuthPage
+            ? 'login-main'
+            : isCatalog || isBookDetail || isBookForm || isDashboard || isContact
+              ? 'catalog-main'
+              : 'mx-auto max-w-6xl px-6 py-12'
       "
     >
       <slot />
@@ -275,6 +279,14 @@ async function logout() {
 </template>
 
 <style scoped>
+.login-main {
+  padding: 80px 24px 82px;
+}
+@media (max-width: 700px) {
+  .login-main {
+    padding: 32px 16px 48px;
+  }
+}
 .catalog-main {
   max-width: 1280px;
   margin: auto;

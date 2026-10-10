@@ -332,3 +332,27 @@ Client lama yang tidak mengirim highlights mempertahankan nilai saat edit; dafta
 menghapus seluruh poin. UUID, kode buku, dan RLS tidak berubah. Terapkan migration sebelum
 menjalankan aplikasi baru; rollback aplikasi mempertahankan kolom dan data. Pengguna mengonfirmasi migration telah diterapkan pada database live; agent belum
 memverifikasi constraint atau persistensi live.
+
+## Pencarian tanpa hasil
+
+Hasil kosong pada `/products` mengikuti ekspor `figmatocode/pencariangagal`: ilustrasi lokal
+`public/images/catalog/search-empty.svg`, judul dengan kata kunci aktual, saran pencarian,
+dan dua tindakan. Hapus semua filter menghapus jenjang, kelas, mapel, dan halaman tanpa
+menghapus kata kunci atau urutan. Lihat semua buku menuju `/products` tanpa query. Chip
+pencarian tetap menghapus hanya kata kunci dan memulihkan fokus input. Pagination tidak
+ditampilkan untuk hasil kosong; loading dan kegagalan API tetap memakai status tersendiri.
+Jumlah buku/mapel tetap memakai respons API, tanpa angka contoh desain.
+
+## Tampilan login
+
+`/login` mengikuti ekspor `figmatocode/login`: kartu dua kolom 960 px, panel branding
+hijau muda, logo navbar melalui PublisherLogos yang dipusatkan pada panel branding, font Lora/Inter, dan form Masuk. Mobile menjadi satu kolom.
+Tombol Daftar menuju `/register` dengan returnTo tervalidasi; registrasi mandiri tetap
+dinonaktifkan. Lupa kata sandi menuju Kontak untuk bantuan pengelola, tanpa alur reset
+kata sandi baru. Login Supabase, validasi, toggle password, loading/error, tujuan kembali,
+status akun aktif, logout, dan mode demo memakai perilaku yang sudah ada.
+
+Halaman `/register` memakai kartu, branding lokal, warna, font, field, dan tombol yang sama
+dengan login. Pilihan Sales/Editor dan jenjang tetap tersedia sebagai tampilan; tombol
+Daftar akun tetap nonaktif dan handler tidak mengirim kredensial. Login mempertahankan
+returnTo tervalidasi; bantuan akun menuju Kontak.

@@ -91,91 +91,42 @@ async function logout() {
 </script>
 
 <template>
-  <section
-    aria-labelledby="login-title"
-    class="mx-auto grid max-w-5xl overflow-hidden rounded-3xl border border-stone-200 bg-white lg:grid-cols-2"
-  >
-    <div class="flex flex-col justify-between gap-10 bg-[#e6ede5] p-7 sm:p-10 lg:p-12">
+  <section aria-labelledby="login-title" class="login-card">
+    <div class="login-welcome">
+      <div class="auth-brand"><PublisherLogos /></div>
       <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-800">
-          Katalog buku Erlangga
-        </p>
-        <h2 class="display-heading mt-6 text-4xl leading-tight sm:text-5xl">
-          Satu tempat untuk mengenal setiap buku.
-        </h2>
-        <p class="mt-5 leading-relaxed text-stone-600">
-          Masuk dengan akun terdaftar untuk melanjutkan aktivitas Anda di katalog.
-        </p>
-        <div class="mt-8 rounded-2xl border border-emerald-900/10 bg-white/60 p-5">
-          <p class="text-sm font-semibold text-emerald-900">Materi pendukung produk</p>
-          <p class="mt-2 text-sm leading-relaxed text-stone-600">
-            Product Knowledge, flyer, dan dummy memerlukan login. Akses mengikuti hak akun dan
-            ketersediaan berkas.
-          </p>
-        </div>
+        <h2>Selamat datang kembali</h2>
+        <p>Masuk dengan akun terdaftar untuk melanjutkan aktivitas Anda di katalog.</p>
       </div>
-      <NuxtLink
-        to="/products"
-        class="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 underline-offset-4 hover:underline"
-        ><span aria-hidden="true">&larr;</span> Jelajahi katalog tanpa login</NuxtLink
-      >
     </div>
-    <div class="p-7 sm:p-10 lg:p-12">
-      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-800">
-        Selamat datang kembali
+    <div class="login-panel">
+      <h1 id="login-title">Masuk</h1>
+      <p class="login-intro">Gunakan email dan kata sandi akunmu.</p>
+      <p v-if="returnTo !== '/' && returnTo !== '/products'" class="login-notice">
+        Setelah login, Anda akan kembali ke konten yang dipilih. Akses mengikuti hak akun dan
+        ketersediaan berkas.
       </p>
-      <h1 id="login-title" class="display-heading mt-3 text-4xl">Login</h1>
-      <p class="mt-3 text-sm leading-relaxed text-stone-600">
-        Gunakan email dan kata sandi akun Anda.
+      <p v-if="!configured" role="status" class="login-notice">
+        Login belum tersedia pada demo ini. Anda tetap dapat
+        <NuxtLink to="/products">menjelajahi katalog</NuxtLink> tanpa masuk.
       </p>
-      <p
-        v-if="returnTo !== '/' && returnTo !== '/products'"
-        class="mt-5 rounded-lg bg-emerald-50 p-4 text-sm leading-relaxed text-emerald-900"
-      >
-        Masuk dengan akun yang sudah terdaftar. Setelah login, Anda akan kembali ke konten buku yang
-        dipilih. Akses berkas mengikuti ketersediaan konten dan hak akses akun.
-      </p>
-      <p
-        v-if="!configured"
-        role="status"
-        class="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
-      >
-        Login belum tersedia pada demo ini. Anda tetap dapat menjelajahi katalog tanpa masuk.
-      </p>
-      <p
-        v-if="message"
-        id="login-message"
-        role="alert"
-        class="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
-      >
-        {{ message }}
-      </p>
-      <div v-if="user" class="mt-7 space-y-4">
-        <p class="text-sm text-stone-600">
-          Anda sudah masuk. Lanjutkan ke tujuan Anda atau keluar untuk memakai akun lain.
-        </p>
-        <UButton :to="returnTo" size="lg" class="w-full justify-center" :disabled="loading"
-          >Lanjutkan</UButton
-        >
-        <UButton
-          color="neutral"
-          variant="outline"
-          size="lg"
-          class="w-full justify-center"
-          :loading="loading"
-          @click="logout"
+      <p v-if="message" id="login-message" role="alert" class="login-alert">{{ message }}</p>
+      <div v-if="user" class="login-account">
+        <p>Anda sudah masuk. Lanjutkan ke tujuan Anda atau keluar untuk memakai akun lain.</p>
+        <UButton :to="returnTo" class="login-primary" :disabled="loading">Lanjutkan</UButton>
+        <UButton variant="outline" class="login-secondary" :loading="loading" @click="logout"
           >Keluar dari akun</UButton
         >
       </div>
       <form
         v-else
-        class="mt-7 space-y-5"
+        class="login-form"
         :aria-busy="loading"
         :aria-describedby="message ? 'login-message' : undefined"
         @submit.prevent="login"
       >
-        <div>
-          <label for="email" class="mb-2 block text-sm">Email</label>
+        <div class="login-field">
+          <label for="email">Email</label>
           <input
             id="email"
             v-model="email"
@@ -183,18 +134,15 @@ async function logout() {
             type="email"
             autocomplete="username"
             maxlength="254"
-            placeholder="nama@contoh.com"
+            placeholder="nama@email.com"
             autocapitalize="none"
             :spellcheck="false"
             :disabled="!configured || loading"
-            class="w-full rounded-lg border border-stone-300 p-3 outline-offset-2 focus-visible:outline-2 focus-visible:outline-emerald-700 disabled:bg-stone-100"
           />
         </div>
-        <div>
-          <label for="password" class="mb-2 block text-sm">Kata sandi</label>
-          <div
-            class="flex overflow-hidden rounded-lg border border-stone-300 focus-within:ring-2 focus-within:ring-emerald-700"
-          >
+        <div class="login-field">
+          <label for="password">Kata sandi</label>
+          <div class="password-field">
             <input
               id="password"
               v-model="password"
@@ -202,42 +150,259 @@ async function logout() {
               :type="showPassword ? 'text' : 'password'"
               autocomplete="current-password"
               :disabled="!configured || loading"
-              class="min-w-0 flex-1 p-3 focus:outline-none disabled:bg-stone-100"
             />
             <button
               type="button"
               :disabled="!configured || loading"
               :aria-pressed="showPassword"
               aria-controls="password"
-              class="px-3 text-xs font-semibold text-emerald-800 focus-visible:outline-2 focus-visible:outline-emerald-700 disabled:text-stone-400"
               @click="showPassword = !showPassword"
             >
               {{ showPassword ? 'Sembunyikan' : 'Tampilkan' }}
             </button>
           </div>
         </div>
+        <div class="login-help"><NuxtLink to="/contact">Lupa kata sandi?</NuxtLink></div>
         <UButton
           type="submit"
-          size="lg"
-          class="w-full justify-center"
+          class="login-primary"
           :disabled="!configured || loading"
           :loading="loading"
           >{{ loading ? 'Memproses login...' : 'Masuk' }}</UButton
         >
       </form>
-      <div class="mt-8 border-t border-stone-200 pt-6 text-sm leading-relaxed text-stone-600">
-        <p class="font-semibold text-stone-800">Belum memiliki akun?</p>
-        <p class="mt-2">
-          Pendaftaran mandiri dinonaktifkan. Hubungi pengelola untuk mendapatkan akun katalog.
-        </p>
-        <UButton
-          :to="registerDestination"
-          class="mt-4 w-full justify-center"
-          size="lg"
-          variant="outline"
+      <div class="login-register">
+        <p>Belum memiliki akun?</p>
+        <UButton :to="registerDestination" variant="outline" class="login-secondary"
           >Daftar</UButton
         >
+        <p class="registration-note">
+          Pendaftaran mandiri dinonaktifkan. Hubungi pengelola untuk mendapatkan akun.
+        </p>
       </div>
     </div>
   </section>
 </template>
+
+<style scoped>
+.login-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 960px;
+  margin: 0 auto;
+  border: 1px solid #e6e8e4;
+  border-radius: 24px;
+  overflow: hidden;
+  color: #222;
+  font-family: var(--font-landing-sans);
+}
+.login-welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  padding: 48px 40px;
+  background: #f4f8f5;
+}
+.auth-brand {
+  display: flex;
+  flex: 1;
+  min-height: 180px;
+  align-items: center;
+  justify-content: center;
+}
+.auth-brand :deep(.erlangga-logo) {
+  width: min(373px, 100%);
+  height: 100px;
+}
+.auth-brand :deep(.publisher-logos) {
+  width: 100%;
+  justify-content: center;
+}
+.login-welcome h2 {
+  font: 600 30px/36px var(--font-landing-serif);
+}
+.login-welcome p {
+  margin-top: 16px;
+  color: #6b6f6b;
+  font: 400 17px/27.2px var(--font-landing-serif);
+}
+.login-panel {
+  min-width: 0;
+  padding: 48px 44px;
+}
+.login-panel h1 {
+  font: 500 30px/36px var(--font-landing-serif);
+}
+.login-intro {
+  margin-top: 6px;
+  color: #6b6f6b;
+  font-size: 15px;
+  line-height: 24px;
+}
+.login-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+.login-field {
+  display: grid;
+  gap: 6px;
+}
+.login-field label {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 21px;
+}
+.login-field > input,
+.password-field {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid #e6e8e4;
+  border-radius: 12px;
+  background: #fff;
+}
+.login-field input {
+  min-width: 0;
+  padding: 12px 14px;
+  font-size: 15px;
+  line-height: 20px;
+}
+.login-field input:disabled {
+  background: #f5f5f4;
+}
+.password-field {
+  display: flex;
+  overflow: hidden;
+}
+.password-field input {
+  flex: 1;
+  width: 0;
+  outline: none;
+}
+.password-field:focus-within {
+  outline: 2px solid #1f5c3f;
+  outline-offset: 2px;
+}
+.password-field button {
+  padding: 4px 12px;
+  color: #1f5c3f;
+  font-size: 13px;
+}
+.password-field button:disabled {
+  opacity: 0.5;
+}
+.login-help {
+  display: flex;
+  justify-content: flex-end;
+  color: #1f5c3f;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.login-primary,
+.login-secondary {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  justify-content: center;
+  padding: 8px 22px;
+  border: 1px solid #1f5c3f;
+  border-radius: 12px;
+  font-family: var(--font-landing-sans);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 24px;
+}
+.login-primary {
+  background: #1f5c3f;
+  color: #fff;
+}
+.login-primary:hover {
+  background: #184a32;
+}
+.login-secondary {
+  color: #1f5c3f;
+  background: #fff;
+}
+.login-secondary:hover {
+  background: #f4f8f5;
+}
+.login-register {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+  color: #6b6f6b;
+  font-size: 13px;
+}
+.registration-note {
+  font-size: 12px;
+  line-height: 19px;
+}
+.login-account {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+  font-size: 14px;
+  line-height: 22px;
+  color: #6b6f6b;
+}
+.login-notice,
+.login-alert {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 21px;
+}
+.login-notice {
+  background: #f4f8f5;
+  color: #1f5c3f;
+}
+.login-notice a {
+  text-decoration: underline;
+}
+.login-alert {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+button,
+input,
+a {
+  outline-offset: 3px;
+}
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 2px solid #1f5c3f;
+}
+@media (max-width: 800px) {
+  .login-card {
+    grid-template-columns: 1fr;
+  }
+  .login-welcome {
+    gap: 32px;
+    padding: 32px;
+  }
+  .auth-brand {
+    min-height: 140px;
+  }
+  .auth-brand :deep(.erlangga-logo) {
+    max-width: 300px;
+    height: 80px;
+  }
+  .login-panel {
+    padding: 32px;
+  }
+}
+@media (max-width: 450px) {
+  .login-welcome,
+  .login-panel {
+    padding: 28px 24px;
+  }
+  .login-welcome h2 {
+    font-size: 26px;
+    line-height: 32px;
+  }
+}
+</style>

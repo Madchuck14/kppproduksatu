@@ -58,6 +58,9 @@ const { data, error, status, refresh } = await useFetch('/api/products', {
   })),
 })
 const page = computed(() => data.value?.page ?? requestedPage.value)
+const isEmpty = computed(
+  () => status.value === 'success' && !error.value && data.value?.products.length === 0,
+)
 const totalPages = computed(() => Math.max(1, Math.ceil((data.value?.total ?? 0) / pageSize.value)))
 const pageItems = computed(() => {
   const pages = new Set([1, totalPages.value, page.value - 1, page.value, page.value + 1])
@@ -136,10 +139,18 @@ async function clearSearch() {
   search.value = ''
   searchInput.value?.focus()
 }
+function clearFilters() {
+  return updateQuery({ level: undefined, grade: undefined, subject: undefined })
+}
 </script>
 
 <template>
-  <section :class="['catalog-page', { 'catalog-page--search': appliedSearch }]">
+  <section
+    :class="[
+      'catalog-page',
+      { 'catalog-page--search': appliedSearch, 'catalog-page--empty': isEmpty },
+    ]"
+  >
     <nav class="catalog-breadcrumb" aria-label="Breadcrumb">
       <NuxtLink to="/">Beranda</NuxtLink><span aria-hidden="true">/</span
       ><template v-if="appliedSearch"
@@ -155,7 +166,9 @@ async function clearSearch() {
             ? 'Mencari buku...'
             : error
               ? 'Hasil pencarian belum dapat dimuat.'
-              : `${data?.total ?? 0} buku ditemukan. Persempit hasil dengan filter di samping.`
+              : isEmpty
+                ? 'Tidak ada buku yang cocok dengan pencarian dan filter Anda.'
+                : `${data?.total ?? 0} buku ditemukan. Persempit hasil dengan filter di samping.`
         }}
       </p>
       <p v-else>Telusuri buku berdasarkan jenjang, kelas, dan mata pelajaran.</p>
@@ -282,12 +295,29 @@ async function clearSearch() {
             variant="catalog"
           />
         </div>
-        <p v-else-if="status !== 'pending'" class="catalog-message">
-          Tidak ada buku yang sesuai dengan pencarianmu.
-        </p>
+        <section v-else-if="isEmpty" class="empty-search" aria-labelledby="empty-search-title">
+          <img src="/images/catalog/search-empty.svg" alt="" width="120" height="100" />
+          <h2 id="empty-search-title">
+            {{
+              appliedSearch
+                ? `Tidak ada buku untuk “${appliedSearch}”`
+                : 'Tidak ada buku yang cocok'
+            }}
+          </h2>
+          <p>Coba periksa ejaan atau gunakan kata kunci yang lebih umum.</p>
+          <ul class="empty-search-tips">
+            <li>Periksa kembali ejaan kata kunci</li>
+            <li>Kurangi filter jenjang, kelas, atau mata pelajaran</li>
+            <li>Cari dengan nama penulis atau kode buku</li>
+          </ul>
+          <div class="empty-search-actions">
+            <button type="button" @click="clearFilters">Hapus semua filter</button>
+            <NuxtLink to="/products">Lihat semua buku</NuxtLink>
+          </div>
+        </section>
       </div>
     </div>
-    <div v-if="!error" class="catalog-pagination">
+    <div v-if="!error && !isEmpty" class="catalog-pagination">
       <nav aria-label="Halaman katalog" class="pagination-controls">
         <button
           type="button"
@@ -598,6 +628,84 @@ legend {
   color: #2f6b4f;
   text-decoration: underline;
 }
+.catalog-page--empty .catalog-layout {
+  min-height: 637px;
+}
+.catalog-page--empty .results-bar {
+  margin-bottom: 8px;
+}
+.empty-search {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  padding: 72px 0;
+  text-align: center;
+}
+.empty-search > img {
+  flex-shrink: 0;
+  width: 120px;
+  height: 100px;
+}
+.empty-search h2 {
+  margin-top: 4px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: #222;
+  font: 500 26px/1.2 var(--font-landing-serif);
+}
+.empty-search > p,
+.empty-search-tips {
+  color: #6b6f6b;
+  font-size: 15px;
+  line-height: 24px;
+}
+.empty-search-tips {
+  display: grid;
+  gap: 6px;
+  margin-top: 18px;
+  text-align: left;
+}
+.empty-search-tips li {
+  position: relative;
+  padding-left: 18px;
+}
+.empty-search-tips li::before {
+  content: '–';
+  position: absolute;
+  left: 0;
+}
+.empty-search-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+.empty-search-actions button,
+.empty-search-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 22px;
+  border: 1px solid #1f5c3f;
+  border-radius: 12px;
+  color: #1f5c3f;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 24px;
+}
+.empty-search-actions button {
+  background: #1f5c3f;
+  color: white;
+}
+.empty-search-actions button:hover {
+  background: #184a32;
+}
+.empty-search-actions a:hover {
+  background: #f4f8f5;
+}
 .catalog-pagination {
   display: flex;
   flex-wrap: wrap;
@@ -672,6 +780,15 @@ legend {
   }
 }
 @media (max-width: 700px) {
+  .catalog-page--empty .catalog-layout {
+    min-height: 0;
+  }
+  .empty-search {
+    padding: 40px 0;
+  }
+  .empty-search h2 {
+    font-size: 24px;
+  }
   .catalog-heading h1 {
     font-size: 32px;
     line-height: 40px;
