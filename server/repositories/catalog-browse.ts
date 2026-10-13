@@ -5,7 +5,7 @@ import { bookDivisions } from '#shared/utils/book-divisions'
 import type { CatalogBrowse } from '#shared/types/catalog-browse'
 import { demoProducts } from '../data/products'
 import { getCatalogClient } from '../utils/catalog-client'
-import { mapProductRow } from './products'
+import { mapProductRow, productColumns } from './products'
 
 export async function getCatalogBrowse(
   event: H3Event,
@@ -28,7 +28,8 @@ export async function getCatalogBrowse(
   }
   if (source !== 'supabase')
     throw createError({ statusCode: 503, statusMessage: 'Sumber katalog tidak valid' })
-  const { data, error } = await getCatalogClient(event).rpc('catalog_browse_groups', {
+  const client = getCatalogClient(event)
+  const { data, error } = await client.rpc('catalog_browse_groups', {
     group_kind: kind,
   })
   if (error)
@@ -42,16 +43,51 @@ export async function getCatalogBrowse(
       z.object({
         group_code: z.string(),
         book_count: z.number().int().nonnegative(),
-        books: z.array(z.unknown()),
+        books: z.array(z.object({ id: z.string().uuid() }).passthrough()),
       }),
     )
     .parse(data)
+  // Older RPC definitions omit the newer public detail columns. Read their actual
+  // values in one query, preserving the RPC's ranking instead of inventing defaults.
+  const missingDetailIds = [
+    ...new Set(
+      rows
+        .flatMap((row) => row.books)
+        .filter((book) =>
+          ['division_code', 'synopsis', 'target_market'].some((key) => !(key in book)),
+        )
+        .map((book) => book.id),
+    ),
+  ]
+  const details = new Map<string, ReturnType<typeof mapProductRow>>()
+  if (missingDetailIds.length) {
+    const { data: products, error: detailError } = await client
+      .from('products')
+      .select(productColumns)
+      .in('id', missingDetailIds)
+      .eq('published', true)
+    if (detailError)
+      throw createError({
+        statusCode: 503,
+        statusMessage: 'Informasi buku pada ranking belum dapat dimuat',
+      })
+    for (const product of products ?? []) {
+      const mapped = mapProductRow(event, product)
+      details.set(mapped.id, mapped)
+    }
+  }
+  const missingIds = new Set(missingDetailIds)
   return {
     source,
     groups: rows.map((row) => ({
       code: row.group_code,
       total: row.book_count,
-      products: row.books.map((book) => mapProductRow(event, book)),
+      products: row.books.flatMap((book) => {
+        if (!missingIds.has(book.id)) return [mapProductRow(event, book)]
+        const product = details.get(book.id)
+        // A book unpublished between the RPC and detail read must not be exposed.
+        return product ? [product] : []
+      }),
     })),
   }
 }

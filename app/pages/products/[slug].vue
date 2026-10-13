@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import type { FlyerPreview } from '#shared/types/flyer'
+import type { PresentationPreview } from '#shared/types/presentation'
 import { bookDivisions } from '#shared/utils/book-divisions'
-
 const route = useRoute()
 const config = useRuntimeConfig()
 const user = useSupabaseUser()
 type ResourceStatus = {
   flyer: boolean
-  flyerFormat: FlyerPreview['format'] | null
+  flyerFormat: PresentationPreview['format'] | null
   dummy: boolean
   productKnowledge: boolean
+  presentationFormat: PresentationPreview['format'] | null
   productKnowledgeFormat: 'PDF' | 'PPT' | 'PPTX' | null
 }
 const { data: product, error } = await useFetch(
@@ -34,7 +34,7 @@ const relatedProducts = computed(() =>
 const coverDialog = useTemplateRef<HTMLDialogElement>('cover-dialog')
 const pdfDialog = useTemplateRef<HTMLDialogElement>('pdf-dialog')
 const pdfViewerUrl = ref('')
-const flyerPreview = ref<FlyerPreview | null>(null)
+const presentationPreview = ref<PresentationPreview | null>(null)
 const pdfViewerTitle = ref('')
 const pdfViewerKind = ref<'product-knowledge' | 'flyer' | 'dummy'>('flyer')
 let pdfRequest = 0
@@ -77,21 +77,21 @@ async function openPdfResource(resource: (typeof resources)[number]) {
   pdfViewerKind.value = resource.id
   pdfViewerTitle.value = resource.title
   pdfViewerUrl.value = ''
-  flyerPreview.value = null
+  presentationPreview.value = null
   pdfViewerError.value = ''
   pdfViewerBusy.value = true
   pdfDialog.value?.showModal()
   try {
     const result = await $fetch<{
       url: string
-      format?: FlyerPreview['format']
+      format?: PresentationPreview['format']
       slides?: string[]
     }>(
       `/api/products/${encodeURIComponent(product.value!.slug)}/resources/${resource.id}?preview=1`,
     )
     if (request === pdfRequest) {
-      if (resource.id === 'flyer' && result.format && result.format !== 'pdf')
-        flyerPreview.value = { format: result.format, slides: result.slides ?? [] }
+      if (resource.id === 'product-knowledge' && result.format && result.format !== 'pdf')
+        presentationPreview.value = { format: result.format, slides: result.slides ?? [] }
       else pdfViewerUrl.value = result.url
     }
   } catch (error) {
@@ -114,7 +114,7 @@ function resourceFormat(resourceId: (typeof resources)[number]['id']) {
     return resourceStatus.value?.productKnowledgeFormat ?? 'PPT/PPTX'
   return 'PDF'
 }
-function isPowerPointFormat(format: FlyerPreview['format'] | null | undefined) {
+function isPowerPointFormat(format: PresentationPreview['format'] | null | undefined) {
   return format === 'ppt' || format === 'pptx'
 }
 function closePdfDialog() {
@@ -124,7 +124,7 @@ function closePdfDialog() {
 function resetPdfDialog() {
   pdfRequest += 1
   pdfViewerUrl.value = ''
-  flyerPreview.value = null
+  presentationPreview.value = null
   pdfViewerError.value = ''
   pdfViewerBusy.value = false
 }
@@ -278,7 +278,8 @@ useSeoMeta({
             <h3>{{ resource.title }}</h3>
             <p class="resource-metadata">
               {{
-                resource.id === 'flyer' && isPowerPointFormat(resourceStatus?.flyerFormat)
+                resource.id === 'product-knowledge' &&
+                isPowerPointFormat(resourceStatus?.presentationFormat)
                   ? 'PowerPoint \u00b7 Preview slide'
                   : resource.id === 'product-knowledge'
                     ? `Materi presentasi \u00b7 ${resourceFormat(resource.id)}`
@@ -299,20 +300,17 @@ useSeoMeta({
               <a
                 :href="`/api/products/${encodeURIComponent(product.slug)}/resources/${resource.id}?download=1`"
                 class="resource-download"
-                :aria-label="`Unduh ${resource.id === 'flyer' && isPowerPointFormat(resourceStatus?.flyerFormat) ? 'PowerPoint' : resourceFormat(resource.id)}: ${resource.title}`"
+                :aria-label="`Unduh ${resource.id === 'product-knowledge' && isPowerPointFormat(resourceStatus?.presentationFormat) ? 'PowerPoint' : resourceFormat(resource.id)}: ${resource.title}`"
               >
                 <img src="/images/book-detail/download.svg" alt="" width="16" height="16" />
                 {{
-                  resource.id === 'flyer' && isPowerPointFormat(resourceStatus?.flyerFormat)
+                  resource.id === 'product-knowledge' &&
+                  resourceStatus?.presentationFormat !== 'pdf'
                     ? 'Unduh PowerPoint'
                     : `Unduh ${resourceFormat(resource.id)}`
                 }}
               </a>
               <button
-                v-if="
-                  resource.id !== 'product-knowledge' ||
-                  resourceStatus?.productKnowledgeFormat === 'PDF'
-                "
                 type="button"
                 class="resource-view"
                 :aria-label="`Lihat: ${resource.title}`"
@@ -334,7 +332,7 @@ useSeoMeta({
     >
       <div class="flex h-full flex-col">
         <div
-          v-if="!pdfViewerUrl && !flyerPreview"
+          v-if="!pdfViewerUrl && !presentationPreview"
           class="flex items-center justify-between gap-4 border-b border-stone-200 px-5 py-4"
         >
           <h2 class="text-lg font-semibold">{{ pdfViewerTitle }}</h2>
@@ -361,11 +359,11 @@ useSeoMeta({
           >
             {{ pdfViewerError }}
           </div>
-          <FlyerSlideViewer
-            v-else-if="flyerPreview"
-            :slides="flyerPreview.slides"
+          <PresentationSlideViewer
+            v-else-if="presentationPreview"
+            :slides="presentationPreview.slides"
             :title="pdfViewerTitle"
-            :download-url="`/api/products/${encodeURIComponent(product.slug)}/resources/flyer?download=1`"
+            :download-url="`/api/products/${encodeURIComponent(product.slug)}/resources/product-knowledge?download=1`"
             @close="closePdfDialog"
           />
           <PdfFlipbookViewer

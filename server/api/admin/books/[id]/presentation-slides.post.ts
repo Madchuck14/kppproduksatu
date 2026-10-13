@@ -1,15 +1,18 @@
 import { serverSupabaseClient } from '#supabase/server'
 import { bookIdSchema } from '#shared/schemas/editor'
 import { requireEditor } from '../../../../utils/require-editor'
-import { getEditorFlyerPath, setEditorFlyerSlides } from '../../../../repositories/editor-books'
+import {
+  getEditorPresentationPath,
+  setEditorPresentationSlides,
+} from '../../../../repositories/editor-books'
 import { readUploadBytes } from '../../../../utils/book-material'
-import { validateFlyerSlide } from '../../../../utils/flyer-slide'
+import { validatePresentationSlide } from '../../../../utils/presentation-slide'
 
 export default defineEventHandler(async (event) => {
   const account = await requireEditor(event)
   const id = bookIdSchema.safeParse(getRouterParam(event, 'id'))
   if (!id.success) throw createError({ statusCode: 400, statusMessage: 'Buku tidak valid' })
-  const flyerPath = await getEditorFlyerPath(event, account, id.data)
+  const presentationPath = await getEditorPresentationPath(event, account, id.data)
   const contentType = getHeader(event, 'content-type') ?? ''
   if (!contentType.startsWith('multipart/form-data;'))
     throw createError({ statusCode: 400, statusMessage: 'Pilih gambar slide' })
@@ -29,7 +32,7 @@ export default defineEventHandler(async (event) => {
     slides.map(async (slide) => {
       const file = slide as File
       const data = new Uint8Array(await file.arrayBuffer())
-      const extension = validateFlyerSlide(data, file.type)
+      const extension = validatePresentationSlide(data, file.type)
       return { data, type: file.type, extension }
     }),
   )
@@ -37,7 +40,7 @@ export default defineEventHandler(async (event) => {
   const paths: string[] = []
   try {
     for (const slide of validated) {
-      const path = `books/${id.data}/flyer-slides/${crypto.randomUUID()}.${slide.extension}`
+      const path = `books/${id.data}/presentation-slides/${crypto.randomUUID()}.${slide.extension}`
       const { error } = await client.storage
         .from('book-materials')
         .upload(path, slide.data, { contentType: slide.type, upsert: false })
@@ -45,7 +48,7 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 503, statusMessage: 'Slide gagal diunggah. Coba lagi.' })
       paths.push(path)
     }
-    return await setEditorFlyerSlides(event, account, id.data, flyerPath, paths)
+    return await setEditorPresentationSlides(event, account, id.data, presentationPath, paths)
   } catch (error) {
     if (paths.length) await client.storage.from('book-materials').remove(paths)
     throw error

@@ -29,6 +29,9 @@ export default defineEventHandler(async (event) => {
   return {
     flyer: Boolean(data.flyer_path),
     flyerFormat: flyerExtension?.success ? flyerExtension.data : null,
+    presentationFormat: data.product_knowledge_path
+      ? data.product_knowledge_path.split('.').pop()
+      : null,
     dummy: Boolean(data.dummy_book_path),
     productKnowledge: Boolean(data.product_knowledge_path),
     productKnowledgeFormat,

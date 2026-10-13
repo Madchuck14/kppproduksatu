@@ -22,6 +22,7 @@ type BookRow = {
   publication_year: number | null
   flyer_path: string | null
   flyer_slide_paths: string[]
+  product_knowledge_slide_paths: string[]
   dummy_book_path: string | null
   product_knowledge_path: string | null
   created_at: string

@@ -61,14 +61,14 @@ async function fullscreen() {
 </script>
 
 <template>
-  <div ref="viewer" tabindex="0" class="flyer-viewer" @keydown="onKey">
-    <header class="flyer-toolbar">
+  <div ref="viewer" tabindex="0" class="presentation-viewer" @keydown="onKey">
+    <header class="presentation-toolbar">
       <h2>{{ title }}</h2>
       <a :href="downloadUrl">Unduh PowerPoint</a>
       <button type="button" @click="fullscreen">Layar penuh</button>
       <button type="button" @click="emit('close')">Tutup</button>
     </header>
-    <div class="flyer-stage">
+    <div class="presentation-stage">
       <p v-if="loading" role="status">Memuat slide...</p>
       <p v-else-if="errorMessage" role="alert">{{ errorMessage }}</p>
       <p v-else-if="!images.length">
@@ -81,7 +81,7 @@ async function fullscreen() {
         :style="{ width: `${zoom}%` }"
       />
     </div>
-    <footer v-if="images.length && !loading" class="flyer-toolbar flyer-controls">
+    <footer v-if="images.length && !loading" class="presentation-toolbar presentation-controls">
       <button type="button" :disabled="page === 0" aria-label="Slide sebelumnya" @click="move(-1)">
         Sebelumnya
       </button>
@@ -107,14 +107,14 @@ async function fullscreen() {
 </template>
 
 <style scoped>
-.flyer-viewer {
+.presentation-viewer {
   display: flex;
   height: 100%;
   flex-direction: column;
   background: white;
   color: #222;
 }
-.flyer-toolbar {
+.presentation-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -122,53 +122,53 @@ async function fullscreen() {
   padding: 14px 20px;
   border-bottom: 1px solid #e6e8e4;
 }
-.flyer-toolbar h2 {
+.presentation-toolbar h2 {
   flex: 1;
   min-width: 140px;
   font-weight: 600;
 }
-.flyer-toolbar :is(button, a, select) {
+.presentation-toolbar :is(button, a, select) {
   border: 1px solid #1f5c3f;
   border-radius: 8px;
   padding: 6px 10px;
   color: #1f5c3f;
 }
-.flyer-toolbar button:disabled {
+.presentation-toolbar button:disabled {
   opacity: 0.4;
 }
-.flyer-stage {
+.presentation-stage {
   flex: 1;
   min-height: 0;
   overflow: auto;
   background: #eeefeb;
   padding: 20px;
 }
-.flyer-stage img {
+.presentation-stage img {
   display: block;
   max-width: none;
   height: auto;
   margin: auto;
 }
-.flyer-stage p {
+.presentation-stage p {
   padding: 24px;
   text-align: center;
 }
-.flyer-controls {
+.presentation-controls {
   justify-content: center;
   border-top: 1px solid #e6e8e4;
   border-bottom: 0;
 }
-.flyer-viewer :is(a, button, select):focus-visible {
+.presentation-viewer :is(a, button, select):focus-visible {
   outline: 2px solid #1f5c3f;
   outline-offset: 3px;
 }
 @media (max-width: 640px) {
-  .flyer-toolbar {
+  .presentation-toolbar {
     padding: 10px;
     gap: 8px;
     font-size: 13px;
   }
-  .flyer-stage {
+  .presentation-stage {
     padding: 10px;
   }
 }

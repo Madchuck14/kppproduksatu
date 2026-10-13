@@ -38,6 +38,12 @@ menyimpan UUID acak lokal; tidak ada email, user ID, atau IP dalam ledger statis
 Ranking memakai total kumulatif dan hanya memasukkan buku published yang sudah memiliki akses;
 seri diurutkan menurut `created_at` terbaru lalu UUID. Koleksi tanpa akses menampilkan keadaan
 kosong, bukan ranking buatan. Mode demo tidak mencatat atau mengarang popularitas.
+
+Jika fungsi `catalog_browse_groups` masih memakai kontrak lama tanpa divisi, sinopsis, atau
+target pasar, repository memuat metadata nyata buku ranking melalui satu query produk published.
+Urutan dan count tetap mengikuti RPC; UUID dideduplikasi saat membaca metadata, dan buku yang
+di-unpublish sebelum pembacaan metadata tidak ditampilkan. Error database tetap menjadi error,
+tanpa data demo atau metadata kosong buatan. RPC terbaru tidak memerlukan query tambahan.
 Favorit pribadi dijelaskan di bagian Favorit buku.
 Aset desain disimpan lokal di `public/images/landing`,
 logo di `public/images/erlangga.png` dan `public/images/phibeta.png`.
@@ -71,9 +77,9 @@ Bagian Materi Promosi mengikuti ekspor lokal Figma `37:8192` dan hanya ditampilk
 kepada pengguna yang sudah login. Panel hijau berisi kartu Flyer Promosi, Presentasi Buku,
 dan Buku Dummy, dengan pratinjau, status berkas, serta tombol unduh dan Lihat.
 Aset flyer dan ikon unduh disimpan di `public/images/book-detail`; pratinjau dummy memakai
-sampul katalog. Flyer baru memakai PPT/PPTX dengan preview gambar slide; Product Knowledge
-menerima PDF/PPT/PPTX dan Dummy Buku menerima PDF. Label unduhan mengikuti format nyata, termasuk
-flyer PDF lama.
+sampul katalog. PPT Produk (Product Knowledge) memakai PPT/PPTX dengan preview gambar slide,
+sedangkan Flyer dan Dummy Buku memakai PDF. Label unduhan mengikuti format nyata, termasuk PDF
+Product Knowledge lama yang tetap dapat dibuka.
 Ukuran contoh tidak ditampilkan karena metadata tersebut belum tersedia. Endpoint preview dan
 unduhan memverifikasi login pada server.
 Pratinjau dummy mengikuti ekspor `figmatocode/previewdummy`: dialog putih beradius 20 px,
@@ -82,11 +88,10 @@ mengambang. Isi serta jumlah halaman berasal dari PDF nyata; pembalikan halaman 
 StPageFlip yang sudah tersedia. Zoom dapat diganti lewat tombol atau pilihan persentase;
 halaman dapat digeser saat diperbesar. Tombol panah keyboard, Escape, dan fokus dialog
 tetap berfungsi. Aset toolbar disimpan lokal di `public/images/dummy-preview`.
-Flyer PPT/PPTX memakai penampil gambar slide dalam dialog: navigasi tombol/panah keyboard,
+PPT Produk memakai penampil gambar slide dalam dialog: navigasi tombol/panah keyboard,
 zoom 50–200%, fullscreen, dan unduh PowerPoint asli. Seluruh gambar diambil saat dialog dibuka,
 lalu object URL lokal dibersihkan ketika ditutup. Preview ini statis, tanpa transisi atau animasi.
-Flyer PDF lama dan Product Knowledge PDF tetap memakai viewer PDF yang tersedia. Product Knowledge
-PPT/PPTX dapat diunduh dalam format aslinya dan tidak ditampilkan sebagai viewer PDF.
+Flyer, Dummy Buku, dan Product Knowledge PDF lama memakai viewer PDF yang tersedia.
 Favorit anonim menawarkan login
 dengan tujuan kembali ke buku. Tombol pemesanan menuju kontak pada footer beranda.
 
@@ -102,8 +107,8 @@ yang dikenal, serta `/products` dan `/favorites`. Login tanpa tujuan mengarahkan
 Login dari registrasi tanpa tujuan buku kembali ke katalog publik `/products`.
 Endpoint status hanya mengembalikan boolean dan format, tanpa URL/path privat. Endpoint preview
 dan unduhan memverifikasi `auth.getUser()` dan membatasi buku published sebelum membuat signed URL
-berumur 60 detik. Dashboard Editor mengunggah flyer PPT/PPTX, gambar slide PNG/JPG, Dummy Buku PDF,
-serta Product Knowledge PDF/PPT/PPTX ke bucket privat `book-materials`. Endpoint upload memeriksa
+berumur 60 detik. Dashboard Editor mengunggah PPT Produk PPT/PPTX, gambar slide PNG/JPG, serta
+Flyer dan Dummy Buku PDF ke bucket privat `book-materials`. Endpoint upload tetap memeriksa
 session, scope jenjang, MIME, signature, dan ukuran; RLS menutup akses materi anonim.
 CRUD katalog per jenjang tersedia pada dashboard Editor.
 
@@ -185,13 +190,14 @@ Object baru memakai `books/{product UUID}/{random UUID}.{extension}`; RLS Storag
 ke buku tersebut. Tidak ada overwrite object. File lama tidak otomatis dihapus saat sampul diganti
 atau buku dihapus; pembersihan aset tak terpakai dilakukan terpisah oleh pengelola.
 
-Flyer dibatasi PPT/PPTX 20 MB dengan 1–20 gambar slide PNG/JPG, masing-masing maksimal 2 MB.
+PPT Produk dibatasi PPT/PPTX 50 MB dengan 1–20 gambar slide PNG/JPG, masing-masing maksimal 2 MB.
 Editor mengekspor gambar secara manual dari PowerPoint, memeriksa urutan pada form, lalu mengunggah
 seluruh set. Gambar diurutkan berdasarkan nama secara numerik dan dapat dipindahkan naik/turun.
 Penggantian PPT mengosongkan preview lama. Upload gambar disimpan sebagai satu daftar setelah
 semua file berhasil diunggah; kegagalan mempertahankan daftar sebelumnya dan membersihkan file
-baru. Perubahan flyer saat upload menyebabkan 409, bukan memasang slide pada PPT yang berbeda.
-Dummy Buku dibatasi PDF 20 MB dan Product Knowledge PDF 50 MB. Dummy Buku memakai PDF.js dan
+baru. Perubahan PPT Produk saat upload menyebabkan 409, bukan memasang slide pada PPT yang berbeda.
+Flyer dan Dummy Buku dibatasi PDF 20 MB. Product Knowledge PDF lama tetap terbaca, tetapi unggahan
+baru memakai PPT/PPTX. Dummy Buku memakai PDF.js dan
 StPageFlip (`page-flip`) dalam popup flipbook: dua halaman pada layar lebar, satu halaman pada layar
 sempit, dengan sampul, swipe/drag, tombol navigasi, dan panah keyboard. PDF diambil sekali sebelum
 halaman disiapkan agar navigasi tidak bergantung pada masa berlaku signed URL. Penampil hanya
@@ -279,23 +285,22 @@ Deployment memerlukan migration `202610070001_product_favorites.sql`; lihat pand
 Halaman `/admin/books/new` mengikuti Figma `97:5388`, dengan kartu Identitas buku,
 Klasifikasi, Deskripsi buku, Sampul buku, Materi privat, dan Publikasi. Desktop memakai
 kontainer 1280 px dengan padding 32 px, kolom kanan 380 px, dan jarak antarkolom 24 px.
-Font Lora/Inter, logo, header/footer, dan aset ikon lokal dipakai kembali. Halaman edit memakai layout dan kartu yang sama, dengan metadata, sampul, serta status materi
-yang sudah tersimpan. Penulis, tahun, kelas, dan mapel tetap opsional saat edit; deskripsi lama
-tetap menerima 20.000 karakter. Guard Editor dan scope jenjang tidak berubah.
+Font Lora/Inter, logo, header/footer, dan aset ikon lokal dipakai kembali. Halaman tambah dan
+edit memakai `EditorBookForm` yang sama: susunan kartu, kolom, jarak, tampilan mobile, serta
+unggahan sampul dan materi identik. Pada edit, metadata, sampul, status materi, dan jumlah slide
+yang sudah tersimpan dimuat sebagai nilai awal; judul halaman, tombol simpan, serta label ganti
+sampul mengikuti mode edit.
 
-ISBN, kurikulum, isi buku, dan manfaat merupakan state UI sementara.
-Kolom tersebut belum dikirim ke API atau disimpan ke database. Jika salah satunya diisi,
-Simpan buku menampilkan pemberitahuan dan tidak mengirim request agar data tidak dibuang
-diam-diam. Isian hilang ketika meninggalkan halaman. Kolom lama masih memakai kontrak API
-yang ada. Form tambah menandai penulis, tahun terbit, kelas, dan mata pelajaran wajib sesuai
-desain; kurikulum masih pratinjau dan belum divalidasi sebagai kolom wajib saat menyimpan.
-Deskripsi singkat memakai `description` yang sudah tersedia, dibatasi 300 karakter pada UI
-tambah. Edit mempertahankan batas 20.000 karakter. Isi buku dan manfaat memiliki penghitung 2.000 dan 1.000 karakter.
+Penulis, tahun terbit, kelas, dan mata pelajaran wajib dilengkapi pada kedua form melalui
+validasi HTML yang sama. Placeholder kelas/mapel mengikuti jenjang dan tidak dapat dipilih
+sebagai nilai kosong. Buku lama yang belum lengkap perlu diisi sebelum disimpan lewat form edit.
+Kontrak API tetap kompatibel dengan metadata lama yang nullable; perubahan ini tidak mengubah
+schema database, guard Editor, atau scope jenjang.
 
-Migrasi dan integrasi penyimpanan kolom baru ditunda ke sesi berikutnya. Sesi ini tidak
-mengubah schema, repository, API, RLS, atau kebijakan akses materi. Teks materi privat pada
-desain belum membuktikan pembatasan akses login pada backend; kebijakan akses yang berjalan
-tetap dijelaskan pada bagian Detail buku dan tujuan login.
+Sinopsis, keunggulan, target pasar, dan divisi dikirim melalui kontrak katalog yang tersedia.
+ISBN dan kurikulum masih state UI sementara dan belum disimpan. Mengisi salah satunya menahan
+pengiriman form dengan penjelasan agar data tidak dibuang diam-diam. Penyimpanan serta akses
+materi privat dijelaskan pada bagian Detail buku dan tujuan login.
 
 ## Katalog publik dan kelas buku
 

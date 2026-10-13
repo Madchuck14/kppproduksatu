@@ -46,7 +46,9 @@ const input = {
   subject: 'Matematika',
   title: 'Contoh',
   author: '',
-  description: '',
+  synopsis: null,
+  targetMarket: [],
+  divisionCode: null,
   price: 0,
   publicationYear: null,
   featured: false,
@@ -145,6 +147,9 @@ source = 'supabase'
 const calls = []
 const row = {
   id: base.id,
+  division_code: null,
+  synopsis: null,
+  target_market: [],
   slug: base.slug,
   title: base.title,
   author: base.author,
@@ -248,9 +253,12 @@ client.from = () => {
   throw new Error('database unavailable')
 }
 await assert.rejects(list(), /database unavailable/, 'Database failure must not fall back to demo')
-const { saveEditorBook } = load('server/repositories/editor-books.ts')
+const { saveEditorBook, setEditorBookMaterial } = load('server/repositories/editor-books.ts')
 let editorRow = {
   ...row,
+  division_code: null,
+  synopsis: null,
+  target_market: [],
   highlights: ['Existing point'],
   published: true,
   flyer_path: null,
@@ -317,8 +325,119 @@ assert.deepEqual(
 console.log(
   'PASS: highlights validation, public mapping, create/update roundtrip, empty-list clearing, and legacy-write preservation (repository stub).',
 )
+editorRow = {
+  ...editorRow,
+  flyer_path: 'books/id/flyer/original.pdf',
+  flyer_slide_paths: ['legacy-flyer.png'],
+  product_knowledge_path: 'books/id/product-knowledge/original.pptx',
+  product_knowledge_slide_paths: ['old-presentation.png'],
+}
+await setEditorBookMaterial(
+  {},
+  account,
+  row.id,
+  'product-knowledge',
+  'books/id/product-knowledge/new.pptx',
+)
+assert.deepEqual(writes.at(-1), {
+  product_knowledge_path: 'books/id/product-knowledge/new.pptx',
+  product_knowledge_slide_paths: [],
+})
+assert.equal(editorRow.flyer_path, 'books/id/flyer/original.pdf')
+assert.deepEqual(editorRow.flyer_slide_paths, ['legacy-flyer.png'])
+editorRow.product_knowledge_slide_paths = ['current-presentation.png']
+await setEditorBookMaterial({}, account, row.id, 'flyer', 'books/id/flyer/replacement.pdf')
+assert.deepEqual(writes.at(-1), {
+  flyer_path: 'books/id/flyer/replacement.pdf',
+  flyer_slide_paths: [],
+})
+assert.equal(editorRow.product_knowledge_path, 'books/id/product-knowledge/new.pptx')
+assert.deepEqual(editorRow.product_knowledge_slide_paths, ['current-presentation.png'])
+console.log(
+  'PASS: replacing PPT Produk clears only presentation previews; replacing Flyer PDF preserves PPT Produk and clears legacy flyer metadata (repository stub).',
+)
 console.log(
   'PASS: grade validation, legacy input, pagination beyond 60, sorting, multi-subject filters, facets, empty results, school counts, published-only query constraints, and database failure propagation.',
+)
+const { getCatalogBrowse } = load('server/repositories/catalog-browse.ts')
+const first = {
+  ...row,
+  division_code: 'sd-1-mipa',
+  synopsis: 'Sinopsis tersimpan',
+  target_market: ['Guru SD'],
+}
+const second = { ...first, id: '11111111-1111-4111-8111-111111111111', slug: 'ranked-second' }
+function legacy(book) {
+  const result = { ...book }
+  for (const key of ['division_code', 'synopsis', 'target_market']) delete result[key]
+  return result
+}
+let rpcBooks = [legacy(second), legacy(first)]
+let detailRows = [first, second]
+let detailError = null
+let rpcError = null
+const detailCalls = []
+client = {
+  rpc: async () => ({
+    data: [{ group_code: 'SD', book_count: 2, books: rpcBooks }],
+    error: rpcError,
+  }),
+  from() {
+    const query = {}
+    for (const method of ['select', 'in', 'eq'])
+      query[method] = (...args) => {
+        detailCalls.push([method, ...args])
+        return query
+      }
+    query.then = (resolve) => resolve({ data: detailRows, error: detailError })
+    return query
+  },
+}
+const browse = await getCatalogBrowse({}, 'level')
+assert.deepEqual(
+  browse.groups[0].products.map((book) => book.id),
+  [second.id, first.id],
+  'Metadata read preserves RPC rank',
+)
+assert.equal(browse.groups[0].products[0].synopsis, 'Sinopsis tersimpan')
+assert.deepEqual(browse.groups[0].products[0].targetMarket, ['Guru SD'])
+assert.equal(browse.groups[0].products[0].divisionCode, 'sd-1-mipa')
+assert.equal(detailCalls.filter((call) => call[0] === 'select').length, 1)
+assert.ok(
+  detailCalls.some((call) => call[0] === 'eq' && call[1] === 'published' && call[2] === true),
+)
+assert.equal(
+  detailCalls[0][1].includes('flyer_path'),
+  false,
+  'Metadata query excludes private materials',
+)
+rpcBooks = [legacy(first), legacy(first)]
+detailCalls.length = 0
+await getCatalogBrowse({}, 'level')
+assert.deepEqual(
+  detailCalls.find((call) => call[0] === 'in')[2],
+  [first.id],
+  'Repeated ranked IDs use one metadata lookup',
+)
+detailRows = []
+assert.deepEqual(
+  (await getCatalogBrowse({}, 'level')).groups[0].products,
+  [],
+  'Unpublished/missing metadata is not exposed',
+)
+detailError = { code: '42501' }
+await assert.rejects(getCatalogBrowse({}, 'level'), (error) => error.statusCode === 503)
+detailError = null
+rpcBooks = [second, first]
+detailCalls.length = 0
+assert.equal((await getCatalogBrowse({}, 'level')).groups[0].products.length, 2)
+assert.equal(detailCalls.length, 0, 'Current RPC avoids extra queries')
+rpcError = { code: 'PGRST202' }
+await assert.rejects(getCatalogBrowse({}, 'level'), (error) => error.statusCode === 503)
+source = 'demo'
+assert.ok((await getCatalogBrowse({}, 'level')).groups.every((group) => !group.products.length))
+console.log(
+  'PASS: legacy ranking RPC loads real public metadata once, retains order, deduplicates IDs, excludes unpublished/private data, propagates failures, and preserves current RPC/demo paths.',
 )
 console.log(
   'Database behavior uses a query stub; this does not verify live PostgreSQL constraints or RLS.',

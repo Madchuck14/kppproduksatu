@@ -20,11 +20,15 @@ const draftDetails = reactive({
 })
 const materials = [
   { kind: 'dummy', label: 'Dummy Buku', help: 'PDF, maksimal 20 MB' },
-  { kind: 'product-knowledge', label: 'Product Knowledge', help: 'PPT/PPTX, maksimal 50 MB' },
+  {
+    kind: 'product-knowledge',
+    label: 'PPT Produk',
+    help: 'PPT/PPTX, maksimal 50 MB. Unggah gambar slide di bawah untuk preview.',
+  },
   {
     kind: 'flyer',
     label: 'Flyer',
-    help: 'PPT/PPTX, maksimal 20 MB. Unggah gambar slide di bawah untuk preview.',
+    help: 'PDF, maksimal 20 MB',
   },
 ] as const
 const form = reactive({
@@ -66,14 +70,14 @@ const materialFiles = reactive<Record<'flyer' | 'dummy' | 'product-knowledge', F
   dummy: null,
   'product-knowledge': null,
 })
-const flyerSlides = shallowRef<File[]>([])
-const uploadedFlyer = ref(Boolean(props.book?.resources.flyer))
-const flyerSlideCount = ref(props.book?.flyerSlideCount ?? 0)
-function selectFlyerSlides(event: Event) {
+const presentationSlides = shallowRef<File[]>([])
+const uploadedPresentation = ref(Boolean(props.book?.resources.productKnowledge))
+const presentationSlideCount = ref(props.book?.presentationSlideCount ?? 0)
+function selectPresentationSlides(event: Event) {
   const input = event.target as HTMLInputElement
   const selected = Array.from(input.files ?? [])
   message.value = ''
-  flyerSlides.value = []
+  presentationSlides.value = []
   if (
     selected.length > 20 ||
     selected.some(
@@ -87,18 +91,20 @@ function selectFlyerSlides(event: Event) {
     input.value = ''
     return
   }
-  flyerSlides.value = selected.sort((a, b) => a.name.localeCompare(b.name, 'id', { numeric: true }))
+  presentationSlides.value = selected.sort((a, b) =>
+    a.name.localeCompare(b.name, 'id', { numeric: true }),
+  )
 }
-function moveFlyerSlide(index: number, direction: number) {
-  const slides = [...flyerSlides.value]
+function movePresentationSlide(index: number, direction: number) {
+  const slides = [...presentationSlides.value]
   const target = index + direction
   if (target < 0 || target >= slides.length) return
   const selected = slides.splice(index, 1)[0]!
   slides.splice(target, 0, selected)
-  flyerSlides.value = slides
+  presentationSlides.value = slides
 }
 function materialType(kind: keyof typeof materialFiles, selected: File) {
-  if (kind !== 'flyer') return selected.type
+  if (kind !== 'product-knowledge') return selected.type
   return /\.pptx$/i.test(selected.name)
     ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
     : 'application/vnd.ms-powerpoint'
@@ -135,27 +141,16 @@ function selectMaterial(kind: keyof typeof materialFiles, event: Event) {
   message.value = ''
   materialFiles[kind] = null
   if (!selected) return
-  const acceptedTypes =
-    kind === 'flyer'
-      ? [
-          'application/vnd.ms-powerpoint',
-          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        ]
-      : kind === 'product-knowledge'
-        ? [
-            'application/pdf',
-            'application/vnd.ms-powerpoint',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-          ]
-        : ['application/pdf']
+  const validFormat =
+    kind === 'product-knowledge'
+      ? /\.(ppt|pptx)$/i.test(selected.name)
+      : selected.type === 'application/pdf'
   const maxSize = kind === 'product-knowledge' ? 50 * 1024 * 1024 : 20 * 1024 * 1024
-  if (!acceptedTypes.includes(selected.type) || !selected.size || selected.size > maxSize) {
+  if (!validFormat || !selected.size || selected.size > maxSize) {
     message.value =
-      kind === 'flyer'
-        ? 'Pilih flyer PPT/PPTX maksimal 20 MB.'
-        : kind === 'product-knowledge'
-          ? 'Pilih Product Knowledge PDF/PPT/PPTX maksimal 50 MB.'
-          : 'Pilih berkas PDF maksimal 20 MB.'
+      kind === 'product-knowledge'
+        ? 'Pilih PPT Produk PPT/PPTX maksimal 50 MB.'
+        : 'Pilih berkas PDF maksimal 20 MB.'
     input.value = ''
     return
   }
@@ -165,12 +160,16 @@ async function save() {
   if (busy.value) return
   message.value = ''
   errors.value = {}
-  if (materialFiles.flyer && !flyerSlides.value.length) {
-    message.value = 'Pilih gambar hasil ekspor slide untuk melengkapi preview flyer PowerPoint.'
+  if (materialFiles['product-knowledge'] && !presentationSlides.value.length) {
+    message.value = 'Pilih gambar hasil ekspor slide untuk melengkapi preview PPT Produk.'
     return
   }
-  if (flyerSlides.value.length && !materialFiles.flyer && !uploadedFlyer.value) {
-    message.value = 'Pilih flyer PPT/PPTX sebelum gambar slide.'
+  if (
+    presentationSlides.value.length &&
+    !materialFiles['product-knowledge'] &&
+    !uploadedPresentation.value
+  ) {
+    message.value = 'Pilih PPT Produk PPT/PPTX sebelum gambar slide.'
     return
   }
   if (draftDetails.isbn.trim() || draftDetails.curriculum.trim()) {
@@ -216,8 +215,7 @@ async function save() {
     for (const kind of ['flyer', 'dummy', 'product-knowledge'] as const) {
       const material = materialFiles[kind]
       if (!material) continue
-      const label =
-        kind === 'dummy' ? 'Dummy Buku' : kind === 'flyer' ? 'flyer' : 'Product Knowledge'
+      const label = kind === 'dummy' ? 'Dummy Buku' : kind === 'flyer' ? 'flyer' : 'PPT Produk'
       progress.value = `Mengunggah ${label}...`
       await $fetch(`/api/admin/books/${book.id}/materials/${kind}`, {
         method: 'POST',
@@ -225,21 +223,21 @@ async function save() {
         headers: { 'Content-Type': materialType(kind, material) },
       })
       materialFiles[kind] = null
-      if (kind === 'flyer') {
-        uploadedFlyer.value = true
-        flyerSlideCount.value = 0
+      if (kind === 'product-knowledge') {
+        uploadedPresentation.value = true
+        presentationSlideCount.value = 0
       }
     }
-    if (flyerSlides.value.length) {
-      progress.value = 'Mengunggah gambar slide flyer...'
+    if (presentationSlides.value.length) {
+      progress.value = 'Mengunggah gambar slide PPT Produk...'
       const body = new FormData()
-      for (const slide of flyerSlides.value) body.append('slides', slide)
-      const updated = await $fetch<EditorBook>(`/api/admin/books/${book.id}/flyer-slides`, {
+      for (const slide of presentationSlides.value) body.append('slides', slide)
+      const updated = await $fetch<EditorBook>(`/api/admin/books/${book.id}/presentation-slides`, {
         method: 'POST',
         body,
       })
-      flyerSlideCount.value = updated.flyerSlideCount
-      flyerSlides.value = []
+      presentationSlideCount.value = updated.presentationSlideCount
+      presentationSlides.value = []
     }
     await navigateTo('/admin?notice=saved')
   } catch (error) {
@@ -285,10 +283,8 @@ async function save() {
             <p v-if="errors.title" class="field-error">{{ errors.title }}</p>
           </div>
           <div class="form-field">
-            <label for="new-book-author"
-              >Penulis <span v-if="!book" class="required">*</span></label
-            >
-            <input id="new-book-author" v-model="form.author" :required="!book" maxlength="200" />
+            <label for="new-book-author">Penulis <span class="required">*</span></label>
+            <input id="new-book-author" v-model="form.author" required maxlength="200" />
           </div>
           <div class="field-row">
             <div class="form-field">
@@ -333,14 +329,12 @@ async function save() {
               <p v-if="errors.price" class="field-error">{{ errors.price }}</p>
             </div>
             <div class="form-field">
-              <label for="new-book-year"
-                >Tahun terbit <span v-if="!book" class="required">*</span></label
-              >
+              <label for="new-book-year">Tahun terbit <span class="required">*</span></label>
               <input
                 id="new-book-year"
                 v-model.number="form.publicationYear"
                 type="number"
-                :required="!book"
+                required
                 min="1000"
                 max="9999"
                 step="1"
@@ -368,23 +362,17 @@ async function save() {
               <p v-if="errors.educationLevel" class="field-error">{{ errors.educationLevel }}</p>
             </div>
             <div class="form-field">
-              <label for="new-book-grade">Kelas <span v-if="!book" class="required">*</span></label>
+              <label for="new-book-grade">Kelas <span class="required">*</span></label>
               <select
                 id="new-book-grade"
                 v-model="form.grade"
-                :required="!book"
+                required
                 :disabled="!gradeOptions.length"
                 :aria-invalid="!!errors.grade"
                 aria-describedby="new-book-grade-help"
               >
-                <option :value="null" :disabled="!book">
-                  {{
-                    book
-                      ? 'Belum ditentukan'
-                      : form.educationLevel
-                        ? 'Pilih kelas'
-                        : 'Pilih jenjang dulu'
-                  }}
+                <option :value="null" disabled>
+                  {{ form.educationLevel ? 'Pilih kelas' : 'Pilih jenjang dulu' }}
                 </option>
                 <option v-for="item in gradeOptions" :key="item" :value="item">
                   Kelas {{ item }}
@@ -398,25 +386,17 @@ async function save() {
           </div>
           <div class="field-row">
             <div class="form-field">
-              <label for="new-book-subject"
-                >Mata pelajaran <span v-if="!book" class="required">*</span></label
-              >
+              <label for="new-book-subject">Mata pelajaran <span class="required">*</span></label>
               <select
                 id="new-book-subject"
                 v-model="form.subject"
-                :required="!book"
+                required
                 :disabled="!subjectOptions.length"
                 :aria-invalid="!!errors.subject"
                 aria-describedby="new-book-subject-help"
               >
-                <option value="" :disabled="!book">
-                  {{
-                    book
-                      ? 'Belum ditentukan'
-                      : form.educationLevel
-                        ? 'Pilih mata pelajaran'
-                        : 'Pilih jenjang dulu'
-                  }}
+                <option value="" disabled>
+                  {{ form.educationLevel ? 'Pilih mata pelajaran' : 'Pilih jenjang dulu' }}
                 </option>
                 <option v-for="item in subjectOptions" :key="item" :value="item">{{ item }}</option>
               </select>
@@ -575,13 +555,7 @@ async function save() {
                 file<input
                   :id="`new-book-${item.kind}`"
                   type="file"
-                  :accept="
-                    item.kind === 'flyer'
-                      ? '.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation'
-                      : item.kind === 'product-knowledge'
-                        ? '.pdf,.ppt,.pptx,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation'
-                        : '.pdf,application/pdf'
-                  "
+                  :accept="item.kind === 'product-knowledge' ? '.ppt,.pptx' : 'application/pdf'"
                   @change="selectMaterial(item.kind, $event)"
               /></label>
               <span class="file-name">{{
@@ -593,42 +567,44 @@ async function save() {
             </div>
           </div>
           <div class="material-upload">
-            <label for="new-book-flyer-slides" class="file-heading">Gambar slide flyer</label>
+            <label for="new-book-presentation-slides" class="file-heading"
+              >Gambar slide PPT Produk</label
+            >
             <p class="field-help">
               Ekspor semua slide dari PowerPoint sebagai PNG/JPG. Maksimal 20 slide, 2 MB per
               gambar. Unggahan mengganti seluruh preview.
             </p>
             <div class="file-picker">
-              <label class="file-button" for="new-book-flyer-slides"
+              <label class="file-button" for="new-book-presentation-slides"
                 >Pilih gambar<input
-                  id="new-book-flyer-slides"
+                  id="new-book-presentation-slides"
                   type="file"
                   multiple
                   accept="image/png,image/jpeg"
-                  @change="selectFlyerSlides"
+                  @change="selectPresentationSlides"
               /></label>
               <span class="file-name">{{
-                flyerSlides.length
-                  ? `${flyerSlides.length} slide dipilih`
-                  : `${flyerSlideCount} slide tersimpan`
+                presentationSlides.length
+                  ? `${presentationSlides.length} slide dipilih`
+                  : `${presentationSlideCount} slide tersimpan`
               }}</span>
             </div>
-            <ol v-if="flyerSlides.length" class="slide-upload-list">
-              <li v-for="(slide, index) in flyerSlides" :key="`${slide.name}-${index}`">
+            <ol v-if="presentationSlides.length" class="slide-upload-list">
+              <li v-for="(slide, index) in presentationSlides" :key="`${slide.name}-${index}`">
                 <span>{{ index + 1 }}. {{ slide.name }}</span>
                 <button
                   type="button"
                   :disabled="index === 0"
                   :aria-label="`Pindahkan slide ${index + 1} ke atas`"
-                  @click="moveFlyerSlide(index, -1)"
+                  @click="movePresentationSlide(index, -1)"
                 >
                   Naik
                 </button>
                 <button
                   type="button"
-                  :disabled="index === flyerSlides.length - 1"
+                  :disabled="index === presentationSlides.length - 1"
                   :aria-label="`Pindahkan slide ${index + 1} ke bawah`"
-                  @click="moveFlyerSlide(index, 1)"
+                  @click="movePresentationSlide(index, 1)"
                 >
                   Turun
                 </button>

@@ -110,11 +110,11 @@ privat `book-materials`, serta kebijakan upload Editor sesuai scope jenjang. Con
 dibuat `NOT VALID`: data lama berkode nonnumerik tetap terbaca, tetapi harus diperbaiki saat row
 tersebut diperbarui. Jangan jalankan aplikasi baru dalam mode Supabase sebelum migration diterapkan.
 
-Flyer baru menerima PPT/PPTX maksimal 20 MB dan gambar slide PNG/JPG untuk preview; Dummy Buku
-menerima PDF maksimal 20 MB. Product Knowledge menerima PDF/PPT/PPTX maksimal 50 MB. Berkas
-PowerPoint diunduh dalam format asli; PDF lama tetap dapat dipratinjau. Bucket tidak memiliki URL
-publik permanen. Materi buku published hanya dapat dibuka setelah login lewat endpoint server yang
-membuat signed URL berumur 60 detik.
+Flyer dan Dummy Buku menerima PDF maksimal 20 MB. PPT Produk (Product Knowledge) menerima
+PPT/PPTX maksimal 50 MB dengan gambar slide hasil ekspor PNG/JPG untuk preview statis.
+Product Knowledge PDF lama tetap dapat dibuka. Bucket tidak memiliki URL publik permanen.
+Materi published hanya dapat dibuka setelah login lewat endpoint server yang membuat signed URL
+berumur 60 detik.
 
 Jalankan `supabase/migrations/202610060002_unique_book_title.sql` setelah migration materi privat.
 Migration berhenti tanpa perubahan bila menemukan judul duplikat setelah spasi tepi dan kapital
@@ -127,26 +127,32 @@ baca menjadi publik hanya untuk materi milik buku published. Ini merupakan langk
 migration `202610130004_flyer_slide_previews.sql` berikutnya menggantinya dengan akses authenticated.
 Bucket tetap privat; object path harus sama dengan path yang tersimpan pada row produk.
 
-## Preview flyer PowerPoint
+## Preview PPT Produk
 
-Terapkan `supabase/migrations/202610130004_flyer_slide_previews.sql` setelah migration materi
-sebelumnya, sebelum deploy aplikasi. Migration transaksional dapat diulang dan menambah
-`products.flyer_slide_paths` sebagai daftar berurutan path PNG/JPG privat. UUID, flyer PDF lama,
-dan materi lain tetap utuh; tidak ada konversi otomatis atau penghapusan file.
+Terapkan migration sebelumnya termasuk `202610130004_flyer_slide_previews.sql`, lalu
+`supabase/migrations/202610130006_product_presentation_previews.sql` sebelum deploy aplikasi.
+Migration koreksi transaksional dapat diulang dan menambah `products.product_knowledge_slide_paths`
+sebagai daftar berurutan path PNG/JPG privat untuk PPT Produk. UUID, metadata/file lama, dan
+materi lain tetap utuh; tidak ada konversi, pemindahan konten, atau penghapusan file otomatis.
+Migration 004 merupakan implementasi awal yang salah menempatkan preview PPT pada Flyer;
+riwayatnya dipertahankan agar database yang sudah menerapkannya tetap dapat diperbarui.
 
-Migration memperluas kebijakan upload Editor untuk folder `flyer-slides`, memeriksa scope
-jenjang yang sama, dan mengganti pembacaan materi anonim dengan authenticated untuk seluruh
-materi. Hanya file yang terdaftar pada buku published dapat dibaca Sales/pengguna login;
+Migration memperluas kebijakan upload Editor untuk folder `presentation-slides`, memeriksa scope
+jenjang yang sama, dan mempertahankan pembacaan authenticated untuk seluruh materi.
+Hanya file yang terdaftar pada buku published dapat dibaca Sales/pengguna login;
 Editor tetap dapat mengelola materi dalam scope. Signed URL yang sudah terbit tetap berlaku
 sampai kedaluwarsa, maksimal 60 detik untuk URL yang dibuat aplikasi.
 
 Editor memilih PPT/PPTX dan gambar hasil ekspor PNG/JPG: maksimal 20 slide, 2 MB per gambar.
-Form menampilkan urutan numerik nama file dan tombol Naik/Turun. PPT/PPTX maksimal 20 MB;
-upload baru wajib disertai gambar pada form. Endpoint `POST /api/admin/books/:id/flyer-slides`
+Form menampilkan urutan numerik nama file dan tombol Naik/Turun. PPT Produk PPT/PPTX maksimal 50 MB;
+upload baru wajib disertai gambar pada form. Endpoint `POST /api/admin/books/:id/presentation-slides`
 menerima multipart dengan field `slides` berulang sesuai urutan. Total request dibatasi 41 MB;
 set preview diganti hanya setelah semua file berhasil diunggah. File PPT baru mengosongkan
 preview lama sehingga kegagalan upload gambar tidak menampilkan slide dari PPT sebelumnya.
 File lama yang tidak terpakai tetap memerlukan pembersihan operasional terpisah.
+Flyer kembali menerima PDF 20 MB; penggantian Flyer mengosongkan metadata preview Flyer lama.
+Jika sempat mengunggah PPT sebagai Flyer, unggah ulang PDF pada slot Flyer serta PPT/gambar
+pada slot PPT Produk. Jangan memindahkan file otomatis karena kedua slot memiliki makna berbeda.
 
 Urutan rollout: backup dan catat UUID/jumlah buku, jalankan migration, verifikasi data lama,
 lalu deploy aplikasi. Pada project pengujian periksa upload PPT/PPTX dan gambar, urutan setelah
@@ -154,14 +160,20 @@ reload, zoom/fullscreen, nama/format unduhan, penolakan gambar palsu/lebih dari 
 anonim ditolak, Sales dapat membaca published, draft ditolak, serta Editor di luar scope ditolak.
 Periksa RLS Storage langsung untuk original dan slide; API saja tidak membuktikan kebijakan DB.
 
-Rollback memakai aplikasi sebelumnya dan mempertahankan kolom/data/policy privat. Versi lama
-yang meminta signed URL melalui client anonim akan gagal membuka materi; jangan membuka kembali
-akses anonim sebagai rollback. Sesuaikan pembacaan versi rollback agar memakai session pengguna.
-Migration ini belum dijalankan oleh agent pada Supabase live.
+Rollback ke versi sebelum koreksi dengan mempertahankan kolom/data/policy privat. Metadata dan
+folder preview Flyer lama dipertahankan untuk kompatibilitas; versi baru tidak memakainya.
+Jangan drop kolom atau membuka kembali akses anonim sebagai rollback. Hindari memakai aplikasi
+lama dan baru bersamaan untuk mengedit slot materi yang berbeda. Migration koreksi ini belum
+dijalankan oleh agent pada Supabase live. Pengguna mengonfirmasi SQL koreksi telah diterapkan
+di Supabase pada sesi ini; agent belum memverifikasi schema/RLS live. File koreksi awal bernama
+`202610130005_product_presentation_previews.sql` kini memakai versi `006` agar tidak berbenturan
+dengan migration `202610130005_catalog_browse_book_details.sql` dari UI terbaru. Isi SQL koreksi
+tetap sama dan idempotent; jangan menganggap migration browse sudah diterapkan hanya karena
+versi `005` pernah dicatat. Periksa riwayat migration sebelum menyelaraskan deployment.
 
-Verifikasi tanpa database: `node scripts/verify-flyer.mjs` menguji validasi format dan alur
-preview/unduhan dengan stub repository/Storage. `node scripts/verify-flyer-smoke.mjs` memakai
-server lokal di port 3100 (ubah lewat `FLYER_TEST_BASE_URL`) untuk memeriksa SSR, route katalog,
+Verifikasi tanpa database: `node scripts/verify-presentation.mjs` menguji validasi format dan alur
+preview/unduhan dengan stub repository/Storage. `node scripts/verify-presentation-smoke.mjs` memakai
+server lokal di port 3100 (ubah lewat `PRESENTATION_TEST_BASE_URL`) untuk memeriksa SSR, route katalog,
 login, dan penolakan akses materi/admin anonim. Keduanya tidak membuktikan Auth/RLS/upload live
 atau interaksi browser.
 
@@ -455,6 +467,12 @@ migration ini ke database live.
   error database/jaringan lain tetap menjadi error.
 
 Endpoint `GET /api/catalog/browse?kind=level|division` membaca kelompok. Endpoint
+ranking tetap kompatibel dengan definisi RPC lama yang belum menyertakan divisi, sinopsis,
+atau target pasar: aplikasi membaca metadata nyata melalui satu query produk published, dengan
+urutan ranking tetap berasal dari statistik. Tetap terapkan migration
+`202610130005_catalog_browse_book_details.sql` untuk menghindari query tambahan; jangan reset
+counter atau ledger untuk memperbaiki kontrak metadata. Perubahan ini tidak menulis database.
+Endpoint
 `POST /api/products/:slug/access` menerima `{ "visitor": "UUID" }`, memvalidasi Zod, dan
 tidak dicache. Client mencatat setelah detail berhasil tampil; kegagalan statistik tidak
 menghalangi detail. Storage browser yang dinonaktifkan menyebabkan akses tidak dicatat.

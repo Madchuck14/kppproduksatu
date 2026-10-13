@@ -9,8 +9,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Buku atau jenis materi tidak valid' })
   const { client, path, extension, slides } = await getBookResource(event, slug.data, kind.data)
   const query = getQuery(event)
-  const isFlyerPowerPoint = kind.data === 'flyer' && (extension === 'ppt' || extension === 'pptx')
-  if (query.preview === '1' && extension !== 'pdf' && !isFlyerPowerPoint)
+  const isPresentationPowerPoint =
+    kind.data === 'product-knowledge' && (extension === 'ppt' || extension === 'pptx')
+  if (query.preview === '1' && extension !== 'pdf' && !isPresentationPowerPoint)
     throw createError({
       statusCode: 415,
       statusMessage: 'Format materi ini tidak mendukung pratinjau',
@@ -25,7 +26,7 @@ export default defineEventHandler(async (event) => {
   if (signed.error || !signed.data?.signedUrl)
     throw createError({ statusCode: 503, statusMessage: 'Materi belum dapat dibuka' })
   if (query.preview === '1') {
-    if (isFlyerPowerPoint) {
+    if (kind.data === 'product-knowledge' && extension !== 'pdf') {
       const signedSlides = slides.length
         ? await client.storage.from('book-materials').createSignedUrls(slides, 60)
         : { data: [], error: null }

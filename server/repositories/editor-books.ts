@@ -16,7 +16,7 @@ import { assertBookScope } from '../utils/require-editor'
 import { getProductImageUrl } from '../utils/storage'
 
 const columns =
-  'id,book_code,education_level,division_code,grade,subject,title,slug,author,description,synopsis,target_market,highlights,price,publication_year,featured,published,image_path,flyer_path,flyer_slide_paths,dummy_book_path,product_knowledge_path,updated_at'
+  'id,book_code,education_level,division_code,grade,subject,title,slug,author,description,synopsis,target_market,highlights,price,publication_year,featured,published,image_path,flyer_path,product_knowledge_slide_paths,dummy_book_path,product_knowledge_path,updated_at'
 const rowSchema = z.object({
   id: z.string().uuid(),
   book_code: z.string().nullable(),
@@ -37,7 +37,7 @@ const rowSchema = z.object({
   published: z.boolean(),
   image_path: z.string().nullable(),
   flyer_path: z.string().nullable(),
-  flyer_slide_paths: z.array(z.string()).default([]),
+  product_knowledge_slide_paths: z.array(z.string()).default([]),
   dummy_book_path: z.string().nullable(),
   product_knowledge_path: z.string().nullable(),
   updated_at: z.string(),
@@ -91,7 +91,7 @@ function mapBook(event: H3Event, value: unknown): EditorBook {
       productKnowledge: Boolean(row.product_knowledge_path),
     },
     updatedAt: row.updated_at,
-    flyerSlideCount: row.flyer_slide_paths.length,
+    presentationSlideCount: row.product_knowledge_slide_paths.length,
   }
 }
 
@@ -278,7 +278,7 @@ export async function setEditorBookMaterial(
       ? { flyer_path: path, flyer_slide_paths: [] }
       : kind === 'dummy'
         ? { dummy_book_path: path }
-        : { product_knowledge_path: path }
+        : { product_knowledge_path: path, product_knowledge_slide_paths: [] }
   const { data, error } = await client
     .from('products')
     .update(update)
@@ -294,44 +294,48 @@ export async function setEditorBookMaterial(
   return mapBook(event, data)
 }
 
-export async function getEditorFlyerPath(event: H3Event, account: AccountSession, id: string) {
+export async function getEditorPresentationPath(
+  event: H3Event,
+  account: AccountSession,
+  id: string,
+) {
   await getEditorBook(event, account, id)
   const client = await serverSupabaseClient<EditorDatabase>(event)
   const { data, error } = await client
     .from('products')
-    .select('flyer_path')
+    .select('product_knowledge_path')
     .eq('id', id)
     .maybeSingle()
   fail(error)
-  if (!data?.flyer_path || !/\.(ppt|pptx)$/.test(data.flyer_path))
+  if (!data?.product_knowledge_path || !/\.(ppt|pptx)$/.test(data.product_knowledge_path))
     throw createError({
       statusCode: 400,
-      statusMessage: 'Unggah flyer PPT/PPTX sebelum gambar slide',
+      statusMessage: 'Unggah PPT Produk PPT/PPTX sebelum gambar slide',
     })
-  return data.flyer_path
+  return data.product_knowledge_path
 }
 
-export async function setEditorFlyerSlides(
+export async function setEditorPresentationSlides(
   event: H3Event,
   account: AccountSession,
   id: string,
-  flyerPath: string,
+  presentationPath: string,
   paths: string[],
 ) {
   await getEditorBook(event, account, id)
   const client = await serverSupabaseClient<EditorDatabase>(event)
   const { data, error } = await client
     .from('products')
-    .update({ flyer_slide_paths: paths })
+    .update({ product_knowledge_slide_paths: paths })
     .eq('id', id)
-    .eq('flyer_path', flyerPath)
+    .eq('product_knowledge_path', presentationPath)
     .select(columns)
     .maybeSingle()
   fail(error)
   if (!data)
     throw createError({
       statusCode: 409,
-      statusMessage: 'Flyer atau akses berubah. Muat ulang sebelum mengunggah slide.',
+      statusMessage: 'PPT Produk atau akses berubah. Muat ulang sebelum mengunggah slide.',
     })
   return mapBook(event, data)
 }

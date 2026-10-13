@@ -14,7 +14,7 @@ export async function getBookResource(event: H3Event, slug: string, kind: BookRe
     throw createError({ statusCode: 401, statusMessage: 'Silakan login untuk membuka materi' })
   const { data, error } = await client
     .from('products')
-    .select('flyer_path,flyer_slide_paths,dummy_book_path,product_knowledge_path')
+    .select('flyer_path,product_knowledge_slide_paths,dummy_book_path,product_knowledge_path')
     .eq('slug', slug)
     .eq('published', true)
     .maybeSingle()
@@ -29,6 +29,6 @@ export async function getBookResource(event: H3Event, slug: string, kind: BookRe
     client,
     path,
     extension: extension.data,
-    slides: kind === 'flyer' ? data.flyer_slide_paths : [],
+    slides: kind === 'product-knowledge' ? data.product_knowledge_slide_paths : [],
   }
 }

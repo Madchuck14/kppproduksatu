@@ -1,6 +1,6 @@
 import { createError } from 'h3'
 
-export function validateFlyerSlide(bytes: Uint8Array, type: string) {
+export function validatePresentationSlide(bytes: Uint8Array, type: string) {
   const valid =
     bytes.length >= 16 &&
     bytes.length <= 2 * 1024 * 1024 &&

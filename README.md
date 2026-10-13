@@ -47,8 +47,9 @@ banner CMS, sitemap, dan structured data belum diimplementasikan.
 Dashboard Editor sudah memiliki unggahan privat Product Knowledge, flyer, dan Dummy Buku. Migration
 `202610060001_book_publication_materials.sql` harus diterapkan sebelum fitur dipakai. Materi buku
 published memerlukan login untuk preview dan unduhan melalui signed URL berumur 60 detik.
-Flyer baru menerima PPT/PPTX asli serta gambar PNG/JPG hasil ekspor slide untuk preview statis.
-Terapkan migration `202610130004_flyer_slide_previews.sql` sebelum menjalankan versi ini.
+PPT Produk (Product Knowledge) menerima PPT/PPTX asli serta gambar PNG/JPG hasil ekspor slide
+untuk preview statis. Flyer dan Dummy Buku tetap PDF. Terapkan migration
+`202610130006_product_presentation_previews.sql` setelah migration sebelumnya sebelum memakai versi ini.
 
 ## Perintah
 

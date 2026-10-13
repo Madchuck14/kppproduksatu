@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-const base = process.env.FLYER_TEST_BASE_URL ?? 'http://localhost:3100'
+const base = process.env.PRESENTATION_TEST_BASE_URL ?? 'http://localhost:3100'
 async function get(route, expected = 200) {
   const response = await fetch(`${base}${route}`, { redirect: 'manual' })
   assert.equal(response.status, expected, `${route}: expected ${expected}, got ${response.status}`)
@@ -20,8 +20,8 @@ for (const route of [
 ])
   await get(route)
 await get('/api/products?q=matematika')
-await get('/products/definitely-missing-flyer-smoke', 404)
-await get('/api/products/definitely-missing-flyer-smoke', 404)
+await get('/products/definitely-missing-presentation-smoke', 404)
+await get('/api/products/definitely-missing-presentation-smoke', 404)
 for (const kind of ['flyer', 'dummy', 'product-knowledge']) {
   await get(`/api/products/${slug}/resources/${kind}?preview=1`, 401)
   await get(`/api/products/${slug}/resources/${kind}?download=1`, 401)
