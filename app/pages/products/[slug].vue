@@ -38,19 +38,19 @@ const resources: Array<{
   {
     id: 'flyer',
     statusKey: 'flyer',
-    title: 'Flyer Promosi',
+    title: 'Flyer',
     description: 'Ringkasan keunggulan dan isi buku untuk dibagikan ke sekolah.',
   },
   {
     id: 'product-knowledge',
     statusKey: 'productKnowledge',
-    title: 'Presentasi Buku',
+    title: 'PPT Produk',
     description: 'Materi siap pakai untuk memperkenalkan buku kepada guru dan pihak sekolah.',
   },
   {
     id: 'dummy',
     statusKey: 'dummy',
-    title: 'Buku Dummy',
+    title: 'File Dummy Buku',
     description: 'Tampilan seperti buku sungguhan dengan animasi membalik halaman.',
   },
 ]
@@ -147,11 +147,6 @@ useSeoMeta({
         <div v-if="product.educationLevel || product.grade" class="detail-tags">
           <span v-if="product.educationLevel">{{ product.educationLevel }}</span>
           <span v-if="product.grade">Kelas {{ product.grade }}</span>
-        </div>
-        <p class="detail-description">{{ product.description }}</p>
-        <div class="detail-actions">
-          <FavoriteButton :product="product" detail />
-          <NuxtLink to="/#kontak" class="detail-contact">Hubungi kami untuk pemesanan</NuxtLink>
         </div>
         <dl class="detail-metadata">
           <div v-for="detail in bookDetails" :key="detail.label">

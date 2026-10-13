@@ -5,7 +5,7 @@ defineProps<{ phibeta?: boolean }>()
 <template>
   <div class="publisher-logos">
     <span class="erlangga-logo">
-      <img src="/images/erlangga.png" alt="Penerbit Erlangga" width="164" height="164" />
+      <img src="/images/erlangga.png" alt="Penerbit Erlangga" width="112" height="44" />
     </span>
     <img
       v-if="phibeta"
@@ -14,6 +14,14 @@ defineProps<{ phibeta?: boolean }>()
       width="112"
       height="44"
       class="phibeta-logo"
+    />
+    <img
+      v-if="phibeta"
+      src="/images/intelecto.png"
+      alt="Intelecto"
+      width="112"
+      height="50"
+      class="intelecto-logo"
     />
   </div>
 </template>
@@ -25,23 +33,25 @@ defineProps<{ phibeta?: boolean }>()
   gap: 20px;
 }
 .erlangga-logo {
-  display: block;
-  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 164px;
   height: 44px;
-  overflow: hidden;
 }
 .erlangga-logo img {
-  position: absolute;
   width: 100%;
-  max-width: none;
-  height: auto;
-  top: 50%;
-  transform: translateY(-50%);
+  height: 100%;
+  object-fit: contain;
 }
 .phibeta-logo {
   width: 112px;
   height: 44px;
+  object-fit: contain;
+}
+.intelecto-logo {
+  width: 112px;
+  height: 50px;
   object-fit: contain;
 }
 </style>

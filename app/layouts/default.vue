@@ -87,8 +87,8 @@ async function logout() {
         <nav aria-label="Navigasi utama" class="main-nav">
           <NuxtLink to="/" exact-active-class="nav-active">Beranda</NuxtLink>
           <NuxtLink to="/products" active-class="nav-active">Katalog</NuxtLink>
-          <NuxtLink v-if="!isShowcase" to="/favorites" active-class="nav-active">Favorit</NuxtLink>
-          <NuxtLink to="/#kategori">Kategori</NuxtLink>
+          <NuxtLink to="/#kategori">Jenjang</NuxtLink>
+          <NuxtLink to="/#kategori">Divisi</NuxtLink>
           <NuxtLink to="/contact">Kontak</NuxtLink>
         </nav>
         <div class="account-nav">

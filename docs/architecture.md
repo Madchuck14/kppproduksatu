@@ -16,6 +16,7 @@ Katalog sekarang khusus buku sesuai PRD awal, namun penamaan entitas `products` 
 
 Beranda mengikuti desain Figma dengan hero Grow with English, logo Erlangga dan Phibeta,
 pencarian, maksimal empat buku terbaru dari API publik, dan empat kartu jenjang sekolah.
+Bagian Divisi menampilkan enam kartu informasi statis; kartu tersebut belum memfilter katalog.
 Layout desktop mengacu node Figma `39:21` pada ukuran 1440 px: hero 1344×420 px, rak buku
 1280 px, dan grid jenjang empat kolom (dua kolom pada mobile). Variable font Lora dan Inter berformat WOFF2 Latin
 disimpan lokal di `public/fonts` dengan lisensi OFL; font landing tidak mengubah tipografi

@@ -93,7 +93,9 @@ async function logout() {
 <template>
   <section aria-labelledby="login-title" class="login-card">
     <div class="login-welcome">
-      <div class="auth-brand"><PublisherLogos /></div>
+      <div class="auth-brand">
+        <img src="/images/intelecto.png" alt="Intelecto" width="1536" height="1024" />
+      </div>
       <div>
         <h2>Selamat datang kembali</h2>
         <p>Masuk dengan akun terdaftar untuk melanjutkan aktivitas Anda di katalog.</p>
@@ -205,18 +207,17 @@ async function logout() {
 }
 .auth-brand {
   display: flex;
-  flex: 1;
-  min-height: 180px;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-}
-.auth-brand :deep(.erlangga-logo) {
-  width: min(373px, 100%);
-  height: 100px;
-}
-.auth-brand :deep(.publisher-logos) {
   width: 100%;
-  justify-content: center;
+}
+.auth-brand img {
+  display: block;
+  width: 100%;
+  max-width: 440px;
+  height: auto;
+  object-fit: contain;
 }
 .login-welcome h2 {
   font: 600 30px/36px var(--font-landing-serif);
@@ -384,12 +385,8 @@ a:focus-visible {
     gap: 32px;
     padding: 32px;
   }
-  .auth-brand {
-    min-height: 140px;
-  }
-  .auth-brand :deep(.erlangga-logo) {
-    max-width: 300px;
-    height: 80px;
+  .auth-brand img {
+    max-width: 480px;
   }
   .login-panel {
     padding: 32px;

@@ -36,6 +36,14 @@ const [{ data, error, status, refresh }, { data: levelCounts }] = await Promise.
 ])
 const latestBooks = computed(() => data.value?.products.slice(0, 4) ?? [])
 const schoolLevels = educationLevelSchema.options
+const divisions = [
+  { name: 'SD 1 MIPA', icon: 'i-lucide-flask-conical', style: 'division-mipa' },
+  { name: 'SD 2 IPS BHS', icon: 'i-lucide-globe-2', style: 'division-ips' },
+  { name: 'SMP/SMA MIPA', icon: 'i-lucide-atom', style: 'division-secondary' },
+  { name: 'SMK', icon: 'i-lucide-settings-2', style: 'division-vocational' },
+  { name: 'PHIBETA', icon: 'i-lucide-book-open', style: 'division-phibeta' },
+  { name: 'INTELECTO', icon: 'i-lucide-brain', style: 'division-intelecto' },
+]
 const subjectOptions = computed(() =>
   level.value
     ? getSubjectsForLevel(level.value)
@@ -96,6 +104,9 @@ async function searchCatalog() {
       </div>
       <div class="search-filter level-filter">
         <label for="landing-level">Jenjang</label>
+        <span class="level-filter-value" aria-hidden="true">
+          {{ level || 'Semua Jenjang' }}
+        </span>
         <select id="landing-level" v-model="level" name="level">
           <option value="">Semua Jenjang</option>
           <option v-for="item in educationLevelSchema.options" :key="item" :value="item">
@@ -164,7 +175,7 @@ async function searchCatalog() {
       aria-labelledby="subjects-title"
     >
       <div class="section-heading">
-        <h2 id="subjects-title">Jenjang Sekolah</h2>
+        <h2 id="subjects-title">Jenjang</h2>
         <NuxtLink to="/products" class="browse-link"
           >Lihat semua buku
           <img src="/images/landing/category-arrow.svg" alt="" width="17" height="17"
@@ -186,6 +197,27 @@ async function searchCatalog() {
             levelCounts ? `${levelCounts[item]} buku` : 'Jelajahi buku'
           }}</span>
         </NuxtLink>
+      </div>
+    </section>
+    <section class="landing-section divisions-section" aria-labelledby="divisions-title">
+      <div class="section-heading">
+        <h2 id="divisions-title">Divisi</h2>
+      </div>
+      <div class="division-grid">
+        <article
+          v-for="(division, index) in divisions"
+          :key="division.name"
+          :class="['division-card', division.style]"
+        >
+          <span class="division-number" aria-hidden="true">
+            {{ String(index + 1).padStart(2, '0') }}
+          </span>
+          <span class="division-icon" aria-hidden="true">
+            <UIcon :name="division.icon" class="size-6" />
+          </span>
+          <h3>{{ division.name }}</h3>
+          <span class="division-accent" aria-hidden="true" />
+        </article>
       </div>
     </section>
   </div>
@@ -316,14 +348,29 @@ async function searchCatalog() {
   color: #687169;
 }
 .search-filter select {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   width: 100%;
+  height: 100%;
+  padding: 20px 34px 8px 16px;
+  border: 0;
+  color: transparent;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.search-filter select option {
+  color: #344e41;
+  background: white;
+}
+.level-filter-value {
+  display: block;
   font-size: 13px;
   font-weight: 500;
   line-height: 16px;
   color: #344e41;
-  appearance: none;
-  background: transparent;
-  cursor: pointer;
+  pointer-events: none;
 }
 .search-submit {
   color: white;
@@ -448,19 +495,19 @@ async function searchCatalog() {
   --decoration: #f8c3ac;
 }
 .smp {
-  background: #fbe0e0;
-  color: #963838;
-  --decoration: #f1bcbc;
+  background: #dfeafb;
+  color: #285a9e;
+  --decoration: #bbd1f5;
 }
 .sma {
-  background: #dcefe5;
-  color: #1d6647;
-  --decoration: #b3dbc5;
+  background: #b8c3d1;
+  color: #39485b;
+  --decoration: #96a6ba;
 }
 .smk {
-  background: #e2e3f8;
-  color: #383c96;
-  --decoration: #c1c4f1;
+  background: #8f9cac;
+  color: #263445;
+  --decoration: #718196;
 }
 .smp .subject-decoration {
   inset: auto -30px -44px auto;
@@ -472,6 +519,112 @@ async function searchCatalog() {
   inset: -40px -24px auto auto;
   width: 150px;
   height: 150px;
+}
+.divisions-section {
+  margin-top: 54px;
+  margin-bottom: 64px;
+}
+.division-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 24px;
+}
+.division-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 142px;
+  overflow: hidden;
+  padding: 24px;
+  border: 1px solid var(--division-border);
+  border-radius: 18px 36px 18px 18px;
+  background: var(--division-bg);
+  color: var(--division-fg);
+  isolation: isolate;
+}
+.division-card h3 {
+  position: relative;
+  z-index: 1;
+  max-width: calc(100% - 76px);
+  font: 600 22px/1.2 var(--font-landing-serif);
+}
+.division-number {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  color: var(--division-fg);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  opacity: 0.66;
+}
+.division-icon {
+  position: absolute;
+  right: 20px;
+  bottom: 18px;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--division-border);
+  border-radius: 16px;
+  background: var(--division-icon-bg);
+  color: var(--division-fg);
+}
+.division-accent {
+  position: absolute;
+  z-index: -1;
+  right: -23px;
+  top: -36px;
+  width: 116px;
+  height: 116px;
+  border: 1px solid var(--division-border);
+  border-radius: 40% 60% 55% 45%;
+  background: var(--division-shape);
+  transform: rotate(24deg);
+}
+.division-mipa {
+  --division-bg: #fff4e9;
+  --division-fg: #89461f;
+  --division-border: #f1d6bd;
+  --division-icon-bg: #ffe8d3;
+  --division-shape: #f9e4d0;
+}
+.division-ips {
+  --division-bg: #edf5ff;
+  --division-fg: #315d91;
+  --division-border: #d3e2f5;
+  --division-icon-bg: #e1edfc;
+  --division-shape: #dceafd;
+}
+.division-secondary {
+  --division-bg: #f3efff;
+  --division-fg: #5b478d;
+  --division-border: #dfd5f4;
+  --division-icon-bg: #eae3fb;
+  --division-shape: #e5dcf9;
+}
+.division-vocational {
+  --division-bg: #eaf5f2;
+  --division-fg: #286657;
+  --division-border: #cfe5de;
+  --division-icon-bg: #dcefe9;
+  --division-shape: #d7ebe4;
+}
+.division-phibeta {
+  --division-bg: #fff0f2;
+  --division-fg: #994456;
+  --division-border: #f1d4da;
+  --division-icon-bg: #ffe3e8;
+  --division-shape: #f9dfe4;
+}
+.division-intelecto {
+  --division-bg: #f5f2e7;
+  --division-fg: #756022;
+  --division-border: #e7dfc4;
+  --division-icon-bg: #eee8d3;
+  --division-shape: #eee7cf;
 }
 @media (max-width: 1350px) {
   .landing-hero {
@@ -576,6 +729,26 @@ async function searchCatalog() {
   .subject-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
+  }
+  .division-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .division-card {
+    min-height: 132px;
+    padding: 18px;
+  }
+  .division-card h3 {
+    font-size: 19px;
+  }
+  .division-number {
+    left: 16px;
+  }
+  .division-icon {
+    right: 14px;
+    bottom: 14px;
+    width: 44px;
+    height: 44px;
   }
   .subject-card {
     min-height: 160px;
