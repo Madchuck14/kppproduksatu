@@ -8,6 +8,7 @@ export const divisionCodeSchema = z.enum([
   'phibeta',
   'intelecto',
 ])
+export type DivisionCode = z.infer<typeof divisionCodeSchema>
 
 export const bookDivisions = [
   { code: 'sd-1-mipa', name: 'SD 1 MIPA', icon: 'i-lucide-flask-conical', style: 'division-mipa' },

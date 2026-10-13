@@ -11,6 +11,11 @@ const isBookForm = computed(() => /^\/admin\/books\/[^/]+$/.test(route.path))
 const isAuthPage = computed(() => route.path === '/login' || route.path === '/register')
 const isContact = computed(() => route.path === '/contact')
 const isDashboard = computed(() => route.path === '/admin')
+const isSearchOpen = ref(false)
+const headerSearch = ref(typeof route.query.q === 'string' ? route.query.q : '')
+const headerSearchInput = useTemplateRef<HTMLInputElement>('headerSearchInput')
+const headerSearchToggle = useTemplateRef<HTMLButtonElement>('headerSearchToggle')
+const headerSearchForm = useTemplateRef<HTMLFormElement>('headerSearchForm')
 const isShowcase = computed(
   () =>
     isLanding.value ||
@@ -55,6 +60,46 @@ const [, { data: navigationAccount }] = await Promise.all([favoritesRequest, acc
 const loggingOut = ref(false)
 const logoutMessage = ref('')
 
+watch(
+  () => route.query.q,
+  (value) => {
+    headerSearch.value = typeof value === 'string' ? value : ''
+  },
+)
+watch(
+  () => route.fullPath,
+  () => {
+    isSearchOpen.value = false
+  },
+)
+function closeSearchOnOutsideClick(event: PointerEvent) {
+  const target = event.target
+  if (
+    isSearchOpen.value &&
+    target instanceof Node &&
+    !headerSearchToggle.value?.contains(target) &&
+    !headerSearchForm.value?.contains(target)
+  ) {
+    isSearchOpen.value = false
+  }
+}
+onMounted(() => document.addEventListener('pointerdown', closeSearchOnOutsideClick))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', closeSearchOnOutsideClick))
+
+async function toggleHeaderSearch() {
+  isSearchOpen.value = !isSearchOpen.value
+  if (isSearchOpen.value) {
+    await nextTick()
+    headerSearchInput.value?.focus()
+  }
+}
+
+async function searchCatalog() {
+  const query = headerSearch.value.trim()
+  isSearchOpen.value = false
+  await navigateTo({ path: '/products', query: query ? { q: query } : {} })
+}
+
 async function logout() {
   if (loggingOut.value) return
   loggingOut.value = true
@@ -94,15 +139,29 @@ async function logout() {
           <NuxtLink to="/contact">Kontak</NuxtLink>
         </nav>
         <div class="account-nav">
-          <NuxtLink
-            :to="isCatalog ? '/products#catalog-search' : '/#pencarian'"
-            aria-label="Cari buku"
-            ><img
-              :src="isCatalog ? '/images/catalog/search.svg' : '/images/landing/search.svg'"
-              alt=""
+          <button
+            ref="headerSearchToggle"
+            type="button"
+            class="header-icon-button"
+            :aria-label="isSearchOpen ? 'Tutup pencarian' : 'Buka pencarian buku'"
+            :aria-expanded="isSearchOpen"
+            aria-controls="header-catalog-search"
+            @click="toggleHeaderSearch"
+          >
+            <svg
+              viewBox="0 0 24 24"
               width="20"
               height="20"
-          /></NuxtLink>
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <circle cx="10.8" cy="10.8" r="6.8" />
+              <path d="m16 16 4.5 4.5" />
+            </svg>
+          </button>
           <NuxtLink
             v-if="!isBookForm && !isDashboard && user && navigationAccount?.role === 'editor'"
             to="/admin"
@@ -112,22 +171,14 @@ async function logout() {
           <button
             v-if="user"
             type="button"
-            class="inline-flex h-9 w-9 items-center justify-center rounded-full disabled:opacity-50"
+            class="header-icon-button"
             :disabled="loggingOut"
             :aria-busy="loggingOut"
             :aria-label="loggingOut ? 'Sedang keluar' : 'Keluar'"
             :title="loggingOut ? 'Sedang keluar' : 'Keluar'"
             @click="logout"
           >
-            <img
-              v-if="isBookForm || isDashboard"
-              src="/images/editor/logout.svg"
-              alt=""
-              width="20"
-              height="20"
-            />
             <svg
-              v-else
               width="20"
               height="20"
               viewBox="0 0 24 24"
@@ -142,39 +193,73 @@ async function logout() {
               <path d="m16 17 5-5-5-5M21 12H9" />
             </svg>
           </button>
-          <NuxtLink v-else to="/login" class="login-link"
-            ><img
-              :src="
-                isCatalog
-                  ? route.query.q
-                    ? '/images/catalog/user-search.svg'
-                    : '/images/catalog/user.svg'
-                  : '/images/landing/user.svg'
-              "
-              alt=""
+          <NuxtLink v-else to="/login" class="header-icon-button" aria-label="Login" title="Login">
+            <svg
+              viewBox="0 0 24 24"
               width="20"
               height="20"
-            /><span class="sr-only">Login</span></NuxtLink
-          >
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="8" r="3.5" />
+              <path d="M5 20c.7-3.2 3.2-5 7-5s6.3 1.8 7 5" />
+            </svg>
+          </NuxtLink>
           <NuxtLink
             v-if="isShowcase"
             to="/favorites"
-            class="favorites-link"
+            class="header-icon-button favorites-link"
             :aria-label="
               user && !favorites.ready.value
                 ? 'Memuat favorit'
                 : `Favorit: ${favorites.ids.value.length} buku`
             "
+            title="Favorit"
           >
-            <img
-              :src="isCatalog ? '/images/catalog/favorite.svg' : '/images/landing/favorite.svg'"
-              alt=""
+            <svg
+              viewBox="0 0 24 24"
               width="20"
               height="20"
-            />
-            <span>({{ user && !favorites.ready.value ? '?' : favorites.ids.value.length }})</span>
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path
+                d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"
+              />
+            </svg>
+            <span class="favorite-count">{{
+              user && !favorites.ready.value ? '?' : favorites.ids.value.length
+            }}</span>
           </NuxtLink>
         </div>
+        <form
+          v-show="isSearchOpen"
+          id="header-catalog-search"
+          ref="headerSearchForm"
+          class="header-search-popover"
+          role="search"
+          @submit.prevent="searchCatalog"
+          @keydown.esc.stop.prevent="isSearchOpen = false"
+        >
+          <label for="header-search-input" class="sr-only">Cari buku di katalog</label>
+          <input
+            id="header-search-input"
+            ref="headerSearchInput"
+            v-model="headerSearch"
+            type="search"
+            maxlength="100"
+            placeholder="Cari judul, kode, atau penulis..."
+          />
+          <button type="submit">Cari</button>
+        </form>
         <div v-if="isShowcase" class="header-rule" aria-hidden="true">
           <img
             :src="isCatalog ? '/images/catalog/header-line.svg' : '/images/landing/header-line.svg'"
@@ -344,9 +429,21 @@ async function logout() {
   font-size: 12px;
 }
 .favorites-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  position: relative;
+}
+.favorite-count {
+  position: absolute;
+  top: -2px;
+  right: -1px;
+  display: grid;
+  min-width: 16px;
+  height: 16px;
+  place-items: center;
+  padding-inline: 3px;
+  border-radius: 999px;
+  background: #1f5c3f;
+  color: white;
+  font: 600 10px/1 var(--font-landing-sans);
 }
 .header-rule {
   position: absolute;
@@ -417,6 +514,7 @@ async function logout() {
   background: white;
 }
 .header-inner {
+  position: relative;
   max-width: 1440px;
   min-height: 72px;
   margin: auto;
@@ -453,11 +551,27 @@ async function logout() {
 .account-nav {
   display: flex;
   align-items: center;
-  gap: 24px;
+  flex: 0 0 auto;
+  gap: 12px;
   font-size: 13px;
 }
-.account-nav button {
+.header-icon-button {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #1f2933;
   cursor: pointer;
+}
+.header-icon-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 .editor-dashboard-link {
   display: inline-flex;
@@ -473,23 +587,16 @@ async function logout() {
   font-weight: 500;
   white-space: nowrap;
 }
-.account-nav button:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-.account-nav a,
-.account-nav button {
-  border-radius: 10px;
+.header-icon-button,
+.editor-dashboard-link {
   transition:
     background-color 180ms ease,
-    border-color 180ms ease,
     color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease;
+    border-color 180ms ease;
 }
 .main-nav a:focus-visible,
-.account-nav a:focus-visible,
-.account-nav button:focus-visible {
+.header-icon-button:focus-visible,
+.editor-dashboard-link:focus-visible {
   outline: 2px solid #2f6b4f;
   outline-offset: 5px;
 }
@@ -501,12 +608,9 @@ async function logout() {
     text-underline-offset: 4px;
     transform: translateY(-2px);
   }
-  .account-nav a:hover,
-  .account-nav button:not(:disabled):hover {
+  .header-icon-button:not(:disabled):hover {
     background-color: #edf5ef;
     color: #2f6b4f;
-    box-shadow: 0 0 0 6px #edf5ef;
-    transform: translateY(-2px);
   }
   .account-nav .editor-dashboard-link:hover {
     border-color: #24543e;
@@ -518,15 +622,55 @@ async function logout() {
 @media (prefers-reduced-motion: reduce) {
   .main-nav a,
   .account-nav a,
-  .account-nav button {
+  .account-nav button,
+  .header-icon-button,
+  .editor-dashboard-link {
     transition: none;
   }
   .main-nav a:hover,
   .landing-shell .main-nav a:hover,
-  .account-nav a:hover,
-  .account-nav button:not(:disabled):hover {
+  .header-icon-button:not(:disabled):hover {
     transform: none;
   }
+}
+.header-search-popover {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 8px);
+  right: 48px;
+  display: flex;
+  width: min(420px, calc(100vw - 32px));
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #dce8e0;
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 12px 28px rgb(31 41 51 / 14%);
+}
+.header-search-popover input {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 14px;
+  outline: none;
+}
+.header-search-popover input:focus-visible {
+  box-shadow: inset 0 0 0 2px #2f6b4f;
+}
+.header-search-popover button {
+  flex: 0 0 auto;
+  min-width: 72px;
+  border-radius: 999px;
+  padding: 0 16px;
+  background: #1f5c3f;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+}
+.header-search-popover button:hover {
+  background: #17462f;
 }
 .landing-main {
   max-width: 1440px;
@@ -609,15 +753,40 @@ async function logout() {
   }
   .header-inner {
     padding-inline: 24px;
+    gap: 16px;
   }
   .main-nav {
-    gap: 24px;
+    position: static;
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+    transform: none;
+    gap: 16px;
+  }
+  .header-search-popover {
+    right: 24px;
   }
   .landing-main {
     padding: 32px 24px 0;
   }
   .footer-inner {
     padding: 40px 24px 28px;
+  }
+}
+@media (max-width: 1150px) {
+  .header-inner {
+    flex-wrap: wrap;
+  }
+  .landing-shell .header-inner {
+    height: auto;
+  }
+  .landing-shell .main-nav,
+  .main-nav {
+    position: static;
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+    transform: none;
   }
 }
 @media (max-width: 700px) {
@@ -631,7 +800,7 @@ async function logout() {
   }
   .landing-shell .main-nav {
     font-size: 14px;
-    gap: 12px;
+    gap: 8px;
   }
   .landing-shell .landing-main {
     padding-top: 24px;
@@ -649,7 +818,13 @@ async function logout() {
     font-size: 14px;
   }
   .account-nav {
-    gap: 16px;
+    gap: 6px;
+  }
+  .header-inner > a:first-child :deep(.erlangga-logo) {
+    width: 124px;
+  }
+  .header-search-popover {
+    right: 16px;
   }
   .landing-main {
     padding: 24px 16px 0;
@@ -661,6 +836,44 @@ async function logout() {
   .footer-bottom {
     flex-direction: column;
     gap: 12px;
+  }
+}
+@media (max-width: 420px) {
+  .header-inner {
+    padding-inline: 12px;
+    gap: 8px;
+  }
+  .header-inner > a:first-child :deep(.erlangga-logo) {
+    width: 108px;
+  }
+  .header-icon-button {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+  .account-nav {
+    gap: 2px;
+  }
+  .editor-dashboard-link {
+    min-height: 36px;
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+  .editor-navigation .account-nav {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+  .main-nav {
+    flex-wrap: wrap;
+    justify-content: center;
+    column-gap: 16px;
+    row-gap: 8px;
+  }
+  .landing-shell .main-nav a:last-child {
+    width: auto;
+  }
+  .header-search-popover {
+    right: 12px;
   }
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { editorQuerySchema } from '#shared/schemas/editor'
 import { getSubjectsForLevel, type BookSubject } from '#shared/utils/book-subjects'
+import { bookDivisions } from '#shared/utils/book-divisions'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import type { EditorBook } from '#shared/types/editor'
 
@@ -188,8 +189,7 @@ const fieldClass =
         <div
           class="dashboard-table-scroll"
           :aria-busy="status === 'pending'"
-          tabindex="0"
-          aria-label="Daftar buku, geser untuk melihat semua kolom"
+          aria-label="Daftar buku"
         >
           <table v-if="data.books.length" class="dashboard-table">
             <colgroup>
@@ -197,6 +197,7 @@ const fieldClass =
               <col class="column-level" />
               <col class="column-subject" />
               <col class="column-price" />
+              <col class="column-division" />
               <col class="column-materials" />
               <col class="column-status" />
               <col class="column-actions" />
@@ -207,6 +208,7 @@ const fieldClass =
                 <th scope="col">Jenjang</th>
                 <th scope="col">Mata pelajaran</th>
                 <th scope="col">Harga</th>
+                <th scope="col">Divisi</th>
                 <th scope="col">Materi</th>
                 <th scope="col">Status</th>
                 <th scope="col">Tindakan</th>
@@ -214,7 +216,7 @@ const fieldClass =
             </thead>
             <tbody>
               <tr v-for="book in data.books" :key="book.id">
-                <td>
+                <td data-label="Buku">
                   <div class="dashboard-book">
                     <img
                       :src="book.imageUrl"
@@ -230,10 +232,16 @@ const fieldClass =
                     </div>
                   </div>
                 </td>
-                <td>{{ book.educationLevel || 'Belum diisi' }}</td>
-                <td>{{ book.subject || 'Belum ditentukan' }}</td>
-                <td class="book-price">{{ formatPrice(book.price) }}</td>
-                <td>
+                <td data-label="Jenjang">{{ book.educationLevel || 'Belum diisi' }}</td>
+                <td data-label="Mata pelajaran">{{ book.subject || 'Belum ditentukan' }}</td>
+                <td data-label="Harga" class="book-price">{{ formatPrice(book.price) }}</td>
+                <td data-label="Divisi">
+                  {{
+                    bookDivisions.find((division) => division.code === book.divisionCode)?.name ??
+                    'Belum diisi'
+                  }}
+                </td>
+                <td data-label="Materi">
                   <div class="material-dots">
                     <span
                       v-for="material in [
@@ -252,12 +260,12 @@ const fieldClass =
                     </span>
                   </div>
                 </td>
-                <td>
+                <td data-label="Status">
                   <span class="book-status" :class="{ published: book.published }">{{
                     book.published ? 'Dipublikasikan' : 'Draf'
                   }}</span>
                 </td>
-                <td>
+                <td data-label="Tindakan">
                   <div class="book-actions">
                     <NuxtLink :to="`/admin/books/${book.id}`">Edit</NuxtLink>
                     <NuxtLink v-if="book.published" :to="`/products/${book.slug}`">Lihat</NuxtLink>
@@ -549,31 +557,34 @@ const fieldClass =
 }
 .dashboard-table {
   width: 100%;
-  min-width: 1080px;
+  min-width: 0;
   table-layout: fixed;
   border-collapse: collapse;
   text-align: left;
 }
 .column-book {
-  width: 28%;
+  width: 25%;
 }
 .column-level {
   width: 7%;
 }
 .column-subject {
-  width: 17%;
+  width: 15%;
 }
 .column-price {
-  width: 12%;
+  width: 11%;
+}
+.column-division {
+  width: 11%;
 }
 .column-materials {
   width: 6%;
 }
 .column-status {
-  width: 13%;
+  width: 11%;
 }
 .column-actions {
-  width: 17%;
+  width: 14%;
 }
 .dashboard-table th {
   padding: 10px;
@@ -730,6 +741,68 @@ const fieldClass =
   .filter-submit {
     align-self: end;
   }
+  .dashboard-table,
+  .dashboard-table tbody {
+    display: block;
+  }
+  .dashboard-table colgroup,
+  .dashboard-table thead {
+    display: none;
+  }
+  .dashboard-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 16px;
+    margin-bottom: 12px;
+    padding: 8px 14px;
+    border: 1px solid #e6e8e4;
+    border-radius: 12px;
+  }
+  .dashboard-table td {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #e6e8e4;
+    text-align: right;
+  }
+  .dashboard-table td::before {
+    flex: 0 0 auto;
+    color: #6b6f6b;
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: left;
+  }
+  .dashboard-table td:first-child,
+  .dashboard-table td:last-child {
+    grid-column: 1 / -1;
+  }
+  .dashboard-table td:first-child::before {
+    content: none;
+  }
+  .dashboard-table td:last-child {
+    border-bottom: 0;
+  }
+  .dashboard-table td:last-child::before {
+    align-self: flex-start;
+  }
+  .dashboard-table .dashboard-book {
+    text-align: left;
+  }
+  .dashboard-table .book-price {
+    white-space: normal;
+  }
+  .dashboard-table .material-dots,
+  .dashboard-table .book-status,
+  .dashboard-table .book-actions {
+    margin-left: auto;
+  }
+  .dashboard-table .book-actions {
+    justify-content: end;
+  }
 }
 @media (max-width: 700px) {
   .dashboard-heading h1 {
@@ -760,6 +833,22 @@ const fieldClass =
   }
   .dashboard-heading {
     align-items: start;
+  }
+  .dashboard-table tbody tr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dashboard-table td:first-child,
+  .dashboard-table td:last-child {
+    grid-column: auto;
+  }
+  .dashboard-table td:first-child {
+    justify-content: flex-start;
+  }
+  .dashboard-table td:last-child {
+    align-items: flex-start;
+  }
+  .dashboard-table .book-actions {
+    flex-wrap: wrap;
   }
 }
 </style>

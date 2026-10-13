@@ -1,4 +1,5 @@
 import type { BookSubject } from '../utils/book-subjects'
+import type { DivisionCode } from '../utils/book-divisions'
 
 export interface Product {
   id: string
@@ -6,7 +7,9 @@ export interface Product {
   title: string
   author: string
   description: string
-  divisionCode?: string | null
+  divisionCode?: DivisionCode | null
+  synopsis?: string | null
+  targetMarket?: string[]
   highlights?: string[]
   price: number
   imageUrl: string

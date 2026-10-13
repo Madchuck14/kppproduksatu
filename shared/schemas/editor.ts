@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { educationLevelSchema } from './auth'
 import { getGradesForLevel } from '../utils/book-grades'
 import { isSubjectForLevel, subjectsByLevel, type BookSubject } from '../utils/book-subjects'
+import { divisionCodeSchema } from '../utils/book-divisions'
 
 const subjectNames = [...new Set(Object.values(subjectsByLevel).flat())] as [
   BookSubject,
@@ -18,6 +19,7 @@ export const editorQuerySchema = z.object({
 })
 
 export const bookHighlightsSchema = z.array(z.string().trim().min(1).max(200)).max(6)
+export const bookTargetMarketSchema = z.array(z.string().trim().min(1).max(200)).max(10)
 
 export const bookInputSchema = z
   .object({
@@ -26,11 +28,19 @@ export const bookInputSchema = z
       .trim()
       .regex(/^\d{1,50}$/, 'Kode buku wajib diisi dengan angka, maksimal 50 digit.'),
     educationLevel: educationLevelSchema,
+    divisionCode: divisionCodeSchema.nullable().default(null),
     grade: z.number().int().min(1).max(12).nullable().optional(),
     subject: bookSubjectSchema.nullable().default(null),
     title: z.string().trim().min(1, 'Judul wajib diisi.').max(200),
     author: z.string().trim().max(200),
-    description: z.string().trim().max(20000),
+    synopsis: z
+      .string()
+      .trim()
+      .min(1, 'Sinopsis tidak boleh hanya berisi spasi.')
+      .max(20000)
+      .nullable()
+      .default(null),
+    targetMarket: bookTargetMarketSchema.default([]),
     highlights: bookHighlightsSchema.optional(),
     price: z.number().int().min(0, 'Harga tidak boleh negatif.').max(2147483647),
     publicationYear: z.number().int().min(1000).max(9999).nullable(),

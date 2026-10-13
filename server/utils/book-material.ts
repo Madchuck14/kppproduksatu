@@ -85,21 +85,36 @@ export function validateMaterialBytes(bytes: Uint8Array, extension: string) {
 
 export async function readBookMaterial(event: H3Event, kind: MaterialKind) {
   const type = (getHeader(event, 'content-type') ?? '').split(';')[0]?.trim() ?? ''
-  const extension =
+  const extensions: Record<string, string> = {
+    'application/pdf': 'pdf',
+    'application/vnd.ms-powerpoint': 'ppt',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  }
+  const extension = extensions[type]
+  const allowed =
     kind === 'flyer'
-      ? (
-          {
-            'application/vnd.ms-powerpoint': 'ppt',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
-          } as Record<string, string>
-        )[type]
-      : type === 'application/pdf'
-        ? 'pdf'
-        : undefined
+      ? extension === 'ppt' || extension === 'pptx'
+      : extension === 'pdf' ||
+        (kind === 'product-knowledge' && (extension === 'ppt' || extension === 'pptx'))
   if (!extension)
     throw createError({
       statusCode: 400,
-      statusMessage: kind === 'flyer' ? 'Gunakan berkas PPT atau PPTX' : 'Gunakan berkas PDF',
+      statusMessage:
+        kind === 'flyer'
+          ? 'Gunakan berkas PPT atau PPTX'
+          : kind === 'product-knowledge'
+            ? 'Gunakan berkas PDF, PPT, atau PPTX'
+            : 'Gunakan berkas PDF',
+    })
+  if (!allowed)
+    throw createError({
+      statusCode: 400,
+      statusMessage:
+        kind === 'flyer'
+          ? 'Gunakan berkas PPT atau PPTX'
+          : kind === 'product-knowledge'
+            ? 'Gunakan berkas PDF, PPT, atau PPTX'
+            : 'Gunakan berkas PDF',
     })
   const maxSize = kind === 'product-knowledge' ? 50 * 1024 * 1024 : 20 * 1024 * 1024
   const bytes = await readUploadBytes(event, maxSize)

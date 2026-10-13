@@ -4,12 +4,16 @@ type BookRow = {
   id: string
   book_code: string | null
   education_level: 'SD' | 'SMP' | 'SMA' | 'SMK' | null
+  division_code:
+    'sd-1-mipa' | 'sd-2-ips-bhs' | 'smp-sma-mipa' | 'smk' | 'phibeta' | 'intelecto' | null
   subject: string | null
   grade: number | null
   title: string
   slug: string
   author: string
   description: string
+  synopsis: string | null
+  target_market: string[]
   highlights: string[]
   price: number
   featured: boolean

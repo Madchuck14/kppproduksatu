@@ -5,23 +5,31 @@ import { z } from 'zod'
 import type { AccountSession } from '#shared/types/account'
 import type { EditorBook, EditorDashboard } from '#shared/types/editor'
 import type { BookInput, EditorQuery } from '#shared/schemas/editor'
-import { bookSubjectSchema, bookHighlightsSchema } from '#shared/schemas/editor'
+import {
+  bookSubjectSchema,
+  bookHighlightsSchema,
+  bookTargetMarketSchema,
+} from '#shared/schemas/editor'
 import { educationLevelSchema } from '#shared/schemas/auth'
+import { divisionCodeSchema } from '#shared/utils/book-divisions'
 import { assertBookScope } from '../utils/require-editor'
 import { getProductImageUrl } from '../utils/storage'
 
 const columns =
-  'id,book_code,education_level,grade,subject,title,slug,author,description,highlights,price,publication_year,featured,published,image_path,flyer_path,flyer_slide_paths,dummy_book_path,product_knowledge_path,updated_at'
+  'id,book_code,education_level,division_code,grade,subject,title,slug,author,description,synopsis,target_market,highlights,price,publication_year,featured,published,image_path,flyer_path,flyer_slide_paths,dummy_book_path,product_knowledge_path,updated_at'
 const rowSchema = z.object({
   id: z.string().uuid(),
   book_code: z.string().nullable(),
   education_level: educationLevelSchema.nullable(),
+  division_code: divisionCodeSchema.nullable(),
   subject: bookSubjectSchema.nullable(),
   grade: z.number().int().min(1).max(12).nullable(),
   title: z.string(),
   slug: z.string(),
   author: z.string(),
   description: z.string(),
+  synopsis: z.string().nullable(),
+  target_market: bookTargetMarketSchema.default([]),
   highlights: bookHighlightsSchema.default([]),
   price: z.number(),
   publication_year: z.number().int().nullable(),
@@ -51,7 +59,8 @@ function fail(error: { code?: string; message?: string } | null) {
     })
   throw createError({
     statusCode: 503,
-    statusMessage: 'Data buku belum dapat diproses. Pastikan migration Editor sudah diterapkan.',
+    statusMessage:
+      'Data buku belum dapat diproses. Pastikan migration Editor, divisi, sinopsis, dan target pasar sudah diterapkan.',
   })
 }
 
@@ -61,12 +70,15 @@ function mapBook(event: H3Event, value: unknown): EditorBook {
     id: row.id,
     bookCode: row.book_code,
     educationLevel: row.education_level,
+    divisionCode: row.division_code,
     subject: row.subject,
     grade: row.grade,
     title: row.title,
     slug: row.slug,
     author: row.author,
     description: row.description,
+    synopsis: row.synopsis,
+    targetMarket: row.target_market,
     highlights: row.highlights,
     price: row.price,
     publicationYear: row.publication_year,
@@ -99,12 +111,14 @@ function toRow(input: BookInput) {
   return {
     book_code: input.bookCode,
     education_level: input.educationLevel,
+    division_code: input.divisionCode,
     subject: input.subject,
     ...(input.grade !== undefined ? { grade: input.grade } : {}),
     title: input.title,
     slug: makeSlug(input.title, input.bookCode),
     author: input.author,
-    description: input.description,
+    synopsis: input.synopsis,
+    target_market: input.targetMarket,
     ...(input.highlights !== undefined ? { highlights: input.highlights } : {}),
     price: input.price,
     publication_year: input.publicationYear,

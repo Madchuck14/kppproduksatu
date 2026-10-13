@@ -5,6 +5,8 @@ useSeoMeta({
 })
 const address = 'Jl. H. Baping Raya No. 100, Ciracas, Jakarta Timur 13740'
 const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`Penerbit Erlangga ${address}`)}`
+const mapEmbedUrl =
+  'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3965.564382405313!2d106.86915197481105!3d-6.3208058618512855!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69ed0c8e2945cf%3A0x532ab84fc45f49c6!2sPenerbit%20Erlangga!5e0!3m2!1sen!2sid!4v1791865021196!5m2!1sen!2sid'
 const channels = [
   { name: 'Kantor pusat', icon: 'location', value: address, wide: true },
   {
@@ -61,12 +63,16 @@ const hours = [
         </component>
       </div>
       <div class="location-card">
-        <div
-          class="location-illustration"
-          role="img"
-          aria-label="Ilustrasi lokasi Kantor Pusat Erlangga di Ciracas"
-        >
-          <ContactMap />
+        <div class="location-map">
+          <iframe
+            :src="mapEmbedUrl"
+            title="Peta lokasi Kantor Pusat Erlangga"
+            width="600"
+            height="450"
+            allowfullscreen
+            loading="lazy"
+            referrerpolicy="strict-origin-when-cross-origin"
+          />
         </div>
         <div class="location-details">
           <span class="contact-icon"
@@ -219,8 +225,15 @@ const hours = [
   border-radius: 20px;
   overflow: hidden;
 }
-.location-illustration {
-  pointer-events: none;
+.location-map {
+  aspect-ratio: 4 / 3;
+  background: #f4f8f5;
+}
+.location-map iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
 .location-details {
   display: flex;

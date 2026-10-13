@@ -22,13 +22,18 @@ watch(
 async function toggle() {
   message.value = ''
   if (!user.value) {
+    if (props.iconOnly) {
+      await navigateTo({
+        path: '/login',
+        query: { returnTo: `/products/${props.product.slug}` },
+      })
+      return
+    }
     message.value = 'Login untuk menyimpan buku ke favorit.'
     return
   }
   try {
-    const isSaved = await favorites.toggle(props.product.id)
-    if (isSaved !== undefined)
-      message.value = isSaved ? 'Buku disimpan ke favorit.' : 'Buku dihapus dari favorit.'
+    await favorites.toggle(props.product.id)
   } catch (error) {
     const status = (error as { statusCode?: number }).statusCode
     message.value =
@@ -72,19 +77,27 @@ async function toggle() {
       >
         <path d="M12 21s-9-5.4-9-12a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.6-9 12-9 12Z" />
       </svg>
-      <img
-        v-else-if="iconOnly && catalog"
-        src="/images/catalog/heart.svg"
-        alt=""
-        width="16"
-        height="16"
-      />
-      <img v-else-if="iconOnly" src="/images/landing/heart.svg" alt="" width="14" height="14" />
+      <svg
+        v-else-if="iconOnly"
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        aria-hidden="true"
+        :fill="saved ? 'currentColor' : 'none'"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"
+        />
+      </svg>
       <span v-if="!iconOnly">{{
         busy ? 'Menyimpan...' : saved ? 'Tersimpan' : detail ? 'Simpan ke favorit' : 'Favorit'
       }}</span>
     </button>
-    <div v-if="message" :class="{ 'favorite-feedback': iconOnly }">
+    <div v-if="message" :class="{ 'sr-only': iconOnly }">
       <p role="status" class="mt-2 text-sm text-stone-600">{{ message }}</p>
       <NuxtLink
         v-if="message && !user"
@@ -118,14 +131,11 @@ async function toggle() {
   height: 28px;
   border-radius: 50%;
   background: white;
+  color: #1f5c3f;
   cursor: pointer;
 }
-.favorite-icon-button:hover,
-.favorite-icon-button.is-saved {
-  background: #dcefe5;
-}
-.favorite-icon-button.is-saved {
-  box-shadow: inset 0 0 0 1px #2f6b4f;
+.favorite-icon-button:hover {
+  background: #f4f7f4;
 }
 .favorite-icon-button:focus-visible {
   outline: 2px solid #2f6b4f;
@@ -139,18 +149,6 @@ async function toggle() {
   position: absolute;
   top: 13px;
   right: 13px;
-}
-.favorite-feedback {
-  position: absolute;
-  z-index: 2;
-  top: 35px;
-  right: 0;
-  width: 220px;
-  padding: 12px;
-  border: 1px solid #dce8e0;
-  border-radius: 10px;
-  background: white;
-  box-shadow: 0 4px 16px #242b261c;
 }
 .favorite-control--catalog {
   top: 12px;

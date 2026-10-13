@@ -2,6 +2,8 @@
 import { bookInputSchema } from '#shared/schemas/editor'
 import { getSubjectsForLevel } from '#shared/utils/book-subjects'
 import type { BookSubject } from '#shared/utils/book-subjects'
+import { bookDivisions } from '#shared/utils/book-divisions'
+import type { DivisionCode } from '#shared/utils/book-divisions'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import { getGradesForLevel } from '#shared/utils/book-grades'
 import type { EditorBook } from '#shared/types/editor'
@@ -12,30 +14,29 @@ const props = defineProps<{
   account: AccountSession
 }>()
 const savedId = ref(props.book?.id)
-// UI-only fields: connect these to the API after the database migration.
 const draftDetails = reactive({
   isbn: '',
   curriculum: '',
-  contents: '',
-  benefits: '',
 })
 const materials = [
+  { kind: 'dummy', label: 'Dummy Buku', help: 'PDF, maksimal 20 MB' },
+  { kind: 'product-knowledge', label: 'Product Knowledge', help: 'PPT/PPTX, maksimal 50 MB' },
   {
     kind: 'flyer',
     label: 'Flyer',
     help: 'PPT/PPTX, maksimal 20 MB. Unggah gambar slide di bawah untuk preview.',
   },
-  { kind: 'dummy', label: 'Dummy Buku', help: 'PDF, maksimal 20 MB' },
-  { kind: 'product-knowledge', label: 'Product Knowledge', help: 'PDF, maksimal 50 MB' },
 ] as const
 const form = reactive({
   bookCode: props.book?.bookCode ?? '',
   educationLevel: props.book?.educationLevel ?? '',
+  divisionCode: (props.book?.divisionCode ?? '') as DivisionCode | '',
   grade: props.book?.grade ?? null,
   subject: (props.book?.subject ?? '') as BookSubject | '',
   title: props.book?.title ?? '',
   author: props.book?.author ?? '',
-  description: props.book?.description ?? '',
+  synopsis: props.book?.synopsis ?? '',
+  targetMarket: props.book?.targetMarket?.length ? [...props.book.targetMarket] : [''],
   highlights: props.book?.highlights?.length ? [...props.book.highlights] : ['', ''],
   price: props.book?.price ?? 0,
   publicationYear: props.book?.publicationYear ?? null,
@@ -45,6 +46,7 @@ const form = reactive({
 const levels = computed(() =>
   props.account.isSuper ? educationLevelSchema.options : props.account.educationLevels,
 )
+const divisionOptions = bookDivisions
 const subjectOptions = computed(() => getSubjectsForLevel(form.educationLevel))
 const gradeOptions = computed(() => getGradesForLevel(form.educationLevel))
 watch(
@@ -133,15 +135,26 @@ function selectMaterial(kind: keyof typeof materialFiles, event: Event) {
   message.value = ''
   materialFiles[kind] = null
   if (!selected) return
-  const validFormat =
-    kind === 'flyer' ? /\.(ppt|pptx)$/i.test(selected.name) : selected.type === 'application/pdf'
+  const acceptedTypes =
+    kind === 'flyer'
+      ? [
+          'application/vnd.ms-powerpoint',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ]
+      : kind === 'product-knowledge'
+        ? [
+            'application/pdf',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          ]
+        : ['application/pdf']
   const maxSize = kind === 'product-knowledge' ? 50 * 1024 * 1024 : 20 * 1024 * 1024
-  if (!validFormat || !selected.size || selected.size > maxSize) {
+  if (!acceptedTypes.includes(selected.type) || !selected.size || selected.size > maxSize) {
     message.value =
       kind === 'flyer'
         ? 'Pilih flyer PPT/PPTX maksimal 20 MB.'
         : kind === 'product-knowledge'
-          ? 'Pilih Product Knowledge PDF maksimal 50 MB.'
+          ? 'Pilih Product Knowledge PDF/PPT/PPTX maksimal 50 MB.'
           : 'Pilih berkas PDF maksimal 20 MB.'
     input.value = ''
     return
@@ -160,19 +173,17 @@ async function save() {
     message.value = 'Pilih flyer PPT/PPTX sebelum gambar slide.'
     return
   }
-  if (
-    draftDetails.isbn.trim() ||
-    draftDetails.curriculum.trim() ||
-    draftDetails.contents.trim() ||
-    draftDetails.benefits.trim()
-  ) {
+  if (draftDetails.isbn.trim() || draftDetails.curriculum.trim()) {
     message.value =
-      'ISBN, kurikulum, isi buku, dan manfaat belum dapat disimpan. Penyimpanan kolom baru menunggu pembaruan database. Isian tetap tersedia selama halaman ini terbuka.'
+      'ISBN dan kurikulum belum dapat disimpan. Kosongkan isian tersebut sebelum menyimpan.'
     return
   }
   const parsed = bookInputSchema.safeParse({
     ...form,
     highlights: form.highlights.map((item) => item.trim()).filter(Boolean),
+    synopsis: form.synopsis.trim() || null,
+    targetMarket: form.targetMarket.map((item) => item.trim()).filter(Boolean),
+    divisionCode: form.divisionCode || null,
     publicationYear: form.publicationYear || null,
     subject: form.subject || null,
   })
@@ -428,47 +439,35 @@ async function save() {
               </select>
             </div>
           </div>
+          <div class="field-row">
+            <div class="form-field">
+              <label for="new-book-division">Divisi</label>
+              <select
+                id="new-book-division"
+                v-model="form.divisionCode"
+                :aria-invalid="!!errors.divisionCode"
+              >
+                <option value="">Pilih divisi</option>
+                <option v-for="item in divisionOptions" :key="item.code" :value="item.code">
+                  {{ item.name }}
+                </option>
+              </select>
+              <p v-if="errors.divisionCode" class="field-error">{{ errors.divisionCode }}</p>
+            </div>
+          </div>
         </section>
-        <section class="form-card description-card" aria-labelledby="description-heading">
-          <h2 id="description-heading">Deskripsi buku</h2>
+        <section class="form-card description-card" aria-labelledby="details-heading">
+          <h2 id="details-heading">Deskripsi Buku</h2>
           <div class="form-field">
-            <label for="new-book-description">Deskripsi singkat</label>
+            <label for="new-book-synopsis">Sinopsis buku</label>
             <textarea
-              id="new-book-description"
-              v-model="form.description"
-              :maxlength="book ? 20000 : 300"
-              class="short-description"
-              placeholder="Satu atau dua kalimat yang tampil di bawah judul."
-            />
-            <p class="field-help description-help">Tampil di bawah judul pada halaman detail.</p>
-            <p class="character-count">
-              {{ form.description.length.toLocaleString('id-ID') }} / {{ book ? '20.000' : '300' }}
-            </p>
-          </div>
-          <div class="form-field">
-            <label for="new-book-contents">Isi buku</label>
-            <textarea
-              id="new-book-contents"
-              v-model="draftDetails.contents"
-              maxlength="2000"
-              placeholder="Jelaskan cakupan materi yang dibahas."
-              aria-describedby="new-fields-note"
+              id="new-book-synopsis"
+              v-model="form.synopsis"
+              maxlength="20000"
+              placeholder="Tuliskan ringkasan isi dan gambaran buku."
             />
             <p class="character-count">
-              {{ draftDetails.contents.length.toLocaleString('id-ID') }} / 2.000
-            </p>
-          </div>
-          <div class="form-field">
-            <label for="new-book-benefits">Manfaat</label>
-            <textarea
-              id="new-book-benefits"
-              v-model="draftDetails.benefits"
-              maxlength="1000"
-              placeholder="Jelaskan manfaat yang didapat siswa dan guru."
-              aria-describedby="new-fields-note"
-            />
-            <p class="character-count">
-              {{ draftDetails.benefits.length.toLocaleString('id-ID') }} / 1.000
+              {{ form.synopsis.length.toLocaleString('id-ID') }} / 20.000
             </p>
           </div>
           <div class="form-field highlights-field">
@@ -499,6 +498,35 @@ async function save() {
               + Tambah poin
             </button>
             <p class="field-help">Maksimal 6 poin. Tampil sebagai daftar poin di halaman detail.</p>
+          </div>
+          <div class="form-field target-market-field">
+            <span class="field-label">Target pasar</span>
+            <p v-if="errors.targetMarket" class="field-error">{{ errors.targetMarket }}</p>
+            <div v-for="(_, index) in form.targetMarket" :key="index" class="highlight-row">
+              <input
+                v-model="form.targetMarket[index]"
+                :aria-label="`Target pasar ${index + 1}`"
+                maxlength="200"
+                placeholder="Contoh: Siswa kelas 4"
+              />
+              <button
+                type="button"
+                class="remove-highlight"
+                :aria-label="`Hapus target pasar ${index + 1}`"
+                @click="form.targetMarket.splice(index, 1)"
+              >
+                ×
+              </button>
+            </div>
+            <button
+              type="button"
+              class="add-highlight"
+              :disabled="form.targetMarket.length >= 10"
+              @click="form.targetMarket.push('')"
+            >
+              + Tambah target pasar
+            </button>
+            <p class="field-help">Maksimal 10 target pasar, masing-masing 200 karakter.</p>
           </div>
         </section>
       </div>
@@ -547,7 +575,13 @@ async function save() {
                 file<input
                   :id="`new-book-${item.kind}`"
                   type="file"
-                  :accept="item.kind === 'flyer' ? '.ppt,.pptx' : 'application/pdf'"
+                  :accept="
+                    item.kind === 'flyer'
+                      ? '.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation'
+                      : item.kind === 'product-knowledge'
+                        ? '.pdf,.ppt,.pptx,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation'
+                        : '.pdf,application/pdf'
+                  "
                   @change="selectMaterial(item.kind, $event)"
               /></label>
               <span class="file-name">{{
@@ -630,8 +664,8 @@ async function save() {
           >
           <p v-if="progress" role="status">{{ progress }}</p>
           <p id="new-fields-note" class="field-help">
-            ISBN, kurikulum, isi buku, dan manfaat masih pratinjau. Isian belum tersimpan dan akan
-            hilang saat meninggalkan halaman; penyimpanan tersedia setelah pembaruan database.
+            ISBN dan kurikulum belum didukung penyimpanan dan harus dikosongkan sebelum buku
+            disimpan.
           </p>
         </div>
       </aside>
@@ -699,9 +733,6 @@ async function save() {
 }
 .classification-card {
   min-height: 325px;
-}
-.description-card {
-  min-height: 843px;
 }
 .cover-card {
   min-height: 556px;
@@ -796,7 +827,6 @@ async function save() {
   display: grid;
   align-content: start;
   gap: 16px;
-  padding-bottom: 42px;
 }
 .description-help {
   margin-top: 9px;

@@ -110,11 +110,11 @@ privat `book-materials`, serta kebijakan upload Editor sesuai scope jenjang. Con
 dibuat `NOT VALID`: data lama berkode nonnumerik tetap terbaca, tetapi harus diperbaiki saat row
 tersebut diperbarui. Jangan jalankan aplikasi baru dalam mode Supabase sebelum migration diterapkan.
 
-Flyer baru menerima PPT/PPTX maksimal 20 MB; Dummy Buku menerima PDF maksimal 20 MB.
-Product Knowledge menerima PDF maksimal 50 MB. Bucket tidak memiliki URL publik permanen.
-Setelah migration preview flyer terbaru, materi published hanya dapat dibuka setelah login
-lewat endpoint server yang membuat signed URL berumur 60 detik. Product Knowledge PPT/PPTX lama harus
-diunggah ulang sebagai PDF agar dapat dirender dalam dialog aplikasi.
+Flyer baru menerima PPT/PPTX maksimal 20 MB dan gambar slide PNG/JPG untuk preview; Dummy Buku
+menerima PDF maksimal 20 MB. Product Knowledge menerima PDF/PPT/PPTX maksimal 50 MB. Berkas
+PowerPoint diunduh dalam format asli; PDF lama tetap dapat dipratinjau. Bucket tidak memiliki URL
+publik permanen. Materi buku published hanya dapat dibuka setelah login lewat endpoint server yang
+membuat signed URL berumur 60 detik.
 
 Jalankan `supabase/migrations/202610060002_unique_book_title.sql` setelah migration materi privat.
 Migration berhenti tanpa perubahan bila menemukan judul duplikat setelah spasi tepi dan kapital
@@ -164,6 +164,22 @@ preview/unduhan dengan stub repository/Storage. `node scripts/verify-flyer-smoke
 server lokal di port 3100 (ubah lewat `FLYER_TEST_BASE_URL`) untuk memeriksa SSR, route katalog,
 login, dan penolakan akses materi/admin anonim. Keduanya tidak membuktikan Auth/RLS/upload live
 atau interaksi browser.
+
+## Divisi, sinopsis, dan target pasar
+
+Sebelum memakai form Editor yang menyimpan divisi, sinopsis, dan target pasar, jalankan berurutan:
+
+1. `supabase/migrations/202610130001_book_divisions.sql`
+2. `supabase/migrations/202610130002_book_synopsis_target_market.sql`
+3. `supabase/migrations/202610130003_catalog_popularity.sql` jika belum diterapkan.
+4. `supabase/migrations/202610130005_catalog_browse_book_details.sql`
+
+Divisi disimpan sebagai `products.division_code` dari daftar tetap aplikasi. Sinopsis disimpan
+sebagai `products.synopsis`; target pasar disimpan sebagai daftar berurutan di
+`products.target_market` (maksimal 10 label, masing-masing maksimal 200 karakter).
+Migration mempertahankan `products.description` dan data yang sudah ada. Form Editor tidak lagi
+mengubah kolom deskripsi lama saat menyimpan buku. Migration browse memperluas hasil RPC koleksi
+agar menyertakan detail publik tersebut tanpa mengirimkan path berkas Storage.
 
 ## Pemeriksaan sebelum showcase
 

@@ -8,3 +8,5 @@ export const bookResourceColumns = {
   dummy: 'dummy_book_path',
   'product-knowledge': 'product_knowledge_path',
 } as const
+
+export const bookResourceExtensionSchema = z.enum(['pdf', 'ppt', 'pptx'])

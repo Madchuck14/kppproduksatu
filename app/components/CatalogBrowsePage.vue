@@ -8,10 +8,10 @@ const title = props.kind === 'level' ? 'Jenjang' : 'Divisi'
 const path = props.kind === 'level' ? '/jenjang' : '/divisi'
 const parameter = props.kind === 'level' ? 'level' : 'division'
 const levels = [
-  { code: 'SD', name: 'Buku SD', icon: 'i-lucide-pi' },
-  { code: 'SMP', name: 'Buku SMP', icon: 'i-lucide-pencil' },
-  { code: 'SMA', name: 'Buku SMA', icon: 'i-lucide-globe-2' },
-  { code: 'SMK', name: 'Buku SMK', icon: 'i-lucide-code-xml' },
+  { code: 'SD', name: 'Buku SD', icon: 'i-lucide-school' },
+  { code: 'SMP', name: 'Buku SMP', icon: 'i-lucide-school' },
+  { code: 'SMA', name: 'Buku SMA', icon: 'i-lucide-school' },
+  { code: 'SMK', name: 'Buku SMK', icon: 'i-lucide-school' },
 ]
 const items = props.kind === 'level' ? levels : bookDivisions
 const selection = computed(() => {
@@ -45,13 +45,23 @@ useSeoMeta({
         v-for="(item, index) in items"
         :key="item.code"
         :to="{ path, query: { [parameter]: item.code } }"
-        :class="['group-card', `color-${index}`, { selected: selection === item.code }]"
+        :class="[
+          'group-card',
+          'style' in item ? [item.style, 'division-card'] : `level-${item.code.toLowerCase()}`,
+          { selected: selection === item.code },
+        ]"
         :aria-current="selection === item.code ? 'true' : undefined"
       >
-        <span class="decoration" aria-hidden="true" />
+        <span v-if="kind === 'level'" class="decoration" aria-hidden="true" />
+        <span v-else class="division-number" aria-hidden="true">
+          {{ String(index + 1).padStart(2, '0') }}
+        </span>
         <span class="group-icon"><UIcon :name="item.icon" aria-hidden="true" /></span>
         <h2>{{ item.name }}</h2>
-        <span>{{ group(item.code) ? `${group(item.code)!.total} buku` : 'Jelajahi buku' }}</span>
+        <span class="group-caption">{{
+          group(item.code) ? `${group(item.code)!.total} buku` : 'Jelajahi buku'
+        }}</span>
+        <span v-if="kind === 'division'" class="division-accent" aria-hidden="true" />
       </NuxtLink>
     </div>
     <div class="collection-heading">
@@ -120,13 +130,14 @@ h1 {
 }
 .division-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
 }
 .group-card {
   position: relative;
   display: flex;
   flex-direction: column;
   justify-content: end;
-  min-height: 220px;
+  min-height: 180px;
   overflow: hidden;
   padding: 26px;
   border-radius: 28px;
@@ -148,7 +159,7 @@ h1 {
   font-weight: 600;
   line-height: 1.3;
 }
-.group-card > span:last-child {
+.group-caption {
   position: relative;
   margin-top: 3px;
   font-size: 14px;
@@ -163,7 +174,7 @@ h1 {
   height: 46px;
   border-radius: 50%;
   background: #ffffffb3;
-  font-size: 24px;
+  color: inherit;
 }
 .decoration {
   position: absolute;
@@ -174,46 +185,136 @@ h1 {
   border-radius: 50%;
   background: var(--shape);
 }
-.color-0 {
+.level-sd {
   --card-bg: #fde3d8;
   --card-fg: #a9401f;
   --shape: #f8c3ac;
 }
-.color-1 {
-  --card-bg: #fbe0e2;
-  --card-fg: #96383c;
-  --shape: #f1bdc1;
+.level-smp {
+  --card-bg: #dfeafb;
+  --card-fg: #285a9e;
+  --shape: #bbd1f5;
 }
-.color-2 {
-  --card-bg: #dcefe5;
-  --card-fg: #25694d;
-  --shape: #b4dac6;
+.level-sma {
+  --card-bg: #b8c3d1;
+  --card-fg: #39485b;
+  --shape: #96a6ba;
 }
-.color-3 {
-  --card-bg: #e4e2fa;
-  --card-fg: #493d9a;
-  --shape: #c3bef2;
+.level-smk {
+  --card-bg: #8f9cac;
+  --card-fg: #263445;
+  --shape: #718196;
 }
-.color-4 {
-  --card-bg: #fff0f2;
-  --card-fg: #994456;
-  --shape: #f9dfe4;
+.level-smp .decoration {
+  inset: auto -30px -44px auto;
 }
-.color-5 {
-  --card-bg: #f5f2e7;
-  --card-fg: #756022;
-  --shape: #eee7cf;
+.level-sma .decoration {
+  inset: auto auto -50px -40px;
 }
-.color-1 .decoration {
-  inset: auto -30px -40px auto;
-}
-.color-2 .decoration {
-  inset: auto auto -45px -35px;
-}
-.color-3 .decoration {
+.level-smk .decoration {
   inset: -40px -24px auto auto;
-  width: 145px;
-  height: 145px;
+  width: 150px;
+  height: 150px;
+}
+.division-card {
+  flex-direction: row;
+  align-items: center;
+  justify-content: initial;
+  min-height: 142px;
+  padding: 24px;
+  border: 1px solid var(--division-border);
+  border-radius: 18px 36px 18px 18px;
+  background: var(--division-bg);
+  color: var(--division-fg);
+  isolation: isolate;
+}
+.division-card h2 {
+  position: relative;
+  z-index: 1;
+  max-width: calc(100% - 76px);
+  font: 600 22px/1.2 var(--font-landing-serif);
+}
+.division-card .group-caption {
+  position: absolute;
+  bottom: 15px;
+  left: 24px;
+  z-index: 1;
+  margin: 0;
+  font-size: 12px;
+}
+.division-number {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  color: var(--division-fg);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  opacity: 0.66;
+}
+.division-card .group-icon {
+  top: auto;
+  right: 20px;
+  bottom: 18px;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--division-border);
+  border-radius: 16px;
+  background: var(--division-icon-bg);
+}
+.division-accent {
+  position: absolute;
+  z-index: -1;
+  top: -36px;
+  right: -23px;
+  width: 116px;
+  height: 116px;
+  transform: rotate(24deg);
+  border: 1px solid var(--division-border);
+  border-radius: 40% 60% 55% 45%;
+  background: var(--division-shape);
+}
+.division-mipa {
+  --division-bg: #fff4e9;
+  --division-fg: #89461f;
+  --division-border: #f1d6bd;
+  --division-icon-bg: #ffe8d3;
+  --division-shape: #f9e4d0;
+}
+.division-ips {
+  --division-bg: #edf5ff;
+  --division-fg: #315d91;
+  --division-border: #d3e2f5;
+  --division-icon-bg: #e1edfc;
+  --division-shape: #dceafd;
+}
+.division-secondary {
+  --division-bg: #f3efff;
+  --division-fg: #5b478d;
+  --division-border: #dfd5f4;
+  --division-icon-bg: #eae3fb;
+  --division-shape: #e5dcf9;
+}
+.division-vocational {
+  --division-bg: #eaf5f2;
+  --division-fg: #286657;
+  --division-border: #cfe5de;
+  --division-icon-bg: #dcefe9;
+  --division-shape: #d7ebe4;
+}
+.division-phibeta {
+  --division-bg: #fff0f2;
+  --division-fg: #994456;
+  --division-border: #f1d4da;
+  --division-icon-bg: #ffe3e8;
+  --division-shape: #f9dfe4;
+}
+.division-intelecto {
+  --division-bg: #f5f2e7;
+  --division-fg: #756022;
+  --division-border: #e7dfc4;
+  --division-icon-bg: #eee8d3;
+  --division-shape: #eee7cf;
 }
 .collection-heading,
 .shelf-heading {

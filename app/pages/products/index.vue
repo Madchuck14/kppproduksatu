@@ -747,20 +747,30 @@ legend {
   gap: 4px;
   height: 36px;
   padding: 8px 12px;
-  border: 1px solid #e9e9e9;
-  border-radius: 4px;
-  color: #313131;
+  border: 1px solid #dce8e0;
+  border-radius: 10px;
+  background: white;
+  color: #1f5c3f;
   font-size: 14px;
   line-height: 20px;
 }
+.pagination-controls button:not(:disabled):hover {
+  border-color: #9dbbaa;
+  background: #f4f8f5;
+}
 .pagination-controls button:disabled {
-  opacity: 0.3;
+  color: #8b9a91;
+  opacity: 0.65;
 }
 .pagination-controls button[aria-current='page'] {
   color: white;
-  background: black;
-  border-color: black;
+  background: #1f5c3f;
+  border-color: #1f5c3f;
   font-weight: 600;
+}
+.pagination-controls button[aria-current='page']:hover {
+  background: #184a32;
+  border-color: #184a32;
 }
 .pagination-gap {
   width: 31px;
@@ -771,7 +781,7 @@ legend {
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: black;
+  color: #344e41;
 }
 .page-size > span {
   position: relative;
@@ -780,9 +790,13 @@ legend {
   appearance: none;
   padding: 7px 36px 7px 12px;
   height: 36px;
-  border: 1px solid #e9e9e9;
-  border-radius: 4px;
+  border: 1px solid #dce8e0;
+  border-radius: 10px;
   background: white;
+  color: #1f5c3f;
+}
+.page-size select:hover {
+  border-color: #9dbbaa;
 }
 .page-size img {
   position: absolute;

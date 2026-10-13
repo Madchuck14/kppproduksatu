@@ -1,5 +1,6 @@
 import { productSlugSchema } from '#shared/schemas/catalog'
 import { getCatalogClient } from '../../../utils/catalog-client'
+import { bookResourceExtensionSchema } from '../../../utils/book-resource'
 
 export default defineEventHandler(async (event) => {
   const slug = productSlugSchema.safeParse(getRouterParam(event, 'slug'))
@@ -15,10 +16,21 @@ export default defineEventHandler(async (event) => {
   if (error)
     throw createError({ statusCode: 503, statusMessage: 'Status materi belum dapat diperiksa' })
   if (!data) throw createError({ statusCode: 404, statusMessage: 'Buku tidak ditemukan' })
+  const flyerExtension = data.flyer_path
+    ? bookResourceExtensionSchema.safeParse(data.flyer_path.split('.').pop()?.toLowerCase())
+    : null
+  if (flyerExtension && !flyerExtension.success)
+    throw createError({ statusCode: 503, statusMessage: 'Format materi tidak valid' })
+  const extension = data.product_knowledge_path?.split('.').pop()?.toLowerCase() ?? null
+  const productKnowledgeFormat =
+    extension === 'pdf' ? 'PDF' : extension === 'ppt' ? 'PPT' : extension === 'pptx' ? 'PPTX' : null
+  if (data.product_knowledge_path && !productKnowledgeFormat)
+    throw createError({ statusCode: 503, statusMessage: 'Format materi tidak valid' })
   return {
     flyer: Boolean(data.flyer_path),
-    flyerFormat: data.flyer_path ? data.flyer_path.split('.').pop() : null,
+    flyerFormat: flyerExtension?.success ? flyerExtension.data : null,
     dummy: Boolean(data.dummy_book_path),
     productKnowledge: Boolean(data.product_knowledge_path),
+    productKnowledgeFormat,
   }
 })

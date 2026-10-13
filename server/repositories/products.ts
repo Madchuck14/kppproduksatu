@@ -1,7 +1,12 @@
 import type { H3Event } from 'h3'
 import { z } from 'zod'
-import { bookSubjectSchema, bookHighlightsSchema } from '#shared/schemas/editor'
+import {
+  bookSubjectSchema,
+  bookHighlightsSchema,
+  bookTargetMarketSchema,
+} from '#shared/schemas/editor'
 import { educationLevelSchema } from '#shared/schemas/auth'
+import { divisionCodeSchema } from '#shared/utils/book-divisions'
 import { landingSubjects } from '#shared/utils/landing-subjects'
 import type { Product, ProductList } from '#shared/types/product'
 import { demoProducts } from '../data/products'
@@ -14,6 +19,9 @@ const rowSchema = z.object({
   title: z.string(),
   author: z.string(),
   description: z.string(),
+  division_code: divisionCodeSchema.nullable(),
+  synopsis: z.string().nullable(),
+  target_market: bookTargetMarketSchema,
   highlights: bookHighlightsSchema.default([]),
   price: z.number().nonnegative(),
   image_path: z.string().nullable(),
@@ -25,7 +33,7 @@ const rowSchema = z.object({
   publication_year: z.number().int().nullable(),
 })
 export const productColumns =
-  'id,slug,title,author,description,highlights,price,image_path,featured,book_code,education_level,grade,subject,publication_year'
+  'id,slug,title,author,description,division_code,synopsis,target_market,highlights,price,image_path,featured,book_code,education_level,grade,subject,publication_year'
 
 function sourceFor(event: H3Event): ProductList['source'] {
   const source = useRuntimeConfig(event).catalogSource
@@ -43,6 +51,9 @@ export function mapProductRow(event: H3Event, value: unknown): Product {
     title: row.title,
     author: row.author,
     description: row.description,
+    divisionCode: row.division_code,
+    synopsis: row.synopsis,
+    targetMarket: row.target_market,
     highlights: row.highlights,
     price: row.price,
     featured: row.featured,

@@ -64,13 +64,16 @@ Detail buku mengikuti Figma `37:7908`: breadcrumb, sampul 480×504 px, ringkasan
 tabel identitas, tiga kolom informasi, dan maksimal empat buku terkait. Header/footer,
 font lokal Lora/Inter, kartu katalog, serta kontrol favorit memakai komponen yang ada.
 Layout menjadi satu kolom pada mobile. Sampul dan informasi memakai data API SSR;
-kurikulum belum ditampilkan karena belum tersimpan, sementara ISBN dan manfaat ditandai belum tersedia; keunggulan memakai daftar yang tersimpan. Isi buku menggunakan deskripsi yang tersedia.
+kurikulum dan ISBN belum ditampilkan karena belum tersimpan; keunggulan memakai daftar yang
+tersimpan. Form Editor dan halaman detail memakai divisi, sinopsis, serta target pasar dari migration katalog
+terbaru. Detail menampilkan ketiganya bersama identitas buku.
 Bagian Materi Promosi mengikuti ekspor lokal Figma `37:8192` dan hanya ditampilkan
 kepada pengguna yang sudah login. Panel hijau berisi kartu Flyer Promosi, Presentasi Buku,
 dan Buku Dummy, dengan pratinjau, status berkas, serta tombol unduh dan Lihat.
 Aset flyer dan ikon unduh disimpan di `public/images/book-detail`; pratinjau dummy memakai
-sampul katalog. Flyer baru memakai PPT/PPTX dengan preview gambar slide, sedangkan Product Knowledge
-dan Dummy Buku tetap PDF. Label unduhan mengikuti format nyata, termasuk flyer PDF lama.
+sampul katalog. Flyer baru memakai PPT/PPTX dengan preview gambar slide; Product Knowledge
+menerima PDF/PPT/PPTX dan Dummy Buku menerima PDF. Label unduhan mengikuti format nyata, termasuk
+flyer PDF lama.
 Ukuran contoh tidak ditampilkan karena metadata tersebut belum tersedia. Endpoint preview dan
 unduhan memverifikasi login pada server.
 Pratinjau dummy mengikuti ekspor `figmatocode/previewdummy`: dialog putih beradius 20 px,
@@ -82,12 +85,13 @@ tetap berfungsi. Aset toolbar disimpan lokal di `public/images/dummy-preview`.
 Flyer PPT/PPTX memakai penampil gambar slide dalam dialog: navigasi tombol/panah keyboard,
 zoom 50–200%, fullscreen, dan unduh PowerPoint asli. Seluruh gambar diambil saat dialog dibuka,
 lalu object URL lokal dibersihkan ketika ditutup. Preview ini statis, tanpa transisi atau animasi.
-Flyer PDF lama dan Presentasi Buku tetap memakai viewer PDF yang tersedia.
+Flyer PDF lama dan Product Knowledge PDF tetap memakai viewer PDF yang tersedia. Product Knowledge
+PPT/PPTX dapat diunduh dalam format aslinya dan tidak ditampilkan sebagai viewer PDF.
 Favorit anonim menawarkan login
 dengan tujuan kembali ke buku. Tombol pemesanan menuju kontak pada footer beranda.
 
 Halaman detail tetap publik dan memakai API SSR yang sama. Sampul, judul, harga, penulis,
-deskripsi, kode buku, dan jenjang tersedia. Buku lama dengan identitas kosong ditandai
+sinopsis, target pasar, divisi, kode buku, dan jenjang tersedia. Buku lama dengan identitas kosong ditandai
 belum tersedia sampai dilengkapi Editor super. Product Knowledge, flyer, serta dummy untuk buku
 published memerlukan login untuk preview dan unduhan.
 
@@ -98,8 +102,8 @@ yang dikenal, serta `/products` dan `/favorites`. Login tanpa tujuan mengarahkan
 Login dari registrasi tanpa tujuan buku kembali ke katalog publik `/products`.
 Endpoint status hanya mengembalikan boolean dan format, tanpa URL/path privat. Endpoint preview
 dan unduhan memverifikasi `auth.getUser()` dan membatasi buku published sebelum membuat signed URL
-berumur 60 detik. Dashboard Editor mengunggah flyer PPT/PPTX, gambar slide PNG/JPG, serta Dummy
-Buku dan Product Knowledge PDF ke bucket privat `book-materials`. Endpoint upload tetap memeriksa
+berumur 60 detik. Dashboard Editor mengunggah flyer PPT/PPTX, gambar slide PNG/JPG, Dummy Buku PDF,
+serta Product Knowledge PDF/PPT/PPTX ke bucket privat `book-materials`. Endpoint upload memeriksa
 session, scope jenjang, MIME, signature, dan ukuran; RLS menutup akses materi anonim.
 CRUD katalog per jenjang tersedia pada dashboard Editor.
 
@@ -332,9 +336,9 @@ query. Pengujian repository menggunakan fixture serta query stub; bukan bukti li
 ## Halaman kontak
 
 Route publik `/contact` mengikuti ekspor `figmatocode/kontak`: kartu saluran komunikasi,
-ilustrasi lokasi kantor pusat, tautan Google Maps, dan jam operasional. Header/footer bersama
-menghubungkan Kontak dari dashboard dan halaman lainnya. Ikon serta lapisan peta desain
-disimpan lokal di `public/images/contact`; ilustrasi bukan peta navigasi interaktif.
+peta Google Maps tertanam yang responsif, tautan Google Maps, dan jam operasional. Header/footer
+bersama menghubungkan Kontak dari dashboard dan halaman lainnya. Ikon disimpan lokal di
+`public/images/contact`; peta dimuat dari Google Maps dalam iframe.
 Alamat, telepon (021) 8717006, fax (021) 87794609, hotline 1500-885, dan WhatsApp
 08191-1500-885 mengikuti [kontak kantor pusat resmi](https://www2.erlangga.co.id/kontak/kantor-pusat.html).
 Email info@erlangga.co.id mengikuti [situs Erlangga saat ini](https://erlangga.co.id/).

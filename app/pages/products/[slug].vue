@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import type { FlyerPreview } from '#shared/types/flyer'
+import { bookDivisions } from '#shared/utils/book-divisions'
+
 const route = useRoute()
 const config = useRuntimeConfig()
 const user = useSupabaseUser()
 type ResourceStatus = {
   flyer: boolean
+  flyerFormat: FlyerPreview['format'] | null
   dummy: boolean
   productKnowledge: boolean
-  flyerFormat: string | null
+  productKnowledgeFormat: 'PDF' | 'PPT' | 'PPTX' | null
 }
 const { data: product, error } = await useFetch(
   () => `/api/products/${encodeURIComponent(String(route.params.slug))}`,
@@ -44,10 +47,10 @@ const resources: Array<{
   description: string
 }> = [
   {
-    id: 'flyer',
-    statusKey: 'flyer',
-    title: 'Flyer',
-    description: 'Ringkasan keunggulan dan isi buku untuk dibagikan ke sekolah.',
+    id: 'dummy',
+    statusKey: 'dummy',
+    title: 'File Dummy Buku',
+    description: 'Tampilan seperti buku sungguhan dengan animasi membalik halaman.',
   },
   {
     id: 'product-knowledge',
@@ -56,10 +59,10 @@ const resources: Array<{
     description: 'Materi siap pakai untuk memperkenalkan buku kepada guru dan pihak sekolah.',
   },
   {
-    id: 'dummy',
-    statusKey: 'dummy',
-    title: 'File Dummy Buku',
-    description: 'Tampilan seperti buku sungguhan dengan animasi membalik halaman.',
+    id: 'flyer',
+    statusKey: 'flyer',
+    title: 'Flyer',
+    description: 'Ringkasan keunggulan dan isi buku untuk dibagikan ke sekolah.',
   },
 ]
 async function openPdfResource(resource: (typeof resources)[number]) {
@@ -105,6 +108,15 @@ async function openPdfResource(resource: (typeof resources)[number]) {
     if (request === pdfRequest) pdfViewerBusy.value = false
   }
 }
+function resourceFormat(resourceId: (typeof resources)[number]['id']) {
+  if (resourceId === 'flyer') return resourceStatus.value?.flyerFormat?.toUpperCase() ?? 'PDF'
+  if (resourceId === 'product-knowledge')
+    return resourceStatus.value?.productKnowledgeFormat ?? 'PPT/PPTX'
+  return 'PDF'
+}
+function isPowerPointFormat(format: FlyerPreview['format'] | null | undefined) {
+  return format === 'ppt' || format === 'pptx'
+}
 function closePdfDialog() {
   pdfDialog.value?.close()
   resetPdfDialog()
@@ -124,6 +136,12 @@ watch(
 )
 const bookDetails = computed(() => [
   { label: 'Kode buku', value: product.value?.bookCode || 'Belum tersedia' },
+  {
+    label: 'Divisi',
+    value:
+      bookDivisions.find((division) => division.code === product.value?.divisionCode)?.name ??
+      'Belum tersedia',
+  },
   { label: 'Penulis', value: product.value?.author },
   { label: 'Jenjang', value: product.value?.educationLevel || 'Belum tersedia' },
   { label: 'Kelas', value: product.value?.grade || 'Belum tersedia' },
@@ -142,9 +160,9 @@ watch(
 
 useSeoMeta({
   title: () => `${product.value?.title} | ${config.public.siteName}`,
-  description: () => product.value?.description,
+  description: () => product.value?.synopsis || product.value?.description,
   ogTitle: () => product.value?.title,
-  ogDescription: () => product.value?.description,
+  ogDescription: () => product.value?.synopsis || product.value?.description,
   ogImage: () => product.value?.imageUrl,
 })
 </script>
@@ -197,12 +215,8 @@ useSeoMeta({
     </div>
     <section aria-label="Informasi lengkap buku" class="detail-content">
       <div>
-        <h2>Isi buku</h2>
-        <p>{{ product.description }}</p>
-      </div>
-      <div>
-        <h2>Manfaat</h2>
-        <p>Informasi manfaat buku belum tersedia.</p>
+        <h2>Sinopsis</h2>
+        <p>{{ product.synopsis || 'Informasi sinopsis buku belum tersedia.' }}</p>
       </div>
       <div>
         <h2>Keunggulan</h2>
@@ -210,6 +224,13 @@ useSeoMeta({
           <li v-for="(item, index) in product.highlights" :key="index">{{ item }}</li>
         </ul>
         <p v-else>Informasi keunggulan buku belum tersedia.</p>
+      </div>
+      <div>
+        <h2>Target pasar</h2>
+        <ul v-if="product.targetMarket?.length" class="detail-highlights">
+          <li v-for="(item, index) in product.targetMarket" :key="index">{{ item }}</li>
+        </ul>
+        <p v-else>Informasi target pasar buku belum tersedia.</p>
       </div>
     </section>
 
@@ -233,9 +254,7 @@ useSeoMeta({
           class="resource-card"
         >
           <div class="resource-preview" aria-hidden="true">
-            <span class="resource-format">{{
-              resource.id === 'flyer' && resourceStatus?.flyerFormat !== 'pdf' ? 'PPT/PPTX' : 'PDF'
-            }}</span>
+            <span class="resource-format">{{ resourceFormat(resource.id) }}</span>
             <div v-if="resource.id === 'flyer'" class="flyer-preview">
               <img src="/images/book-detail/flyer-front.png" alt="" width="140" height="187" />
               <img src="/images/book-detail/flyer-back.png" alt="" width="137" height="186" />
@@ -259,11 +278,13 @@ useSeoMeta({
             <h3>{{ resource.title }}</h3>
             <p class="resource-metadata">
               {{
-                resource.id === 'flyer' && resourceStatus?.flyerFormat !== 'pdf'
-                  ? 'PowerPoint · Preview slide'
-                  : resource.id === 'dummy'
-                    ? 'Pratinjau buku \u00b7 PDF'
-                    : 'PDF'
+                resource.id === 'flyer' && isPowerPointFormat(resourceStatus?.flyerFormat)
+                  ? 'PowerPoint \u00b7 Preview slide'
+                  : resource.id === 'product-knowledge'
+                    ? `Materi presentasi \u00b7 ${resourceFormat(resource.id)}`
+                    : resource.id === 'dummy'
+                      ? 'Pratinjau buku \u00b7 PDF'
+                      : 'PDF'
               }}
             </p>
             <p class="resource-description">{{ resource.description }}</p>
@@ -278,16 +299,20 @@ useSeoMeta({
               <a
                 :href="`/api/products/${encodeURIComponent(product.slug)}/resources/${resource.id}?download=1`"
                 class="resource-download"
-                :aria-label="`Unduh: ${resource.title}`"
+                :aria-label="`Unduh ${resource.id === 'flyer' && isPowerPointFormat(resourceStatus?.flyerFormat) ? 'PowerPoint' : resourceFormat(resource.id)}: ${resource.title}`"
               >
                 <img src="/images/book-detail/download.svg" alt="" width="16" height="16" />
                 {{
-                  resource.id === 'flyer' && resourceStatus?.flyerFormat !== 'pdf'
+                  resource.id === 'flyer' && isPowerPointFormat(resourceStatus?.flyerFormat)
                     ? 'Unduh PowerPoint'
-                    : 'Unduh PDF'
+                    : `Unduh ${resourceFormat(resource.id)}`
                 }}
               </a>
               <button
+                v-if="
+                  resource.id !== 'product-knowledge' ||
+                  resourceStatus?.productKnowledgeFormat === 'PDF'
+                "
                 type="button"
                 class="resource-view"
                 :aria-label="`Lihat: ${resource.title}`"
@@ -547,8 +572,6 @@ useSeoMeta({
   background: #f4f8f5;
 }
 .detail-metadata {
-  border-top: 1px solid #e6e8e4;
-  padding-top: 20px;
   font-size: 15px;
   line-height: 24px;
 }
@@ -568,8 +591,6 @@ useSeoMeta({
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 36px;
-  border-top: 1px solid #e6e8e4;
-  padding-top: 32px;
 }
 .detail-content h2 {
   font: 500 22px/1.3 var(--font-landing-serif);
