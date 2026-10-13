@@ -1,8 +1,14 @@
 <script setup lang="ts">
+import type { FlyerPreview } from '#shared/types/flyer'
 const route = useRoute()
 const config = useRuntimeConfig()
 const user = useSupabaseUser()
-type ResourceStatus = { flyer: boolean; dummy: boolean; productKnowledge: boolean }
+type ResourceStatus = {
+  flyer: boolean
+  dummy: boolean
+  productKnowledge: boolean
+  flyerFormat: string | null
+}
 const { data: product, error } = await useFetch(
   () => `/api/products/${encodeURIComponent(String(route.params.slug))}`,
 )
@@ -25,6 +31,7 @@ const relatedProducts = computed(() =>
 const coverDialog = useTemplateRef<HTMLDialogElement>('cover-dialog')
 const pdfDialog = useTemplateRef<HTMLDialogElement>('pdf-dialog')
 const pdfViewerUrl = ref('')
+const flyerPreview = ref<FlyerPreview | null>(null)
 const pdfViewerTitle = ref('')
 const pdfViewerKind = ref<'product-knowledge' | 'flyer' | 'dummy'>('flyer')
 let pdfRequest = 0
@@ -56,19 +63,43 @@ const resources: Array<{
   },
 ]
 async function openPdfResource(resource: (typeof resources)[number]) {
+  if (!user.value) {
+    await navigateTo({
+      path: '/login',
+      query: { returnTo: `/products/${product.value!.slug}#${resource.id}` },
+    })
+    return
+  }
   const request = ++pdfRequest
   pdfViewerKind.value = resource.id
   pdfViewerTitle.value = resource.title
   pdfViewerUrl.value = ''
+  flyerPreview.value = null
   pdfViewerError.value = ''
   pdfViewerBusy.value = true
   pdfDialog.value?.showModal()
   try {
-    const result = await $fetch<{ url: string }>(
+    const result = await $fetch<{
+      url: string
+      format?: FlyerPreview['format']
+      slides?: string[]
+    }>(
       `/api/products/${encodeURIComponent(product.value!.slug)}/resources/${resource.id}?preview=1`,
     )
-    if (request === pdfRequest) pdfViewerUrl.value = result.url
-  } catch {
+    if (request === pdfRequest) {
+      if (resource.id === 'flyer' && result.format && result.format !== 'pdf')
+        flyerPreview.value = { format: result.format, slides: result.slides ?? [] }
+      else pdfViewerUrl.value = result.url
+    }
+  } catch (error) {
+    if ((error as { statusCode?: number }).statusCode === 401) {
+      closePdfDialog()
+      await navigateTo({
+        path: '/login',
+        query: { returnTo: `/products/${product.value!.slug}#${resource.id}` },
+      })
+      return
+    }
     if (request === pdfRequest) pdfViewerError.value = 'Materi belum dapat ditampilkan. Coba lagi.'
   } finally {
     if (request === pdfRequest) pdfViewerBusy.value = false
@@ -81,9 +112,16 @@ function closePdfDialog() {
 function resetPdfDialog() {
   pdfRequest += 1
   pdfViewerUrl.value = ''
+  flyerPreview.value = null
   pdfViewerError.value = ''
   pdfViewerBusy.value = false
 }
+watch(
+  () => user.value?.id,
+  () => {
+    closePdfDialog()
+  },
+)
 const bookDetails = computed(() => [
   { label: 'Kode buku', value: product.value?.bookCode || 'Belum tersedia' },
   { label: 'Penulis', value: product.value?.author },
@@ -175,13 +213,18 @@ useSeoMeta({
       </div>
     </section>
 
-    <section v-if="user" class="detail-resources" aria-labelledby="resources-title">
+    <section class="detail-resources" aria-labelledby="resources-title">
       <h2 id="resources-title">Materi Promosi</h2>
       <p class="resources-intro">Tersedia untuk pengguna yang sudah masuk.</p>
-      <p v-if="resourceError" role="alert" class="resources-error">
+      <NuxtLink
+        v-if="!user"
+        :to="{ path: '/login', query: { returnTo: `/products/${product.slug}#flyer` } }"
+        >Login untuk membuka materi promosi</NuxtLink
+      >
+      <p v-if="user && resourceError" role="alert" class="resources-error">
         Status materi belum dapat dimuat. Muat ulang halaman.
       </p>
-      <div class="resource-grid">
+      <div v-if="user" class="resource-grid">
         <article
           v-for="resource in resources"
           :id="resource.id"
@@ -190,7 +233,9 @@ useSeoMeta({
           class="resource-card"
         >
           <div class="resource-preview" aria-hidden="true">
-            <span class="resource-format">PDF</span>
+            <span class="resource-format">{{
+              resource.id === 'flyer' && resourceStatus?.flyerFormat !== 'pdf' ? 'PPT/PPTX' : 'PDF'
+            }}</span>
             <div v-if="resource.id === 'flyer'" class="flyer-preview">
               <img src="/images/book-detail/flyer-front.png" alt="" width="140" height="187" />
               <img src="/images/book-detail/flyer-back.png" alt="" width="137" height="186" />
@@ -213,7 +258,13 @@ useSeoMeta({
           <div class="resource-body">
             <h3>{{ resource.title }}</h3>
             <p class="resource-metadata">
-              {{ resource.id === 'dummy' ? 'Pratinjau buku \u00b7 PDF' : 'PDF' }}
+              {{
+                resource.id === 'flyer' && resourceStatus?.flyerFormat !== 'pdf'
+                  ? 'PowerPoint · Preview slide'
+                  : resource.id === 'dummy'
+                    ? 'Pratinjau buku \u00b7 PDF'
+                    : 'PDF'
+              }}
             </p>
             <p class="resource-description">{{ resource.description }}</p>
             <p v-if="resourceError" class="resource-state">Status berkas belum tersedia</p>
@@ -227,10 +278,14 @@ useSeoMeta({
               <a
                 :href="`/api/products/${encodeURIComponent(product.slug)}/resources/${resource.id}?download=1`"
                 class="resource-download"
-                :aria-label="`Unduh PDF: ${resource.title}`"
+                :aria-label="`Unduh: ${resource.title}`"
               >
                 <img src="/images/book-detail/download.svg" alt="" width="16" height="16" />
-                Unduh PDF
+                {{
+                  resource.id === 'flyer' && resourceStatus?.flyerFormat !== 'pdf'
+                    ? 'Unduh PowerPoint'
+                    : 'Unduh PDF'
+                }}
               </a>
               <button
                 type="button"
@@ -254,7 +309,7 @@ useSeoMeta({
     >
       <div class="flex h-full flex-col">
         <div
-          v-if="!pdfViewerUrl"
+          v-if="!pdfViewerUrl && !flyerPreview"
           class="flex items-center justify-between gap-4 border-b border-stone-200 px-5 py-4"
         >
           <h2 class="text-lg font-semibold">{{ pdfViewerTitle }}</h2>
@@ -281,6 +336,13 @@ useSeoMeta({
           >
             {{ pdfViewerError }}
           </div>
+          <FlyerSlideViewer
+            v-else-if="flyerPreview"
+            :slides="flyerPreview.slides"
+            :title="pdfViewerTitle"
+            :download-url="`/api/products/${encodeURIComponent(product.slug)}/resources/flyer?download=1`"
+            @close="closePdfDialog"
+          />
           <PdfFlipbookViewer
             v-else-if="pdfViewerUrl"
             :key="pdfViewerUrl"

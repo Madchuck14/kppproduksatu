@@ -17,6 +17,7 @@ export default defineEventHandler(async (event) => {
   if (!data) throw createError({ statusCode: 404, statusMessage: 'Buku tidak ditemukan' })
   return {
     flyer: Boolean(data.flyer_path),
+    flyerFormat: data.flyer_path ? data.flyer_path.split('.').pop() : null,
     dummy: Boolean(data.dummy_book_path),
     productKnowledge: Boolean(data.product_knowledge_path),
   }

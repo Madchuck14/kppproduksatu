@@ -20,7 +20,11 @@ const draftDetails = reactive({
   benefits: '',
 })
 const materials = [
-  { kind: 'flyer', label: 'Flyer', help: 'PDF, maksimal 20 MB' },
+  {
+    kind: 'flyer',
+    label: 'Flyer',
+    help: 'PPT/PPTX, maksimal 20 MB. Unggah gambar slide di bawah untuk preview.',
+  },
   { kind: 'dummy', label: 'Dummy Buku', help: 'PDF, maksimal 20 MB' },
   { kind: 'product-knowledge', label: 'Product Knowledge', help: 'PDF, maksimal 50 MB' },
 ] as const
@@ -60,6 +64,43 @@ const materialFiles = reactive<Record<'flyer' | 'dummy' | 'product-knowledge', F
   dummy: null,
   'product-knowledge': null,
 })
+const flyerSlides = shallowRef<File[]>([])
+const uploadedFlyer = ref(Boolean(props.book?.resources.flyer))
+const flyerSlideCount = ref(props.book?.flyerSlideCount ?? 0)
+function selectFlyerSlides(event: Event) {
+  const input = event.target as HTMLInputElement
+  const selected = Array.from(input.files ?? [])
+  message.value = ''
+  flyerSlides.value = []
+  if (
+    selected.length > 20 ||
+    selected.some(
+      (slide) =>
+        !['image/png', 'image/jpeg'].includes(slide.type) ||
+        slide.size > 2 * 1024 * 1024 ||
+        !slide.size,
+    )
+  ) {
+    message.value = 'Pilih maksimal 20 slide PNG/JPG, masing-masing maksimal 2 MB.'
+    input.value = ''
+    return
+  }
+  flyerSlides.value = selected.sort((a, b) => a.name.localeCompare(b.name, 'id', { numeric: true }))
+}
+function moveFlyerSlide(index: number, direction: number) {
+  const slides = [...flyerSlides.value]
+  const target = index + direction
+  if (target < 0 || target >= slides.length) return
+  const selected = slides.splice(index, 1)[0]!
+  slides.splice(target, 0, selected)
+  flyerSlides.value = slides
+}
+function materialType(kind: keyof typeof materialFiles, selected: File) {
+  if (kind !== 'flyer') return selected.type
+  return /\.pptx$/i.test(selected.name)
+    ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    : 'application/vnd.ms-powerpoint'
+}
 const imageUrl = ref(props.book?.imageUrl ?? '/images/book-placeholder.svg')
 let localPreview: string | undefined
 function releasePreview() {
@@ -92,13 +133,16 @@ function selectMaterial(kind: keyof typeof materialFiles, event: Event) {
   message.value = ''
   materialFiles[kind] = null
   if (!selected) return
-  const isPdf = selected.type === 'application/pdf'
+  const validFormat =
+    kind === 'flyer' ? /\.(ppt|pptx)$/i.test(selected.name) : selected.type === 'application/pdf'
   const maxSize = kind === 'product-knowledge' ? 50 * 1024 * 1024 : 20 * 1024 * 1024
-  if (!isPdf || selected.size > maxSize) {
+  if (!validFormat || !selected.size || selected.size > maxSize) {
     message.value =
-      kind === 'product-knowledge'
-        ? 'Pilih Product Knowledge PDF maksimal 50 MB.'
-        : 'Pilih berkas PDF maksimal 20 MB.'
+      kind === 'flyer'
+        ? 'Pilih flyer PPT/PPTX maksimal 20 MB.'
+        : kind === 'product-knowledge'
+          ? 'Pilih Product Knowledge PDF maksimal 50 MB.'
+          : 'Pilih berkas PDF maksimal 20 MB.'
     input.value = ''
     return
   }
@@ -108,6 +152,14 @@ async function save() {
   if (busy.value) return
   message.value = ''
   errors.value = {}
+  if (materialFiles.flyer && !flyerSlides.value.length) {
+    message.value = 'Pilih gambar hasil ekspor slide untuk melengkapi preview flyer PowerPoint.'
+    return
+  }
+  if (flyerSlides.value.length && !materialFiles.flyer && !uploadedFlyer.value) {
+    message.value = 'Pilih flyer PPT/PPTX sebelum gambar slide.'
+    return
+  }
   if (
     draftDetails.isbn.trim() ||
     draftDetails.curriculum.trim() ||
@@ -159,9 +211,24 @@ async function save() {
       await $fetch(`/api/admin/books/${book.id}/materials/${kind}`, {
         method: 'POST',
         body: material,
-        headers: { 'Content-Type': material.type },
+        headers: { 'Content-Type': materialType(kind, material) },
       })
       materialFiles[kind] = null
+      if (kind === 'flyer') {
+        uploadedFlyer.value = true
+        flyerSlideCount.value = 0
+      }
+    }
+    if (flyerSlides.value.length) {
+      progress.value = 'Mengunggah gambar slide flyer...'
+      const body = new FormData()
+      for (const slide of flyerSlides.value) body.append('slides', slide)
+      const updated = await $fetch<EditorBook>(`/api/admin/books/${book.id}/flyer-slides`, {
+        method: 'POST',
+        body,
+      })
+      flyerSlideCount.value = updated.flyerSlideCount
+      flyerSlides.value = []
     }
     await navigateTo('/admin?notice=saved')
   } catch (error) {
@@ -480,7 +547,7 @@ async function save() {
                 file<input
                   :id="`new-book-${item.kind}`"
                   type="file"
-                  accept="application/pdf"
+                  :accept="item.kind === 'flyer' ? '.ppt,.pptx' : 'application/pdf'"
                   @change="selectMaterial(item.kind, $event)"
               /></label>
               <span class="file-name">{{
@@ -490,6 +557,49 @@ async function save() {
                   : 'Belum ada file')
               }}</span>
             </div>
+          </div>
+          <div class="material-upload">
+            <label for="new-book-flyer-slides" class="file-heading">Gambar slide flyer</label>
+            <p class="field-help">
+              Ekspor semua slide dari PowerPoint sebagai PNG/JPG. Maksimal 20 slide, 2 MB per
+              gambar. Unggahan mengganti seluruh preview.
+            </p>
+            <div class="file-picker">
+              <label class="file-button" for="new-book-flyer-slides"
+                >Pilih gambar<input
+                  id="new-book-flyer-slides"
+                  type="file"
+                  multiple
+                  accept="image/png,image/jpeg"
+                  @change="selectFlyerSlides"
+              /></label>
+              <span class="file-name">{{
+                flyerSlides.length
+                  ? `${flyerSlides.length} slide dipilih`
+                  : `${flyerSlideCount} slide tersimpan`
+              }}</span>
+            </div>
+            <ol v-if="flyerSlides.length" class="slide-upload-list">
+              <li v-for="(slide, index) in flyerSlides" :key="`${slide.name}-${index}`">
+                <span>{{ index + 1 }}. {{ slide.name }}</span>
+                <button
+                  type="button"
+                  :disabled="index === 0"
+                  :aria-label="`Pindahkan slide ${index + 1} ke atas`"
+                  @click="moveFlyerSlide(index, -1)"
+                >
+                  Naik
+                </button>
+                <button
+                  type="button"
+                  :disabled="index === flyerSlides.length - 1"
+                  :aria-label="`Pindahkan slide ${index + 1} ke bawah`"
+                  @click="moveFlyerSlide(index, 1)"
+                >
+                  Turun
+                </button>
+              </li>
+            </ol>
           </div>
           <p class="privacy-note">Materi disimpan privat dan tidak masuk bucket sampul publik.</p>
         </section>
@@ -806,6 +916,29 @@ async function save() {
   color: #6b6f6b;
   font-size: 12.5px;
   line-height: 20px;
+}
+.slide-upload-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.slide-upload-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.slide-upload-list span {
+  flex: 1;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.slide-upload-list button {
+  color: #1f5c3f;
+  padding: 4px;
+}
+.slide-upload-list button:disabled {
+  opacity: 0.4;
 }
 .publication-card {
   display: grid;

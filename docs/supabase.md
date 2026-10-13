@@ -110,9 +110,10 @@ privat `book-materials`, serta kebijakan upload Editor sesuai scope jenjang. Con
 dibuat `NOT VALID`: data lama berkode nonnumerik tetap terbaca, tetapi harus diperbaiki saat row
 tersebut diperbarui. Jangan jalankan aplikasi baru dalam mode Supabase sebelum migration diterapkan.
 
-Flyer dan Dummy Buku menerima PDF maksimal 20 MB. Product Knowledge menerima PDF maksimal 50 MB.
-Bucket tidak memiliki URL publik permanen. Materi buku published dapat dibuka siapa pun lewat
-endpoint server yang membuat signed URL berumur 60 detik. Product Knowledge PPT/PPTX lama harus
+Flyer baru menerima PPT/PPTX maksimal 20 MB; Dummy Buku menerima PDF maksimal 20 MB.
+Product Knowledge menerima PDF maksimal 50 MB. Bucket tidak memiliki URL publik permanen.
+Setelah migration preview flyer terbaru, materi published hanya dapat dibuka setelah login
+lewat endpoint server yang membuat signed URL berumur 60 detik. Product Knowledge PPT/PPTX lama harus
 diunggah ulang sebagai PDF agar dapat dirender dalam dialog aplikasi.
 
 Jalankan `supabase/migrations/202610060002_unique_book_title.sql` setelah migration materi privat.
@@ -122,8 +123,47 @@ mencegah dua request bersamaan membuat nama buku yang sama.
 
 Jika migration akses akun pernah dijalankan, lanjutkan dengan
 `supabase/migrations/202610060004_public_book_material_access.sql`. Migration mengganti kebijakan
-baca menjadi publik hanya untuk materi milik buku published. Bucket tetap privat; object path harus
-sama dengan path yang tersimpan pada row produk.
+baca menjadi publik hanya untuk materi milik buku published. Ini merupakan langkah historis;
+migration `202610130004_flyer_slide_previews.sql` berikutnya menggantinya dengan akses authenticated.
+Bucket tetap privat; object path harus sama dengan path yang tersimpan pada row produk.
+
+## Preview flyer PowerPoint
+
+Terapkan `supabase/migrations/202610130004_flyer_slide_previews.sql` setelah migration materi
+sebelumnya, sebelum deploy aplikasi. Migration transaksional dapat diulang dan menambah
+`products.flyer_slide_paths` sebagai daftar berurutan path PNG/JPG privat. UUID, flyer PDF lama,
+dan materi lain tetap utuh; tidak ada konversi otomatis atau penghapusan file.
+
+Migration memperluas kebijakan upload Editor untuk folder `flyer-slides`, memeriksa scope
+jenjang yang sama, dan mengganti pembacaan materi anonim dengan authenticated untuk seluruh
+materi. Hanya file yang terdaftar pada buku published dapat dibaca Sales/pengguna login;
+Editor tetap dapat mengelola materi dalam scope. Signed URL yang sudah terbit tetap berlaku
+sampai kedaluwarsa, maksimal 60 detik untuk URL yang dibuat aplikasi.
+
+Editor memilih PPT/PPTX dan gambar hasil ekspor PNG/JPG: maksimal 20 slide, 2 MB per gambar.
+Form menampilkan urutan numerik nama file dan tombol Naik/Turun. PPT/PPTX maksimal 20 MB;
+upload baru wajib disertai gambar pada form. Endpoint `POST /api/admin/books/:id/flyer-slides`
+menerima multipart dengan field `slides` berulang sesuai urutan. Total request dibatasi 41 MB;
+set preview diganti hanya setelah semua file berhasil diunggah. File PPT baru mengosongkan
+preview lama sehingga kegagalan upload gambar tidak menampilkan slide dari PPT sebelumnya.
+File lama yang tidak terpakai tetap memerlukan pembersihan operasional terpisah.
+
+Urutan rollout: backup dan catat UUID/jumlah buku, jalankan migration, verifikasi data lama,
+lalu deploy aplikasi. Pada project pengujian periksa upload PPT/PPTX dan gambar, urutan setelah
+reload, zoom/fullscreen, nama/format unduhan, penolakan gambar palsu/lebih dari batas, akses
+anonim ditolak, Sales dapat membaca published, draft ditolak, serta Editor di luar scope ditolak.
+Periksa RLS Storage langsung untuk original dan slide; API saja tidak membuktikan kebijakan DB.
+
+Rollback memakai aplikasi sebelumnya dan mempertahankan kolom/data/policy privat. Versi lama
+yang meminta signed URL melalui client anonim akan gagal membuka materi; jangan membuka kembali
+akses anonim sebagai rollback. Sesuaikan pembacaan versi rollback agar memakai session pengguna.
+Migration ini belum dijalankan oleh agent pada Supabase live.
+
+Verifikasi tanpa database: `node scripts/verify-flyer.mjs` menguji validasi format dan alur
+preview/unduhan dengan stub repository/Storage. `node scripts/verify-flyer-smoke.mjs` memakai
+server lokal di port 3100 (ubah lewat `FLYER_TEST_BASE_URL`) untuk memeriksa SSR, route katalog,
+login, dan penolakan akses materi/admin anonim. Keduanya tidak membuktikan Auth/RLS/upload live
+atau interaksi browser.
 
 ## Pemeriksaan sebelum showcase
 

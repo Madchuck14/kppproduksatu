@@ -46,7 +46,9 @@ Pagination tersedia pada dashboard Editor dan katalog publik. Cart, checkout, Mi
 banner CMS, sitemap, dan structured data belum diimplementasikan.
 Dashboard Editor sudah memiliki unggahan privat Product Knowledge, flyer, dan Dummy Buku. Migration
 `202610060001_book_publication_materials.sql` harus diterapkan sebelum fitur dipakai. Materi buku
-published dapat dibuka publik tanpa login melalui signed URL berumur 60 detik.
+published memerlukan login untuk preview dan unduhan melalui signed URL berumur 60 detik.
+Flyer baru menerima PPT/PPTX asli serta gambar PNG/JPG hasil ekspor slide untuk preview statis.
+Terapkan migration `202610130004_flyer_slide_previews.sql` sebelum menjalankan versi ini.
 
 ## Perintah
 

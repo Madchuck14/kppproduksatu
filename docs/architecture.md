@@ -67,38 +67,40 @@ Layout menjadi satu kolom pada mobile. Sampul dan informasi memakai data API SSR
 kurikulum belum ditampilkan karena belum tersimpan, sementara ISBN dan manfaat ditandai belum tersedia; keunggulan memakai daftar yang tersimpan. Isi buku menggunakan deskripsi yang tersedia.
 Bagian Materi Promosi mengikuti ekspor lokal Figma `37:8192` dan hanya ditampilkan
 kepada pengguna yang sudah login. Panel hijau berisi kartu Flyer Promosi, Presentasi Buku,
-dan Buku Dummy, dengan pratinjau, status berkas, serta tombol Unduh PDF dan Lihat.
+dan Buku Dummy, dengan pratinjau, status berkas, serta tombol unduh dan Lihat.
 Aset flyer dan ikon unduh disimpan di `public/images/book-detail`; pratinjau dummy memakai
-sampul katalog. Semua materi tersimpan sebagai PDF, sehingga label PPT/PPTX contoh desain
-disesuaikan dengan berkas nyata. Jumlah halaman dan ukuran contoh tidak ditampilkan karena
-metadata tersebut belum tersedia. Endpoint materi tetap publik dengan penampil PDF yang sudah ada.
+sampul katalog. Flyer baru memakai PPT/PPTX dengan preview gambar slide, sedangkan Product Knowledge
+dan Dummy Buku tetap PDF. Label unduhan mengikuti format nyata, termasuk flyer PDF lama.
+Ukuran contoh tidak ditampilkan karena metadata tersebut belum tersedia. Endpoint preview dan
+unduhan memverifikasi login pada server.
 Pratinjau dummy mengikuti ekspor `figmatocode/previewdummy`: dialog putih beradius 20 px,
 toolbar nama PDF, tombol tutup/unduh, zoom 50–200%, area baca abu-abu, dan navigasi halaman
 mengambang. Isi serta jumlah halaman berasal dari PDF nyata; pembalikan halaman memakai
 StPageFlip yang sudah tersedia. Zoom dapat diganti lewat tombol atau pilihan persentase;
 halaman dapat digeser saat diperbesar. Tombol panah keyboard, Escape, dan fokus dialog
 tetap berfungsi. Aset toolbar disimpan lokal di `public/images/dummy-preview`.
-Flyer dan Presentasi Buku memakai dialog dan viewer yang sama, termasuk toolbar,
-zoom, unduhan, serta navigasi halaman. Nama berkas dan tujuan unduhan mengikuti jenis
-materi yang dipilih. Presentasi PPT/PPTX lama menampilkan penjelasan format dan tetap
-menyediakan unduhan; pratinjau memerlukan berkas PDF.
+Flyer PPT/PPTX memakai penampil gambar slide dalam dialog: navigasi tombol/panah keyboard,
+zoom 50–200%, fullscreen, dan unduh PowerPoint asli. Seluruh gambar diambil saat dialog dibuka,
+lalu object URL lokal dibersihkan ketika ditutup. Preview ini statis, tanpa transisi atau animasi.
+Flyer PDF lama dan Presentasi Buku tetap memakai viewer PDF yang tersedia.
 Favorit anonim menawarkan login
 dengan tujuan kembali ke buku. Tombol pemesanan menuju kontak pada footer beranda.
 
 Halaman detail tetap publik dan memakai API SSR yang sama. Sampul, judul, harga, penulis,
 deskripsi, kode buku, dan jenjang tersedia. Buku lama dengan identitas kosong ditandai
 belum tersedia sampai dilengkapi Editor super. Product Knowledge, flyer, serta dummy untuk buku
-published dapat dibuka publik tanpa login.
+published memerlukan login untuk preview dan unduhan.
 
 Pengunjung anonim dapat membuka penjelasan akses lalu menuju login dengan parameter `returnTo`.
 Setelah login berhasil, tujuan dikembalikan ke halaman buku dan bagian konten yang dipilih.
 Tujuan divalidasi dengan schema yang hanya menerima route detail buku lokal dan anchor konten
 yang dikenal, serta `/products` dan `/favorites`. Login tanpa tujuan mengarahkan semua akun ke landing page `/`.
 Login dari registrasi tanpa tujuan buku kembali ke katalog publik `/products`.
-Endpoint status dan unduhan materi bersifat publik untuk buku published. Endpoint membuat signed URL
-berumur 60 detik tanpa membuka bucket secara langsung. Dashboard Editor mengunggah flyer, Dummy
-Buku, dan Product Knowledge berformat PDF ke bucket privat `book-materials`. Endpoint upload tetap
-memeriksa session, scope jenjang, MIME, signature, dan ukuran.
+Endpoint status hanya mengembalikan boolean dan format, tanpa URL/path privat. Endpoint preview
+dan unduhan memverifikasi `auth.getUser()` dan membatasi buku published sebelum membuat signed URL
+berumur 60 detik. Dashboard Editor mengunggah flyer PPT/PPTX, gambar slide PNG/JPG, serta Dummy
+Buku dan Product Knowledge PDF ke bucket privat `book-materials`. Endpoint upload tetap memeriksa
+session, scope jenjang, MIME, signature, dan ukuran; RLS menutup akses materi anonim.
 CRUD katalog per jenjang tersedia pada dashboard Editor.
 
 Halaman `/login` memakai formulir email/kata sandi dengan validasi Zod, tombol tampil/sembunyikan
@@ -179,8 +181,13 @@ Object baru memakai `books/{product UUID}/{random UUID}.{extension}`; RLS Storag
 ke buku tersebut. Tidak ada overwrite object. File lama tidak otomatis dihapus saat sampul diganti
 atau buku dihapus; pembersihan aset tak terpakai dilakukan terpisah oleh pengelola.
 
-Flyer dan Dummy Buku dibatasi PDF 20 MB. Product Knowledge dibatasi PDF 50 MB. Flyer dan Product
-Knowledge dirender oleh PDF.js ke canvas dalam dialog aplikasi. Dummy Buku memakai PDF.js dan
+Flyer dibatasi PPT/PPTX 20 MB dengan 1–20 gambar slide PNG/JPG, masing-masing maksimal 2 MB.
+Editor mengekspor gambar secara manual dari PowerPoint, memeriksa urutan pada form, lalu mengunggah
+seluruh set. Gambar diurutkan berdasarkan nama secara numerik dan dapat dipindahkan naik/turun.
+Penggantian PPT mengosongkan preview lama. Upload gambar disimpan sebagai satu daftar setelah
+semua file berhasil diunggah; kegagalan mempertahankan daftar sebelumnya dan membersihkan file
+baru. Perubahan flyer saat upload menyebabkan 409, bukan memasang slide pada PPT yang berbeda.
+Dummy Buku dibatasi PDF 20 MB dan Product Knowledge PDF 50 MB. Dummy Buku memakai PDF.js dan
 StPageFlip (`page-flip`) dalam popup flipbook: dua halaman pada layar lebar, satu halaman pada layar
 sempit, dengan sampul, swipe/drag, tombol navigasi, dan panah keyboard. PDF diambil sekali sebelum
 halaman disiapkan agar navigasi tidak bergantung pada masa berlaku signed URL. Penampil hanya
