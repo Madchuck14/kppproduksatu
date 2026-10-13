@@ -2,12 +2,14 @@ import { z } from 'zod'
 import { educationLevelSchema } from './auth'
 import { bookSubjectSchema } from './editor'
 import { getGradesForLevel } from '../utils/book-grades'
+import { divisionCodeSchema } from '../utils/book-divisions'
 
 export const catalogQuerySchema = z
   .object({
     q: z.string().trim().max(100).default(''),
     featured: z.enum(['true', 'false']).optional(),
     level: educationLevelSchema.optional(),
+    division: divisionCodeSchema.optional(),
     grade: z.coerce.number().int().min(1).max(12).optional(),
     subject: z.union([bookSubjectSchema, z.array(bookSubjectSchema).max(50)]).optional(),
     page: z.coerce.number().int().min(1).max(100000).optional(),

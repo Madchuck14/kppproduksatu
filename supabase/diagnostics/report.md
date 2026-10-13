@@ -1,0 +1,16 @@
+| QUERY PLAN                                                                                                                                                                                                |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Limit  (cost=1.03..1.03 rows=1 width=24) (actual time=0.038..0.039 rows=0 loops=1)                                                                                                                        |
+|   Buffers: shared hit=1                                                                                                                                                                                   |
+|   ->  Sort  (cost=1.03..1.03 rows=1 width=24) (actual time=0.038..0.038 rows=0 loops=1)                                                                                                                   |
+|         Sort Key: created_at DESC, id                                                                                                                                                                     |
+|         Sort Method: quicksort  Memory: 25kB                                                                                                                                                              |
+|         Buffers: shared hit=1                                                                                                                                                                             |
+|         ->  Seq Scan on products  (cost=0.00..1.02 rows=1 width=24) (actual time=0.036..0.036 rows=0 loops=1)                                                                                             |
+|               Filter: (published AND published AND ((title ~~* '%matematika%'::text) OR (author ~~* '%matematika%'::text) OR (book_code ~~* '%matematika%'::text) OR (subject ~~* '%matematika%'::text))) |
+|               Rows Removed by Filter: 1                                                                                                                                                                   |
+|               Buffers: shared hit=1                                                                                                                                                                       |
+| Planning:                                                                                                                                                                                                 |
+|   Buffers: shared hit=6                                                                                                                                                                                   |
+| Planning Time: 0.090 ms                                                                                                                                                                                   |
+| Execution Time: 0.052 ms                                                                                                                                                                                  |

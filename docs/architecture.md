@@ -16,7 +16,12 @@ Katalog sekarang khusus buku sesuai PRD awal, namun penamaan entitas `products` 
 
 Beranda mengikuti desain Figma dengan hero Grow with English, logo Erlangga dan Phibeta,
 pencarian, maksimal empat buku terbaru dari API publik, dan empat kartu jenjang sekolah.
-Bagian Divisi menampilkan enam kartu informasi statis; kartu tersebut belum memfilter katalog.
+Kartu jenjang dan enam divisi menuju halaman `/jenjang?level=...` dan
+`/divisi?division=...`. Navigasi Jenjang/Divisi membuka halaman masing-masing tanpa pilihan.
+Kedua halaman menampilkan kartu jumlah buku published dan maksimal empat buku paling sering
+diakses per kelompok. Pilihan kelompok mengikuti URL dan tombol Lihat semua buku menuju
+katalog dengan filter yang sesuai. Daftar enam divisi didefinisikan di
+`shared/utils/book-divisions.ts`; filter `division` memeriksa `products.division_code`.
 Layout desktop mengacu node Figma `39:21` pada ukuran 1440 px: hero 1344×420 px, rak buku
 1280 px, dan grid jenjang empat kolom (dua kolom pada mobile). Variable font Lora dan Inter berformat WOFF2 Latin
 disimpan lokal di `public/fonts` dengan lisensi OFL; font landing tidak mengubah tipografi
@@ -27,7 +32,13 @@ Judul panjang dipotong satu baris pada rak landing; judul lengkap tersedia pada 
 Harga tetap tersedia di katalog dan detail. Tombol favorit landing berbentuk ikon 28 px di sudut
 sampul; navigasi menyediakan ikon favorit beserta jumlah buku milik akun aktif.
 Daftar Supabase sudah diurutkan berdasarkan `created_at` terbaru. Mode demo memakai urutan fixture.
-Belum ada statistik popularitas. Favorit pribadi dijelaskan di bagian Favorit buku.
+Popularitas dihitung dari pembukaan detail buku di browser, satu kali per buku/browser/hari UTC,
+sejak migration popularitas diterapkan. SSR dan request GET API tidak menambah hit. Browser
+menyimpan UUID acak lokal; tidak ada email, user ID, atau IP dalam ledger statistik.
+Ranking memakai total kumulatif dan hanya memasukkan buku published yang sudah memiliki akses;
+seri diurutkan menurut `created_at` terbaru lalu UUID. Koleksi tanpa akses menampilkan keadaan
+kosong, bukan ranking buatan. Mode demo tidak mencatat atau mengarang popularitas.
+Favorit pribadi dijelaskan di bagian Favorit buku.
 Aset desain disimpan lokal di `public/images/landing`,
 logo di `public/images/erlangga.png` dan `public/images/phibeta.png`.
 

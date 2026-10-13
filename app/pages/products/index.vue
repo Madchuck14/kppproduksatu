@@ -3,6 +3,7 @@ import { educationLevelSchema } from '#shared/schemas/auth'
 import { bookSubjectSchema } from '#shared/schemas/editor'
 import { getSubjectsForLevel, subjectsByLevel } from '#shared/utils/book-subjects'
 import { getGradesForLevel } from '#shared/utils/book-grades'
+import { bookDivisions, divisionCodeSchema } from '#shared/utils/book-divisions'
 
 const config = useRuntimeConfig()
 const route = useRoute()
@@ -24,6 +25,13 @@ const level = computed(() => {
   return parsed.success ? parsed.data : ''
 })
 const gradeOptions = computed(() => getGradesForLevel(level.value))
+const division = computed(() => {
+  const parsed = divisionCodeSchema.safeParse(route.query.division)
+  return parsed.success ? parsed.data : undefined
+})
+const divisionName = computed(
+  () => bookDivisions.find((item) => item.code === division.value)?.name,
+)
 const grade = computed(() => {
   const value = Number(route.query.grade)
   return gradeOptions.value.includes(value) ? value : undefined
@@ -50,6 +58,7 @@ const { data, error, status, refresh } = await useFetch('/api/products', {
   query: computed(() => ({
     q: appliedSearch.value,
     level: level.value || undefined,
+    division: division.value,
     grade: grade.value,
     subject: subjects.value.length ? subjects.value : undefined,
     sort: sort.value,
@@ -140,7 +149,12 @@ async function clearSearch() {
   searchInput.value?.focus()
 }
 function clearFilters() {
-  return updateQuery({ level: undefined, grade: undefined, subject: undefined })
+  return updateQuery({
+    level: undefined,
+    grade: undefined,
+    subject: undefined,
+    division: undefined,
+  })
 }
 </script>
 
@@ -160,6 +174,12 @@ function clearFilters() {
     </nav>
     <div class="catalog-heading">
       <h1>{{ appliedSearch ? `Hasil untuk “${appliedSearch}”` : 'Katalog Buku' }}</h1>
+      <p v-if="divisionName" class="flex items-center gap-3">
+        Divisi: {{ divisionName }}
+        <button type="button" class="underline" @click="updateQuery({ division: undefined })">
+          Hapus filter divisi
+        </button>
+      </p>
       <p v-if="appliedSearch" aria-live="polite">
         {{
           status === 'pending'

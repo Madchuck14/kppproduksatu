@@ -173,3 +173,5 @@ Report what changed, what was verified, and any unavailable checks or pre-existi
 failures. Update relevant docs when setup, configuration, API behavior, or deployment
 steps change. Do not claim cloud deployment, Docker, or Supabase verification from
 a local demo smoke test.
+
+@RTK.md

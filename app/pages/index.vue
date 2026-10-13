@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { educationLevelSchema } from '#shared/schemas/auth'
+import { bookDivisions } from '#shared/utils/book-divisions'
 import { getSubjectsForLevel, subjectsByLevel, type BookSubject } from '#shared/utils/book-subjects'
 
 const config = useRuntimeConfig()
@@ -36,14 +37,7 @@ const [{ data, error, status, refresh }, { data: levelCounts }] = await Promise.
 ])
 const latestBooks = computed(() => data.value?.products.slice(0, 4) ?? [])
 const schoolLevels = educationLevelSchema.options
-const divisions = [
-  { name: 'SD 1 MIPA', icon: 'i-lucide-flask-conical', style: 'division-mipa' },
-  { name: 'SD 2 IPS BHS', icon: 'i-lucide-globe-2', style: 'division-ips' },
-  { name: 'SMP/SMA MIPA', icon: 'i-lucide-atom', style: 'division-secondary' },
-  { name: 'SMK', icon: 'i-lucide-settings-2', style: 'division-vocational' },
-  { name: 'PHIBETA', icon: 'i-lucide-book-open', style: 'division-phibeta' },
-  { name: 'INTELECTO', icon: 'i-lucide-brain', style: 'division-intelecto' },
-]
+const divisions = bookDivisions
 const subjectOptions = computed(() =>
   level.value
     ? getSubjectsForLevel(level.value)
@@ -176,8 +170,8 @@ async function searchCatalog() {
     >
       <div class="section-heading">
         <h2 id="subjects-title">Jenjang</h2>
-        <NuxtLink to="/products" class="browse-link"
-          >Lihat semua buku
+        <NuxtLink to="/jenjang" class="browse-link"
+          >Lihat semua jenjang
           <img src="/images/landing/category-arrow.svg" alt="" width="17" height="17"
         /></NuxtLink>
       </div>
@@ -185,7 +179,7 @@ async function searchCatalog() {
         <NuxtLink
           v-for="item in schoolLevels"
           :key="item"
-          :to="{ path: '/products', query: { level: item } }"
+          :to="{ path: '/jenjang', query: { level: item } }"
           :class="['subject-card', item.toLowerCase()]"
         >
           <span class="subject-decoration" aria-hidden="true" />
@@ -202,11 +196,13 @@ async function searchCatalog() {
     <section class="landing-section divisions-section" aria-labelledby="divisions-title">
       <div class="section-heading">
         <h2 id="divisions-title">Divisi</h2>
+        <NuxtLink to="/divisi" class="browse-link">Lihat semua divisi</NuxtLink>
       </div>
       <div class="division-grid">
-        <article
+        <NuxtLink
           v-for="(division, index) in divisions"
           :key="division.name"
+          :to="{ path: '/divisi', query: { division: division.code } }"
           :class="['division-card', division.style]"
         >
           <span class="division-number" aria-hidden="true">
@@ -217,7 +213,7 @@ async function searchCatalog() {
           </span>
           <h3>{{ division.name }}</h3>
           <span class="division-accent" aria-hidden="true" />
-        </article>
+        </NuxtLink>
       </div>
     </section>
   </div>

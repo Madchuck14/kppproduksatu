@@ -61,6 +61,7 @@ export async function listProducts(
     q: string
     featured?: string
     level?: string
+    division?: string
     grade?: number
     subject?: string | string[]
     page?: number
@@ -80,6 +81,7 @@ export async function listProducts(
       (product) =>
         (featured === undefined || product.featured === featured) &&
         (!options.level || product.educationLevel === options.level) &&
+        (!options.division || product.divisionCode === options.division) &&
         (options.grade === undefined || product.grade === options.grade) &&
         `${product.title} ${product.author} ${product.bookCode ?? ''} ${product.subject ?? ''}`
           .toLocaleLowerCase('id-ID')
@@ -120,6 +122,7 @@ export async function listProducts(
     .order('id', { ascending: true })
   if (featured !== undefined) query = query.eq('featured', featured)
   if (options.level) query = query.eq('education_level', options.level)
+  if (options.division) query = query.eq('division_code', options.division)
   if (options.grade !== undefined) query = query.eq('grade', options.grade)
   if (subjects.length) query = query.in('subject', subjects)
   if (search) query = query.or(searchFilter)
@@ -134,8 +137,9 @@ export async function listProducts(
   const page = Math.min(options.page, Math.max(1, Math.ceil(total / pageSize)))
   if (page !== options.page) return listProducts(event, { ...options, page })
   const { data: facetRows, error: aggregateError } = await getCatalogClient(event).rpc(
-    'catalog_subject_counts',
+    options.division ? 'catalog_division_subject_counts' : 'catalog_subject_counts',
     {
+      ...(options.division ? { filter_division: options.division } : {}),
       search_text: search,
       filter_level: options.level ?? null,
       filter_grade: options.grade ?? null,
@@ -168,6 +172,7 @@ export async function listProducts(
       .order('id')
       .range(offset, offset + 999)
     if (options.level) facets = facets.eq('education_level', options.level)
+    if (options.division) facets = facets.eq('division_code', options.division)
     if (options.grade !== undefined) facets = facets.eq('grade', options.grade)
     if (featured !== undefined) facets = facets.eq('featured', featured)
     if (search) facets = facets.or(searchFilter)

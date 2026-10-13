@@ -15,6 +15,7 @@ if (error.value || !product.value) {
 }
 
 const { data: catalog, error: relatedError } = await useFetch('/api/products')
+useBookAccess(() => product.value?.slug)
 const { data: resourceStatus, error: resourceError } = await useFetch<ResourceStatus>(
   () => `/api/products/${encodeURIComponent(String(route.params.slug))}/resources`,
 )

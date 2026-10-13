@@ -5,6 +5,7 @@ const config = useRuntimeConfig()
 const route = useRoute()
 const isLanding = computed(() => route.path === '/')
 const isCatalog = computed(() => route.path === '/products')
+const isBrowse = computed(() => route.path === '/jenjang' || route.path === '/divisi')
 const isBookDetail = computed(() => /^\/products\/[^/]+$/.test(route.path))
 const isBookForm = computed(() => /^\/admin\/books\/[^/]+$/.test(route.path))
 const isAuthPage = computed(() => route.path === '/login' || route.path === '/register')
@@ -14,6 +15,7 @@ const isShowcase = computed(
   () =>
     isLanding.value ||
     isCatalog.value ||
+    isBrowse.value ||
     isBookDetail.value ||
     isBookForm.value ||
     isDashboard.value ||
@@ -87,8 +89,8 @@ async function logout() {
         <nav aria-label="Navigasi utama" class="main-nav">
           <NuxtLink to="/" exact-active-class="nav-active">Beranda</NuxtLink>
           <NuxtLink to="/products" active-class="nav-active">Katalog</NuxtLink>
-          <NuxtLink to="/#kategori">Jenjang</NuxtLink>
-          <NuxtLink to="/#kategori">Divisi</NuxtLink>
+          <NuxtLink to="/jenjang" active-class="nav-active">Jenjang</NuxtLink>
+          <NuxtLink to="/divisi" active-class="nav-active">Divisi</NuxtLink>
           <NuxtLink to="/contact">Kontak</NuxtLink>
         </nav>
         <div class="account-nav">
@@ -193,7 +195,7 @@ async function logout() {
           ? 'landing-main'
           : isAuthPage
             ? 'login-main'
-            : isCatalog || isBookDetail || isBookForm || isDashboard || isContact
+            : isCatalog || isBrowse || isBookDetail || isBookForm || isDashboard || isContact
               ? 'catalog-main'
               : 'mx-auto max-w-6xl px-6 py-12'
       "
@@ -317,8 +319,9 @@ async function logout() {
 .landing-shell .main-nav {
   position: absolute;
   top: 25px;
-  left: calc(50% - 225px);
-  gap: 67px;
+  left: 50%;
+  transform: translateX(-50%);
+  gap: 32px;
   align-items: center;
   font: 400 16px/22px var(--font-landing-serif);
 }
@@ -595,6 +598,7 @@ async function logout() {
   }
   .landing-shell .main-nav {
     position: static;
+    transform: none;
     gap: 24px;
   }
   .landing-shell .footer-inner {

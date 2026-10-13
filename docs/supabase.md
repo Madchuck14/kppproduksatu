@@ -275,3 +275,163 @@ relevan dan tetap mempertahankan semantics ILIKE. Catat ukuran indeks dan biaya 
 Referensi: [Database functions](https://supabase.com/docs/guides/database/functions),
 [Query optimization](https://supabase.com/docs/guides/database/query-optimization), dan
 [RLS performance](https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv).
+
+## Divisi buku
+
+Migration `supabase/migrations/202610130001_book_divisions.sql` menambahkan kolom opsional
+`products.division_code` bertipe `text`. Satu buku dapat memiliki satu divisi dari enam kode
+tetap berikut. Constraint database menolak kode lain, termasuk string kosong.
+
+| Kode           | Nama tampilan |
+| -------------- | ------------- |
+| `sd-1-mipa`    | SD 1 MIPA     |
+| `sd-2-ips-bhs` | SD 2 IPS BHS  |
+| `smp-sma-mipa` | SMP/SMA MIPA  |
+| `smk`          | SMK           |
+| `phibeta`      | PHIBETA       |
+| `intelecto`    | INTELECTO     |
+
+Migration hanya memperluas schema: tidak mengisi atau mengubah data buku lama, UUID,
+referensi favorit, grant, atau RLS. Buku lama mendapat `NULL`; penentuan divisi harus memakai
+data yang dikonfirmasi klien, bukan diturunkan otomatis dari jenjang atau mata pelajaran.
+Divisi tidak membatasi hak akses Editor; scope tetap berdasarkan jenjang pendidikan.
+
+Urutan rollout dan verifikasi:
+
+1. Siapkan backup dan catat jumlah serta UUID produk sebelum migration.
+2. Terapkan migration melalui mekanisme yang mencatat versinya. Transaksi dapat diulang;
+   kolom memakai `IF NOT EXISTS` dan constraint dipasang ulang. Nilai tidak valid yang sudah
+   ada akan menggagalkan transaksi, bukan dihapus atau dikoreksi otomatis.
+3. Pastikan jumlah/UUID produk tidak berubah. Pada penerapan pertama, buku lama harus memiliki
+   `division_code IS NULL`. Pada pengulangan, nilai divisi yang sudah valid tetap tersimpan.
+4. Pada database pengujian, verifikasi keenam kode dan `NULL` diterima, sedangkan kode lain,
+   string kosong, dan nama tampilan seperti `SD 1 MIPA` ditolak. Ulangi migration untuk
+   memastikan nilai valid tidak berubah. Periksa akses publik published dan scope Editor.
+
+Migration belum dijalankan atau diverifikasi pada database live oleh agent. Form Editor,
+kontrak API, dan dashboard belum membaca atau menulis kolom ini; integrasi aplikasi merupakan
+tahap berikutnya. Writer aplikasi sekarang memakai daftar kolom eksplisit sehingga penambahan
+kolom nullable tetap kompatibel dengan versi sebelumnya.
+
+Belum ditambahkan indeks divisi: tahap ini belum menambahkan query filter divisi. Menampilkan
+kolom tidak memerlukan join atau indeks baru. Saat filter ditambahkan, ukur query representatif
+dengan `EXPLAIN (ANALYZE, BUFFERS)` dan tentukan indeks berdasarkan filter serta urutan aktual.
+
+Rollback aplikasi dengan versi sebelumnya dan pertahankan kolom beserta constraint agar nilai
+divisi yang sudah diisi tidak hilang. Penghapusan kolom bukan bagian rollback tahap ini.
+
+## Sinopsis dan target pasar buku
+
+Migration `supabase/migrations/202610130002_book_synopsis_target_market.sql` menyiapkan
+revisi detail buku: bagian deskripsi singkat dihapus dari desain, Isi buku menjadi Sinopsis,
+dan Manfaat menjadi Target Pasar. Tahap ini hanya memperluas database, belum mengubah UI/API.
+
+| Kolom           | Bentuk data                                                               | Kondisi buku lama |
+| --------------- | ------------------------------------------------------------------------- | ----------------- |
+| `synopsis`      | `text`, opsional, maksimal 20.000 karakter, nonblank jika diisi           | `NULL`            |
+| `target_market` | `text[]`, maksimal 10 label nonblank, masing-masing maksimal 200 karakter | Array kosong      |
+| `description`   | Kolom lama dipertahankan sementara untuk kompatibilitas                   | Nilai tetap utuh  |
+
+Target pasar berupa daftar bebas, misalnya `ARRAY['Murid SD', 'Guru SD', 'Orang Tua']`.
+Contoh bukan default seluruh buku atau daftar pilihan wajib; isi harus sesuai buku dan
+konfirmasi klien. Array kosong diterima, tetapi NULL, elemen NULL/kosong/whitespace,
+array multidimensi, dan nilai yang melewati batas ditolak. Target pasar merupakan informasi
+publik buku, bukan aturan role pengguna atau scope Editor.
+
+Database saat ini hanya memiliki `description` untuk deskripsi singkat sekaligus Isi buku.
+Manfaat pada form masih pratinjau dan tidak tersimpan. Karena makna data lama bercampur,
+migration tidak otomatis menyalin `description` menjadi sinopsis atau membuat target pasar
+berdasarkan jenjang. Tidak ada UPDATE data buku; UUID, timestamp, referensi, grant, dan RLS
+tetap utuh. Indeks tidak ditambahkan karena kedua kolom hanya untuk konten tampilan.
+
+Urutan rollout:
+
+1. Siapkan backup dan catat UUID, jumlah produk, timestamp, dan nilai `description` lama.
+2. Terapkan migration melalui mekanisme yang mencatat versinya. Migration transaksional
+   dan dapat diulang; nilai baru yang valid tetap tersimpan saat pengulangan. Data baru
+   yang tidak valid menyebabkan transaksi gagal tanpa koreksi atau penghapusan otomatis.
+3. Pada database pengujian, pastikan data lama tetap sama dan kolom baru memiliki nilai
+   awal di atas. Uji sinopsis NULL/nonblank, batas 20.000/20.001 karakter, target pasar
+   kosong/valid, batas 10/11 label serta 200/201 karakter, dan penolakan NULL/blank/multidimensi.
+   Ulangi migration dan pastikan konten baru yang sudah valid tidak berubah.
+4. Verifikasi pembacaan published oleh anon serta scope baca/tulis Editor tetap berlaku.
+5. Tahap aplikasi berikutnya memperbarui tipe, validasi Zod, query, form, dan detail buku.
+   Writer lama yang tidak mengirim field baru tetap mempertahankan nilai tersimpan.
+   Lengkapi sinopsis dan target pasar melalui alur Editor setelah integrasi tersedia.
+
+Jangan rename/drop `description` pada tahap database ini: repository publik, repository
+Editor, form, dan metadata SEO masih menggunakannya. Penghapusan blok deskripsi singkat
+merupakan perubahan UI berikutnya. Penghapusan kolom lama memerlukan migrasi lanjutan
+setelah semua reader/writer dan kebutuhan SEO diperbarui serta konten lama ditinjau.
+
+Rollback dengan aplikasi sebelumnya dan biarkan kolom baru, fungsi validasi, constraint,
+serta data tersimpan. Migration belum dijalankan atau diuji pada PostgreSQL live oleh agent.
+
+## Halaman jenjang/divisi dan popularitas
+
+Terapkan `202610130001_book_divisions.sql`, kemudian
+`202610130003_catalog_popularity.sql` sebelum memakai halaman `/jenjang` dan `/divisi`.
+Migration popularitas diterapkan melalui mekanisme yang mencatat versinya dan dibungkus
+transaksi. Versi terbaru dapat dijalankan ulang pada schema yang dibuat versi awal file ini:
+tabel memakai `IF NOT EXISTS`, fungsi memakai `CREATE OR REPLACE`, dan policy statistik
+dipasang ulang dalam transaksi yang sama. Ledger serta counter tidak dihapus atau direset.
+Jika versi awal sudah dijalankan saat file masih disusun, jalankan seluruh file terbaru
+untuk melengkapi RPC yang belum tersedia. Jangan drop tabel untuk mengatasi error `42P07`.
+Schema tabel yang sudah ada tetap harus sesuai definisi migration; `IF NOT EXISTS` bukan
+alat untuk memperbaiki tabel lain yang kebetulan memakai nama sama. Agent tidak menjalankan
+migration ini ke database live.
+
+- `product_access_days` menyimpan UUID browser acak, UUID produk, dan hari UTC. Primary key
+  gabungan mencegah hit ganda untuk buku/browser/hari yang sama, termasuk request bersamaan.
+  Tidak ada akses baca/tulis langsung bagi anon atau authenticated.
+- `product_access_stats` menyimpan total kumulatif per buku. Publik hanya dapat membaca
+  statistik buku published melalui RLS; seluruh penulisan langsung ditolak.
+- `record_product_access(book_slug, visitor)` merupakan satu-satunya writer runtime.
+  Fungsi `SECURITY DEFINER` memakai search path kosong, hanya menerima buku published,
+  menentukan hari sendiri, dan menambah counter atomik hanya jika ledger baru berhasil dibuat.
+  Grant execute dibatasi anon/authenticated karena pembacaan detail tetap publik.
+- `catalog_browse_groups(group_kind)` memakai `SECURITY INVOKER`, RLS, dan filter published
+  eksplisit. Satu RPC mengembalikan count dan maksimal empat buku dengan akses terbanyak
+  untuk empat jenjang atau enam divisi. Kolom output eksplisit tidak menyertakan path materi
+  privat; `image_path` sampul publik tetap dipetakan oleh helper storage server.
+- `catalog_division_subject_counts` menyediakan facet mapel sesuai filter divisi tanpa
+  mengubah signature RPC count lama. Fallback metadata hanya untuk RPC yang belum tersedia;
+  error database/jaringan lain tetap menjadi error.
+
+Endpoint `GET /api/catalog/browse?kind=level|division` membaca kelompok. Endpoint
+`POST /api/products/:slug/access` menerima `{ "visitor": "UUID" }`, memvalidasi Zod, dan
+tidak dicache. Client mencatat setelah detail berhasil tampil; kegagalan statistik tidak
+menghalangi detail. Storage browser yang dinonaktifkan menyebabkan akses tidak dicatat.
+Ranking kumulatif bukan jumlah manusia unik: browser berbeda, penghapusan storage, dan
+UUID buatan dapat menghasilkan hit tambahan. Desain ini bukan perlindungan terhadap bot atau
+manipulasi terarah; kebutuhan tersebut memerlukan kebijakan rate limiting terpisah.
+
+Ledger bertambah mengikuti jumlah buku/browser/hari; jangan menghapus hari UTC aktif karena
+akan membuka pencatatan ganda. Retensi ledger lama dapat ditetapkan operasional tanpa menghapus
+counter kumulatif. Tidak ada cron atau penghapusan otomatis pada tahap ini.
+
+Verifikasi di database pengujian: duplicate hit hari yang sama tetap satu, browser berbeda
+menambah satu, draft/missing tidak tercatat, request bersamaan tidak kehilangan hit, penulisan
+langsung dan pembacaan ledger ditolak untuk anon/authenticated, serta unpublish menghilangkan
+buku dari ranking/count. Pastikan enam divisi dan empat jenjang tetap muncul saat kosong dan
+respons tidak mengekspos materi privat. Periksa ranking empat teratas, tie-break, filter divisi,
+scope Editor yang sudah ada, dan FK cascade saat buku dihapus. Buku lama dengan divisi NULL
+tetap masuk jenjang yang sesuai tetapi tidak masuk kelompok divisi sebelum dilengkapi.
+
+Gunakan `EXPLAIN (ANALYZE, BUFFERS)` pada data representatif untuk memeriksa query kelompok
+dan filter divisi. Counter dipisahkan dari produk sehingga pencatatan tidak memicu perubahan
+`products.updated_at`. Primary key statistik mendukung join; belum ditambahkan indeks filter
+divisi tanpa pengukuran plan. Rollback aplikasi sebelumnya dan pertahankan tabel/fungsi/data;
+jangan menghapus statistik atau kolom divisi sebagai rollback tampilan.
+
+Skrip `scripts/verify-catalog-popularity.mjs` menjalankan migration dan pengujian permission,
+deduplikasi, ranking, serta cascade pada PostgreSQL sementara di memori melalui PGlite.
+Tentukan `PGLITE_MODULE_PATH` ke `dist/index.js` instalasi sementara; tidak ada dependency
+PGlite pada aplikasi dan skrip tidak menghubungi Supabase live. Schema pengujian hanya
+memodelkan akses publik; ini tidak menggantikan pengujian Auth dan scope Editor live.
+
+Skrip `scripts/verify-catalog-browse.mjs` menguji SSR, navigasi, pilihan kelompok, history,
+mobile, dan pencatatan detail di Chrome headless. Tentukan `PLAYWRIGHT_MODULE_PATH` ke
+`index.mjs` instalasi Playwright, serta `CATALOG_TEST_BASE_URL` jika server bukan port 3000.
+Data ranking UI merupakan fixture berlabel; seluruh POST statistik diintersep sehingga
+skrip tidak menulis statistik live. `CATALOG_SCREENSHOT_DIR` opsional menyimpan screenshot.
