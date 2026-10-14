@@ -1,11 +1,23 @@
 import { productSlugSchema } from '#shared/schemas/catalog'
 import { getCatalogClient } from '../../../utils/catalog-client'
 import { bookResourceExtensionSchema } from '../../../utils/book-resource'
+import { getProduct } from '../../../repositories/products'
 
 export default defineEventHandler(async (event) => {
   const slug = productSlugSchema.safeParse(getRouterParam(event, 'slug'))
   if (!slug.success)
     throw createError({ statusCode: 400, statusMessage: 'Alamat buku tidak valid' })
+  if (useRuntimeConfig(event).catalogSource === 'demo') {
+    await getProduct(event, slug.data)
+    return {
+      flyer: false,
+      flyerFormat: null,
+      dummy: false,
+      productKnowledge: false,
+      presentationFormat: null,
+      productKnowledgeFormat: null,
+    }
+  }
   const client = getCatalogClient(event)
   const { data, error } = await client
     .from('products')

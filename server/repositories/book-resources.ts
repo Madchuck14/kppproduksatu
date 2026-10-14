@@ -3,18 +3,34 @@ import type { H3Event } from 'h3'
 import type { EditorDatabase } from '#shared/types/editor-database'
 import type { BookResourceKind } from '../utils/book-resource'
 import { bookResourceColumns, bookResourceExtensionSchema } from '../utils/book-resource'
+import { getCatalogClient } from '../utils/catalog-client'
+import { getProduct } from './products'
 
 export async function getBookResource(event: H3Event, slug: string, kind: BookResourceKind) {
-  const client = await serverSupabaseClient<EditorDatabase>(event)
-  const {
-    data: { user },
-    error: authError,
-  } = await client.auth.getUser()
-  if (authError || !user)
-    throw createError({ statusCode: 401, statusMessage: 'Silakan login untuk membuka materi' })
+  const protectedClient =
+    kind === 'dummy' ? await serverSupabaseClient<EditorDatabase>(event) : null
+  if (protectedClient) {
+    const {
+      data: { user },
+      error: authError,
+    } = await protectedClient.auth.getUser()
+    if (authError || !user)
+      throw createError({
+        statusCode: 401,
+        statusMessage: 'Silakan login untuk membuka Dummy Buku',
+      })
+  }
+  const source = useRuntimeConfig(event).catalogSource
+  if (source === 'demo') {
+    await getProduct(event, slug)
+    throw createError({ statusCode: 404, statusMessage: 'Materi belum tersedia dalam mode demo' })
+  }
+  if (source !== 'supabase')
+    throw createError({ statusCode: 503, statusMessage: 'Sumber katalog tidak valid' })
+  const client = protectedClient ?? getCatalogClient(event)
   const { data, error } = await client
     .from('products')
-    .select('flyer_path,product_knowledge_slide_paths,dummy_book_path,product_knowledge_path')
+    .select('flyer_path,dummy_book_path,product_knowledge_path')
     .eq('slug', slug)
     .eq('published', true)
     .maybeSingle()
@@ -29,6 +45,5 @@ export async function getBookResource(event: H3Event, slug: string, kind: BookRe
     client,
     path,
     extension: extension.data,
-    slides: kind === 'product-knowledge' ? data.product_knowledge_slide_paths : [],
   }
 }

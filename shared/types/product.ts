@@ -6,6 +6,9 @@ export interface Product {
   slug: string
   title: string
   author: string
+  curriculum?: string | null
+  isbn?: string | null
+  /** Compatibility alias of synopsis; no separate database column. */
   description: string
   divisionCode?: DivisionCode | null
   synopsis?: string | null

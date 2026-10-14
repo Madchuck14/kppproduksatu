@@ -14,16 +14,12 @@ const props = defineProps<{
   account: AccountSession
 }>()
 const savedId = ref(props.book?.id)
-const draftDetails = reactive({
-  isbn: '',
-  curriculum: '',
-})
 const materials = [
   { kind: 'dummy', label: 'Dummy Buku', help: 'PDF, maksimal 20 MB' },
   {
     kind: 'product-knowledge',
     label: 'PPT Produk',
-    help: 'PPT/PPTX, maksimal 50 MB. Unggah gambar slide di bawah untuk preview.',
+    help: 'PPTX untuk pratinjau; PPT hanya dapat diunduh. Maksimal 50 MB.',
   },
   {
     kind: 'flyer',
@@ -39,6 +35,8 @@ const form = reactive({
   subject: (props.book?.subject ?? '') as BookSubject | '',
   title: props.book?.title ?? '',
   author: props.book?.author ?? '',
+  curriculum: props.book?.curriculum ?? '',
+  isbn: props.book?.isbn ?? '',
   synopsis: props.book?.synopsis ?? '',
   targetMarket: props.book?.targetMarket?.length ? [...props.book.targetMarket] : [''],
   highlights: props.book?.highlights?.length ? [...props.book.highlights] : ['', ''],
@@ -70,39 +68,6 @@ const materialFiles = reactive<Record<'flyer' | 'dummy' | 'product-knowledge', F
   dummy: null,
   'product-knowledge': null,
 })
-const presentationSlides = shallowRef<File[]>([])
-const uploadedPresentation = ref(Boolean(props.book?.resources.productKnowledge))
-const presentationSlideCount = ref(props.book?.presentationSlideCount ?? 0)
-function selectPresentationSlides(event: Event) {
-  const input = event.target as HTMLInputElement
-  const selected = Array.from(input.files ?? [])
-  message.value = ''
-  presentationSlides.value = []
-  if (
-    selected.length > 20 ||
-    selected.some(
-      (slide) =>
-        !['image/png', 'image/jpeg'].includes(slide.type) ||
-        slide.size > 2 * 1024 * 1024 ||
-        !slide.size,
-    )
-  ) {
-    message.value = 'Pilih maksimal 20 slide PNG/JPG, masing-masing maksimal 2 MB.'
-    input.value = ''
-    return
-  }
-  presentationSlides.value = selected.sort((a, b) =>
-    a.name.localeCompare(b.name, 'id', { numeric: true }),
-  )
-}
-function movePresentationSlide(index: number, direction: number) {
-  const slides = [...presentationSlides.value]
-  const target = index + direction
-  if (target < 0 || target >= slides.length) return
-  const selected = slides.splice(index, 1)[0]!
-  slides.splice(target, 0, selected)
-  presentationSlides.value = slides
-}
 function materialType(kind: keyof typeof materialFiles, selected: File) {
   if (kind !== 'product-knowledge') return selected.type
   return /\.pptx$/i.test(selected.name)
@@ -160,25 +125,10 @@ async function save() {
   if (busy.value) return
   message.value = ''
   errors.value = {}
-  if (materialFiles['product-knowledge'] && !presentationSlides.value.length) {
-    message.value = 'Pilih gambar hasil ekspor slide untuk melengkapi preview PPT Produk.'
-    return
-  }
-  if (
-    presentationSlides.value.length &&
-    !materialFiles['product-knowledge'] &&
-    !uploadedPresentation.value
-  ) {
-    message.value = 'Pilih PPT Produk PPT/PPTX sebelum gambar slide.'
-    return
-  }
-  if (draftDetails.isbn.trim() || draftDetails.curriculum.trim()) {
-    message.value =
-      'ISBN dan kurikulum belum dapat disimpan. Kosongkan isian tersebut sebelum menyimpan.'
-    return
-  }
   const parsed = bookInputSchema.safeParse({
     ...form,
+    curriculum: form.curriculum.trim() || null,
+    isbn: form.isbn.trim() || null,
     highlights: form.highlights.map((item) => item.trim()).filter(Boolean),
     synopsis: form.synopsis.trim() || null,
     targetMarket: form.targetMarket.map((item) => item.trim()).filter(Boolean),
@@ -223,21 +173,6 @@ async function save() {
         headers: { 'Content-Type': materialType(kind, material) },
       })
       materialFiles[kind] = null
-      if (kind === 'product-knowledge') {
-        uploadedPresentation.value = true
-        presentationSlideCount.value = 0
-      }
-    }
-    if (presentationSlides.value.length) {
-      progress.value = 'Mengunggah gambar slide PPT Produk...'
-      const body = new FormData()
-      for (const slide of presentationSlides.value) body.append('slides', slide)
-      const updated = await $fetch<EditorBook>(`/api/admin/books/${book.id}/presentation-slides`, {
-        method: 'POST',
-        body,
-      })
-      presentationSlideCount.value = updated.presentationSlideCount
-      presentationSlides.value = []
     }
     await navigateTo('/admin?notice=saved')
   } catch (error) {
@@ -306,11 +241,16 @@ async function save() {
               <label for="new-book-isbn">ISBN</label>
               <input
                 id="new-book-isbn"
-                v-model="draftDetails.isbn"
+                v-model="form.isbn"
                 maxlength="32"
                 placeholder="Contoh: 978-623-0000-00-0"
-                aria-describedby="new-fields-note"
+                :aria-invalid="!!errors.isbn"
+                aria-describedby="new-book-isbn-help"
               />
+              <p id="new-book-isbn-help" class="field-help">
+                ISBN-10 atau ISBN-13; spasi dan tanda hubung boleh digunakan.
+              </p>
+              <p v-if="errors.isbn" class="field-error">{{ errors.isbn }}</p>
             </div>
           </div>
           <div class="field-row">
@@ -406,17 +346,16 @@ async function save() {
               <p v-if="errors.subject" class="field-error">{{ errors.subject }}</p>
             </div>
             <div class="form-field">
-              <label for="new-book-curriculum">Kurikulum <span class="required">*</span></label>
-              <select
+              <label for="new-book-curriculum">Kurikulum</label>
+              <input
                 id="new-book-curriculum"
-                v-model="draftDetails.curriculum"
-                class="curriculum-select"
-                aria-describedby="new-fields-note"
-              >
-                <option value=""></option>
-                <option value="Kurikulum Merdeka">Kurikulum Merdeka</option>
-                <option value="Kurikulum 2013">Kurikulum 2013</option>
-              </select>
+                v-model="form.curriculum"
+                type="text"
+                maxlength="200"
+                placeholder="Contoh: Kurikulum Merdeka"
+                :aria-invalid="!!errors.curriculum"
+              />
+              <p v-if="errors.curriculum" class="field-error">{{ errors.curriculum }}</p>
             </div>
           </div>
           <div class="field-row">
@@ -545,7 +484,7 @@ async function save() {
           </p>
         </section>
         <section class="form-card materials-card" aria-labelledby="materials-heading">
-          <h2 id="materials-heading">Materi privat</h2>
+          <h2 id="materials-heading">Materi Buku</h2>
           <div v-for="item in materials" :key="item.kind" class="material-upload">
             <label :for="`new-book-${item.kind}`" class="file-heading">{{ item.label }}</label>
             <p class="field-help">{{ item.help }}</p>
@@ -566,52 +505,10 @@ async function save() {
               }}</span>
             </div>
           </div>
-          <div class="material-upload">
-            <label for="new-book-presentation-slides" class="file-heading"
-              >Gambar slide PPT Produk</label
-            >
-            <p class="field-help">
-              Ekspor semua slide dari PowerPoint sebagai PNG/JPG. Maksimal 20 slide, 2 MB per
-              gambar. Unggahan mengganti seluruh preview.
-            </p>
-            <div class="file-picker">
-              <label class="file-button" for="new-book-presentation-slides"
-                >Pilih gambar<input
-                  id="new-book-presentation-slides"
-                  type="file"
-                  multiple
-                  accept="image/png,image/jpeg"
-                  @change="selectPresentationSlides"
-              /></label>
-              <span class="file-name">{{
-                presentationSlides.length
-                  ? `${presentationSlides.length} slide dipilih`
-                  : `${presentationSlideCount} slide tersimpan`
-              }}</span>
-            </div>
-            <ol v-if="presentationSlides.length" class="slide-upload-list">
-              <li v-for="(slide, index) in presentationSlides" :key="`${slide.name}-${index}`">
-                <span>{{ index + 1 }}. {{ slide.name }}</span>
-                <button
-                  type="button"
-                  :disabled="index === 0"
-                  :aria-label="`Pindahkan slide ${index + 1} ke atas`"
-                  @click="movePresentationSlide(index, -1)"
-                >
-                  Naik
-                </button>
-                <button
-                  type="button"
-                  :disabled="index === presentationSlides.length - 1"
-                  :aria-label="`Pindahkan slide ${index + 1} ke bawah`"
-                  @click="movePresentationSlide(index, 1)"
-                >
-                  Turun
-                </button>
-              </li>
-            </ol>
-          </div>
-          <p class="privacy-note">Materi disimpan privat dan tidak masuk bucket sampul publik.</p>
+          <p class="privacy-note">
+            Flyer dan PPT Produk dapat dibuka publik setelah buku dipublikasikan. Dummy Buku
+            memerlukan login.
+          </p>
         </section>
         <section class="form-card publication-card" aria-labelledby="publication-heading">
           <h2 id="publication-heading">Publikasi</h2>
@@ -639,10 +536,6 @@ async function save() {
             >Batal</UButton
           >
           <p v-if="progress" role="status">{{ progress }}</p>
-          <p id="new-fields-note" class="field-help">
-            ISBN dan kurikulum belum didukung penyimpanan dan harus dikosongkan sebelum buku
-            disimpan.
-          </p>
         </div>
       </aside>
     </fieldset>
@@ -777,9 +670,6 @@ async function save() {
   background-image: none;
   color: #6b6f6b;
   opacity: 0.7;
-}
-.form-field .curriculum-select {
-  background-image: none;
 }
 .form-field textarea {
   height: 104px;
@@ -922,29 +812,6 @@ async function save() {
   color: #6b6f6b;
   font-size: 12.5px;
   line-height: 20px;
-}
-.slide-upload-list {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  font-size: 12px;
-}
-.slide-upload-list li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.slide-upload-list span {
-  flex: 1;
-  overflow-wrap: anywhere;
-  min-width: 0;
-}
-.slide-upload-list button {
-  color: #1f5c3f;
-  padding: 4px;
-}
-.slide-upload-list button:disabled {
-  opacity: 0.4;
 }
 .publication-card {
   display: grid;

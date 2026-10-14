@@ -20,6 +20,24 @@ export const editorQuerySchema = z.object({
 
 export const bookHighlightsSchema = z.array(z.string().trim().min(1).max(200)).max(6)
 export const bookTargetMarketSchema = z.array(z.string().trim().min(1).max(200)).max(10)
+export const bookCurriculumSchema = z
+  .string()
+  .trim()
+  .min(1, 'Kurikulum tidak boleh kosong.')
+  .max(200, 'Kurikulum maksimal 200 karakter.')
+export const bookIsbnSchema = z
+  .string()
+  .trim()
+  .max(32, 'ISBN maksimal 32 karakter sebelum normalisasi.')
+  .transform((value) => value.replace(/[\s-]/g, '').toUpperCase())
+  .pipe(
+    z
+      .string()
+      .regex(
+        /^(?:[0-9]{9}[0-9X]|[0-9]{13})$/,
+        'ISBN harus terdiri dari 10 atau 13 karakter; ISBN-10 dapat diakhiri X.',
+      ),
+  )
 
 export const bookInputSchema = z
   .object({
@@ -33,6 +51,8 @@ export const bookInputSchema = z
     subject: bookSubjectSchema.nullable().default(null),
     title: z.string().trim().min(1, 'Judul wajib diisi.').max(200),
     author: z.string().trim().max(200),
+    curriculum: bookCurriculumSchema.nullable().optional(),
+    isbn: bookIsbnSchema.nullable().optional(),
     synopsis: z
       .string()
       .trim()

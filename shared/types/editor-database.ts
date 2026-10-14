@@ -11,7 +11,8 @@ type BookRow = {
   title: string
   slug: string
   author: string
-  description: string
+  curriculum: string | null
+  isbn: string | null
   synopsis: string | null
   target_market: string[]
   highlights: string[]
@@ -21,7 +22,6 @@ type BookRow = {
   image_path: string | null
   publication_year: number | null
   flyer_path: string | null
-  flyer_slide_paths: string[]
   product_knowledge_slide_paths: string[]
   dummy_book_path: string | null
   product_knowledge_path: string | null

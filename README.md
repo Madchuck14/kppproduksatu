@@ -1,5 +1,10 @@
 # KPP Produk Satu
 
+Cleanup schema produk tersedia melalui migration `202610140001_remove_legacy_product_columns.sql`.
+Kolom `description` dan `flyer_slide_paths` diarsipkan privat lalu dihapus; aplikasi memakai
+sinopsis dan preview PPT Produk. Ikuti [urutan rollout dan rollback](docs/supabase.md#penghapusan-kolom-produk-lama-14-oktober-2026)
+sebelum menerapkan migration. Perubahan ini belum diterapkan ke Supabase live oleh agent.
+
 Fondasi katalog produk dengan Nuxt 4, Vue 3, TypeScript, Tailwind CSS, Nuxt UI, dan Supabase. Staging direncanakan di Cloudflare Workers; produksi memakai Node.js/Docker di infrastruktur klien.
 
 ## Mulai di Windows
@@ -24,6 +29,11 @@ Docker, dan pemeriksaan interaksi browser belum diverifikasi untuk dashboard ini
 
 ## Yang tersedia
 
+ISBN dan kurikulum tersedia sebagai metadata buku opsional setelah migration
+`202610140003_book_curriculum_isbn.sql`. Form Editor dapat menyimpan, mengedit, dan
+mengosongkan kedua field; detail publik menampilkan nilainya. ISBN disimpan sebagai teks
+tanpa spasi/tanda hubung agar nol di depan tidak hilang. Ikuti [rollout metadata](docs/supabase.md#kurikulum-dan-isbn-buku).
+
 - Halaman beranda, katalog dengan pencarian, dan detail produk.
 - API `GET /api/products` dan `GET /api/products/:slug`, dengan validasi Zod.
 - Pilihan data fixture atau Supabase; kegagalan Supabase tidak diam-diam diganti fixture.
@@ -44,12 +54,14 @@ Pengunjung anonim diarahkan login; mode demo tidak menyimpan favorit.
 
 Pagination tersedia pada dashboard Editor dan katalog publik. Cart, checkout, Midtrans, blog,
 banner CMS, sitemap, dan structured data belum diimplementasikan.
-Dashboard Editor sudah memiliki unggahan privat Product Knowledge, flyer, dan Dummy Buku. Migration
-`202610060001_book_publication_materials.sql` harus diterapkan sebelum fitur dipakai. Materi buku
-published memerlukan login untuk preview dan unduhan melalui signed URL berumur 60 detik.
-PPT Produk (Product Knowledge) menerima PPT/PPTX asli serta gambar PNG/JPG hasil ekspor slide
-untuk preview statis. Flyer dan Dummy Buku tetap PDF. Terapkan migration
-`202610130006_product_presentation_previews.sql` setelah migration sebelumnya sebelum memakai versi ini.
+Editor cukup mengunggah satu PowerPoint: PPTX dirender langsung di browser memakai PptxViewJS,
+tanpa gambar hasil ekspor, iframe Microsoft, atau layanan konversi. Berkas PPT lama tetap dapat
+diunduh; simpan sebagai PPTX untuk pratinjau. Flyer dan Dummy Buku tetap PDF.
+Setelah migration `202610140002_public_promotional_materials.sql`, Flyer dan PPT Produk buku
+published dapat dibuka tanpa login; hanya Dummy Buku yang memerlukan login. Bucket `book-materials`
+tetap privat dan RLS melindungi draft serta akses Editor per jenjang. Terapkan migration sebelumnya
+terlebih dahulu dan ikuti [rollout materi publik](docs/supabase.md#flyer-ppt-publik-dan-preview-pptx-di-browser).
+Migration ini belum diterapkan ke Supabase live oleh agent.
 
 ## Perintah
 

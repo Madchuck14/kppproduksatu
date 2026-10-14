@@ -9,6 +9,8 @@ import {
   bookSubjectSchema,
   bookHighlightsSchema,
   bookTargetMarketSchema,
+  bookCurriculumSchema,
+  bookIsbnSchema,
 } from '#shared/schemas/editor'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import { divisionCodeSchema } from '#shared/utils/book-divisions'
@@ -16,7 +18,7 @@ import { assertBookScope } from '../utils/require-editor'
 import { getProductImageUrl } from '../utils/storage'
 
 const columns =
-  'id,book_code,education_level,division_code,grade,subject,title,slug,author,description,synopsis,target_market,highlights,price,publication_year,featured,published,image_path,flyer_path,product_knowledge_slide_paths,dummy_book_path,product_knowledge_path,updated_at'
+  'id,book_code,education_level,division_code,grade,subject,title,slug,author,curriculum,isbn,synopsis,target_market,highlights,price,publication_year,featured,published,image_path,flyer_path,product_knowledge_slide_paths,dummy_book_path,product_knowledge_path,updated_at'
 const rowSchema = z.object({
   id: z.string().uuid(),
   book_code: z.string().nullable(),
@@ -27,7 +29,8 @@ const rowSchema = z.object({
   title: z.string(),
   slug: z.string(),
   author: z.string(),
-  description: z.string(),
+  curriculum: bookCurriculumSchema.nullable().default(null),
+  isbn: bookIsbnSchema.nullable().default(null),
   synopsis: z.string().nullable(),
   target_market: bookTargetMarketSchema.default([]),
   highlights: bookHighlightsSchema.default([]),
@@ -60,7 +63,7 @@ function fail(error: { code?: string; message?: string } | null) {
   throw createError({
     statusCode: 503,
     statusMessage:
-      'Data buku belum dapat diproses. Pastikan migration Editor, divisi, sinopsis, dan target pasar sudah diterapkan.',
+      'Data buku belum dapat diproses. Pastikan migration Editor, divisi, sinopsis, target pasar, kurikulum, dan ISBN sudah diterapkan.',
   })
 }
 
@@ -76,7 +79,9 @@ function mapBook(event: H3Event, value: unknown): EditorBook {
     title: row.title,
     slug: row.slug,
     author: row.author,
-    description: row.description,
+    curriculum: row.curriculum,
+    isbn: row.isbn,
+    description: row.synopsis ?? '',
     synopsis: row.synopsis,
     targetMarket: row.target_market,
     highlights: row.highlights,
@@ -117,6 +122,8 @@ function toRow(input: BookInput) {
     title: input.title,
     slug: makeSlug(input.title, input.bookCode),
     author: input.author,
+    ...(input.curriculum !== undefined ? { curriculum: input.curriculum } : {}),
+    ...(input.isbn !== undefined ? { isbn: input.isbn } : {}),
     synopsis: input.synopsis,
     target_market: input.targetMarket,
     ...(input.highlights !== undefined ? { highlights: input.highlights } : {}),
@@ -275,7 +282,7 @@ export async function setEditorBookMaterial(
   const client = await serverSupabaseClient<EditorDatabase>(event)
   const update =
     kind === 'flyer'
-      ? { flyer_path: path, flyer_slide_paths: [] }
+      ? { flyer_path: path }
       : kind === 'dummy'
         ? { dummy_book_path: path }
         : { product_knowledge_path: path, product_knowledge_slide_paths: [] }

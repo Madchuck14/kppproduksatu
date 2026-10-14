@@ -1,5 +1,20 @@
 # Arsitektur
 
+## Cleanup kolom produk lama
+
+Setelah migration `202610140001_remove_legacy_product_columns.sql`, `description` dan
+`flyer_slide_paths` tidak lagi menjadi kolom produk. Repository membaca sinopsis;
+field JSON `description` tetap tersedia sebagai alias sinopsis demi kompatibilitas API.
+SEO memakai sinopsis atau teks berdasarkan judul. Flyer memakai PDF tanpa gambar preview;
+`product_knowledge_slide_paths` dipertahankan sebagai metadata preview lama untuk rollback;
+preview baru membaca PPTX asli melalui PptxViewJS.
+
+Nilai lama disimpan untuk rollback pada schema privat `catalog_cleanup_archive`, tanpa
+menyalin deskripsi menjadi sinopsis atau menghapus berkas Storage. Catatan di bagian
+historis berikut yang meminta mempertahankan kolom lama berlaku sebelum cleanup ini.
+Ikuti urutan deployment, penundaan penulisan, verifikasi, dan rollback di
+[setup Supabase](supabase.md#penghapusan-kolom-produk-lama-14-oktober-2026).
+
 ## Keputusan awal
 
 Satu repo Nuxt 4 + TypeScript. Storefront memakai SSR, backend memakai Nitro bawaan, admin custom memakai Nuxt UI. Tailwind dipakai untuk desain storefront. Supabase menyediakan PostgreSQL, Auth, dan Storage. Tidak ada ORM atau backend Express terpisah.
@@ -23,9 +38,10 @@ diakses per kelompok. Pilihan kelompok mengikuti URL dan tombol Lihat semua buku
 katalog dengan filter yang sesuai. Daftar enam divisi didefinisikan di
 `shared/utils/book-divisions.ts`; filter `division` memeriksa `products.division_code`.
 Layout desktop mengacu node Figma `39:21` pada ukuran 1440 px: hero 1344×420 px, rak buku
-1280 px, dan grid jenjang empat kolom (dua kolom pada mobile). Variable font Lora dan Inter berformat WOFF2 Latin
-disimpan lokal di `public/fonts` dengan lisensi OFL; font landing tidak mengubah tipografi
-halaman lainnya. Aset hero, logo, dan ikon berasal dari Figma dan disimpan lokal. Layout
+1280 px, dan grid jenjang empat kolom (dua kolom pada mobile). Variable font Plus Jakarta Sans
+berformat WOFF2 Latin (normal dan italic, bobot 200–800) disimpan lokal di `public/fonts`
+dengan lisensi OFL. Seluruh halaman, termasuk judul, formulir, dan dashboard Editor,
+memakai keluarga font yang sama. Aset hero, logo, dan ikon berasal dari Figma dan disimpan lokal. Layout
 beradaptasi untuk tablet dan mobile.
 Sampul, judul, penulis, serta jenjang berasal dari katalog; jumlah kartu mengikuti data yang tersedia.
 Judul panjang dipotong satu baris pada rak landing; judul lengkap tersedia pada tautan dan detail.
@@ -68,37 +84,40 @@ kode buku menjadi business key unik, UUID tetap primary key.
 
 Detail buku mengikuti Figma `37:7908`: breadcrumb, sampul 480×504 px, ringkasan,
 tabel identitas, tiga kolom informasi, dan maksimal empat buku terkait. Header/footer,
-font lokal Lora/Inter, kartu katalog, serta kontrol favorit memakai komponen yang ada.
+font lokal Plus Jakarta Sans, kartu katalog, serta kontrol favorit memakai komponen yang ada.
 Layout menjadi satu kolom pada mobile. Sampul dan informasi memakai data API SSR;
-kurikulum dan ISBN belum ditampilkan karena belum tersimpan; keunggulan memakai daftar yang
+kurikulum dan ISBN ditampilkan dari metadata opsional; keunggulan memakai daftar yang
 tersimpan. Form Editor dan halaman detail memakai divisi, sinopsis, serta target pasar dari migration katalog
 terbaru. Detail menampilkan ketiganya bersama identitas buku.
-Bagian Materi Promosi mengikuti ekspor lokal Figma `37:8192` dan hanya ditampilkan
-kepada pengguna yang sudah login. Panel hijau berisi kartu Flyer Promosi, Presentasi Buku,
+Bagian Materi Promosi mengikuti ekspor lokal Figma `37:8192` dan ditampilkan kepada semua
+pengunjung. Flyer dan PPT Produk buku published dapat dibuka tanpa login; Dummy Buku memerlukan login.
+Panel hijau berisi kartu Flyer Promosi, Presentasi Buku,
 dan Buku Dummy, dengan pratinjau, status berkas, serta tombol unduh dan Lihat.
 Aset flyer dan ikon unduh disimpan di `public/images/book-detail`; pratinjau dummy memakai
-sampul katalog. PPT Produk (Product Knowledge) memakai PPT/PPTX dengan preview gambar slide,
+sampul katalog. PPT Produk (Product Knowledge) memakai PPT/PPTX dengan preview PPTX langsung di browser,
 sedangkan Flyer dan Dummy Buku memakai PDF. Label unduhan mengikuti format nyata, termasuk PDF
 Product Knowledge lama yang tetap dapat dibuka.
 Ukuran contoh tidak ditampilkan karena metadata tersebut belum tersedia. Endpoint preview dan
-unduhan memverifikasi login pada server.
+unduhan Dummy Buku memverifikasi login pada server; seluruh materi membatasi buku published.
 Pratinjau dummy mengikuti ekspor `figmatocode/previewdummy`: dialog putih beradius 20 px,
 toolbar nama PDF, tombol tutup/unduh, zoom 50–200%, area baca abu-abu, dan navigasi halaman
 mengambang. Isi serta jumlah halaman berasal dari PDF nyata; pembalikan halaman memakai
 StPageFlip yang sudah tersedia. Zoom dapat diganti lewat tombol atau pilihan persentase;
 halaman dapat digeser saat diperbesar. Tombol panah keyboard, Escape, dan fokus dialog
 tetap berfungsi. Aset toolbar disimpan lokal di `public/images/dummy-preview`.
-PPT Produk memakai penampil gambar slide dalam dialog: navigasi tombol/panah keyboard,
-zoom 50–200%, fullscreen, dan unduh PowerPoint asli. Seluruh gambar diambil saat dialog dibuka,
-lalu object URL lokal dibersihkan ketika ditutup. Preview ini statis, tanpa transisi atau animasi.
+PPT Produk memakai PptxViewJS 1.1.9 dalam dialog canvas: navigasi tombol/panah keyboard,
+zoom 50–200%, dan unduh PowerPoint asli. Renderer, JSZip, dan Chart.js dimuat secara lazy dari
+bundle lokal; tidak mengirim dokumen ke Microsoft atau layanan konversi. File PPTX diambil
+sekali saat dialog dibuka, dengan batas 50 MB, lalu cache gambar dilepas saat ditutup.
+Preview ini statis. PPT lama hanya dapat diunduh; simpan ulang sebagai PPTX untuk preview.
 Flyer, Dummy Buku, dan Product Knowledge PDF lama memakai viewer PDF yang tersedia.
 Favorit anonim menawarkan login
 dengan tujuan kembali ke buku. Tombol pemesanan menuju kontak pada footer beranda.
 
 Halaman detail tetap publik dan memakai API SSR yang sama. Sampul, judul, harga, penulis,
 sinopsis, target pasar, divisi, kode buku, dan jenjang tersedia. Buku lama dengan identitas kosong ditandai
-belum tersedia sampai dilengkapi Editor super. Product Knowledge, flyer, serta dummy untuk buku
-published memerlukan login untuk preview dan unduhan.
+belum tersedia sampai dilengkapi Editor super. Product Knowledge dan flyer buku published
+bersifat publik. Preview dan unduhan Dummy Buku tetap memerlukan login.
 
 Pengunjung anonim dapat membuka penjelasan akses lalu menuju login dengan parameter `returnTo`.
 Setelah login berhasil, tujuan dikembalikan ke halaman buku dan bagian konten yang dipilih.
@@ -106,10 +125,12 @@ Tujuan divalidasi dengan schema yang hanya menerima route detail buku lokal dan 
 yang dikenal, serta `/products` dan `/favorites`. Login tanpa tujuan mengarahkan semua akun ke landing page `/`.
 Login dari registrasi tanpa tujuan buku kembali ke katalog publik `/products`.
 Endpoint status hanya mengembalikan boolean dan format, tanpa URL/path privat. Endpoint preview
-dan unduhan memverifikasi `auth.getUser()` dan membatasi buku published sebelum membuat signed URL
-berumur 60 detik. Dashboard Editor mengunggah PPT Produk PPT/PPTX, gambar slide PNG/JPG, serta
+dan unduhan Dummy memverifikasi `auth.getUser()`. Flyer/PPT menggunakan client anonim;
+seluruh pembacaan membatasi buku published sebelum membuat signed URL. URL preview PPTX
+berumur 600 detik agar bundle viewer sempat dimuat; URL Dummy, Flyer, dan unduhan berumur 60 detik.
+Dashboard Editor mengunggah satu PPT Produk PPT/PPTX serta
 Flyer dan Dummy Buku PDF ke bucket privat `book-materials`. Endpoint upload tetap memeriksa
-session, scope jenjang, MIME, signature, dan ukuran; RLS menutup akses materi anonim.
+session, scope jenjang, MIME, signature, dan ukuran; RLS menutup akses Dummy/draft anonim.
 CRUD katalog per jenjang tersedia pada dashboard Editor.
 
 Halaman `/login` memakai formulir email/kata sandi dengan validasi Zod, tombol tampil/sembunyikan
@@ -168,7 +189,7 @@ Daftar Editor tidak mencakup buku di luar scope meskipun buku published dapat di
 Dashboard `/admin` menyediakan ringkasan, daftar berpaginasi 12 buku, pencarian judul/kode/penulis,
 filter jenjang/status, tambah/edit buku, publikasi, dan konfirmasi hapus dengan mengetik judul.
 Tampilan dashboard mengikuti ekspor `figmatocode/dashboard`, memakai header/footer dan font
-Lora/Inter yang sama dengan katalog. Panel akses hijau muda, empat kartu statistik, serta
+Plus Jakarta Sans yang sama dengan katalog. Panel akses hijau muda, empat kartu statistik, serta
 form filter memakai data dan scope akun nyata. Tabel HTML dengan tujuh kolom tetap menyelaraskan
 header dan baris yang salah diterjemahkan Codia; kolom Materi menunjukkan ketersediaan Flyer,
 Presentasi, dan Dummy dengan indikator serta teks aksesibel. Pada layar sempit hanya tabel
@@ -190,12 +211,12 @@ Object baru memakai `books/{product UUID}/{random UUID}.{extension}`; RLS Storag
 ke buku tersebut. Tidak ada overwrite object. File lama tidak otomatis dihapus saat sampul diganti
 atau buku dihapus; pembersihan aset tak terpakai dilakukan terpisah oleh pengelola.
 
-PPT Produk dibatasi PPT/PPTX 50 MB dengan 1–20 gambar slide PNG/JPG, masing-masing maksimal 2 MB.
-Editor mengekspor gambar secara manual dari PowerPoint, memeriksa urutan pada form, lalu mengunggah
-seluruh set. Gambar diurutkan berdasarkan nama secara numerik dan dapat dipindahkan naik/turun.
-Penggantian PPT mengosongkan preview lama. Upload gambar disimpan sebagai satu daftar setelah
-semua file berhasil diunggah; kegagalan mempertahankan daftar sebelumnya dan membersihkan file
-baru. Perubahan PPT Produk saat upload menyebabkan 409, bukan memasang slide pada PPT yang berbeda.
+PPT Produk dibatasi PPT/PPTX 50 MB tanpa unggahan gambar slide. PptxViewJS membaca PPTX asli
+untuk menggambar teks, gambar, tabel, dan grafik di canvas. Form menjelaskan bahwa PPT lama
+hanya dapat diunduh. Penggantian PowerPoint mengosongkan metadata preview gambar lama;
+endpoint unggah gambar legacy dipertahankan untuk kompatibilitas, tetapi tidak digunakan form baru.
+Fidelity font/layout harus ditinjau dengan presentasi klien; hasil browser tidak dijamin identik
+dengan PowerPoint desktop. Kegagalan renderer menampilkan pesan dan tautan unduh berkas asli.
 Flyer dan Dummy Buku dibatasi PDF 20 MB. Product Knowledge PDF lama tetap terbaca, tetapi unggahan
 baru memakai PPT/PPTX. Dummy Buku memakai PDF.js dan
 StPageFlip (`page-flip`) dalam popup flipbook: dua halaman pada layar lebar, satu halaman pada layar
@@ -285,7 +306,7 @@ Deployment memerlukan migration `202610070001_product_favorites.sql`; lihat pand
 Halaman `/admin/books/new` mengikuti Figma `97:5388`, dengan kartu Identitas buku,
 Klasifikasi, Deskripsi buku, Sampul buku, Materi privat, dan Publikasi. Desktop memakai
 kontainer 1280 px dengan padding 32 px, kolom kanan 380 px, dan jarak antarkolom 24 px.
-Font Lora/Inter, logo, header/footer, dan aset ikon lokal dipakai kembali. Halaman tambah dan
+Font Plus Jakarta Sans, logo, header/footer, dan aset ikon lokal dipakai kembali. Halaman tambah dan
 edit memakai `EditorBookForm` yang sama: susunan kartu, kolom, jarak, tampilan mobile, serta
 unggahan sampul dan materi identik. Pada edit, metadata, sampul, status materi, dan jumlah slide
 yang sudah tersimpan dimuat sebagai nilai awal; judul halaman, tombol simpan, serta label ganti
@@ -294,20 +315,24 @@ sampul mengikuti mode edit.
 Penulis, tahun terbit, kelas, dan mata pelajaran wajib dilengkapi pada kedua form melalui
 validasi HTML yang sama. Placeholder kelas/mapel mengikuti jenjang dan tidak dapat dipilih
 sebagai nilai kosong. Buku lama yang belum lengkap perlu diisi sebelum disimpan lewat form edit.
-Kontrak API tetap kompatibel dengan metadata lama yang nullable; perubahan ini tidak mengubah
-schema database, guard Editor, atau scope jenjang.
+Kontrak API tetap kompatibel dengan metadata lama yang nullable. Guard Editor dan scope
+jenjang tetap berlaku; migration `202610140003_book_curriculum_isbn.sql` menambah metadata opsional.
 
 Sinopsis, keunggulan, target pasar, dan divisi dikirim melalui kontrak katalog yang tersedia.
-ISBN dan kurikulum masih state UI sementara dan belum disimpan. Mengisi salah satunya menahan
-pengiriman form dengan penjelasan agar data tidak dibuang diam-diam. Penyimpanan serta akses
-materi privat dijelaskan pada bagian Detail buku dan tujuan login.
+ISBN dan kurikulum disimpan pada kolom `text` nullable. Kurikulum memakai input teks bebas
+maksimal 200 karakter. ISBN menerima format 10/13 karakter dan dinormalisasi tanpa spasi/tanda
+hubung, dengan X kapital pada akhir ISBN-10. Validasi memeriksa format, bukan checksum.
+Input kosong menjadi NULL; client lama yang tidak mengirim kedua field tidak menghapus metadata
+tersimpan. Reader publik/Editor dan RPC ranking mengembalikan metadata nyata; definisi RPC lama
+memakai satu pembacaan detail published untuk melengkapi field yang belum ada. UUID dan referensi
+tetap utuh. Penyimpanan serta akses materi dijelaskan pada bagian Detail buku dan tujuan login.
 
 ## Katalog publik dan kelas buku
 
 Halaman `/products` mengikuti Figma `19:89`: header/footer bersama landing, breadcrumb,
 pencarian, sidebar jenjang/kelas/mata pelajaran, grid tiga kolom, urutan, dan pagination.
 Desktop memakai kontainer 1280 px, padding 32 px, sidebar 250 px, gap 44 px, dan sampul
-persegi 290 px pada viewport 1440 px. Font Lora/Inter serta komponen logo dan favorit
+persegi 290 px pada viewport 1440 px. Font Plus Jakarta Sans serta komponen logo dan favorit
 menggunakan aset lokal. Ikon katalog berasal dari Figma di `public/images/catalog`.
 Sampul, judul, penulis, kelas, dan jumlah hasil memakai data katalog, bukan contoh Figma.
 Label tetap berbahasa Indonesia; jenjang SMK dan footer sekolah mengikuti kebutuhan produk.
@@ -374,7 +399,7 @@ Jumlah buku/mapel tetap memakai respons API, tanpa angka contoh desain.
 ## Tampilan login
 
 `/login` mengikuti ekspor `figmatocode/login`: kartu dua kolom 960 px, panel branding
-hijau muda, logo navbar melalui PublisherLogos yang dipusatkan pada panel branding, font Lora/Inter, dan form Masuk. Mobile menjadi satu kolom.
+hijau muda, logo navbar melalui PublisherLogos yang dipusatkan pada panel branding, font Plus Jakarta Sans, dan form Masuk. Mobile menjadi satu kolom.
 Tombol Daftar menuju `/register` dengan returnTo tervalidasi; registrasi mandiri tetap
 dinonaktifkan. Lupa kata sandi menuju Kontak untuk bantuan pengelola, tanpa alur reset
 kata sandi baru. Login Supabase, validasi, toggle password, loading/error, tujuan kembali,

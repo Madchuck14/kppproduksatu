@@ -34,7 +34,7 @@ const relatedProducts = computed(() =>
 const coverDialog = useTemplateRef<HTMLDialogElement>('cover-dialog')
 const pdfDialog = useTemplateRef<HTMLDialogElement>('pdf-dialog')
 const pdfViewerUrl = ref('')
-const presentationPreview = ref<PresentationPreview | null>(null)
+const presentationUrl = ref('')
 const pdfViewerTitle = ref('')
 const pdfViewerKind = ref<'product-knowledge' | 'flyer' | 'dummy'>('flyer')
 let pdfRequest = 0
@@ -66,7 +66,7 @@ const resources: Array<{
   },
 ]
 async function openPdfResource(resource: (typeof resources)[number]) {
-  if (!user.value) {
+  if (resource.id === 'dummy' && !user.value) {
     await navigateTo({
       path: '/login',
       query: { returnTo: `/products/${product.value!.slug}#${resource.id}` },
@@ -77,7 +77,7 @@ async function openPdfResource(resource: (typeof resources)[number]) {
   pdfViewerKind.value = resource.id
   pdfViewerTitle.value = resource.title
   pdfViewerUrl.value = ''
-  presentationPreview.value = null
+  presentationUrl.value = ''
   pdfViewerError.value = ''
   pdfViewerBusy.value = true
   pdfDialog.value?.showModal()
@@ -85,13 +85,12 @@ async function openPdfResource(resource: (typeof resources)[number]) {
     const result = await $fetch<{
       url: string
       format?: PresentationPreview['format']
-      slides?: string[]
     }>(
       `/api/products/${encodeURIComponent(product.value!.slug)}/resources/${resource.id}?preview=1`,
     )
     if (request === pdfRequest) {
-      if (resource.id === 'product-knowledge' && result.format && result.format !== 'pdf')
-        presentationPreview.value = { format: result.format, slides: result.slides ?? [] }
+      if (resource.id === 'product-knowledge' && result.format === 'pptx')
+        presentationUrl.value = result.url
       else pdfViewerUrl.value = result.url
     }
   } catch (error) {
@@ -103,7 +102,10 @@ async function openPdfResource(resource: (typeof resources)[number]) {
       })
       return
     }
-    if (request === pdfRequest) pdfViewerError.value = 'Materi belum dapat ditampilkan. Coba lagi.'
+    if (request === pdfRequest)
+      pdfViewerError.value =
+        (error as { data?: { statusMessage?: string } }).data?.statusMessage ??
+        'Materi belum dapat ditampilkan. Coba lagi.'
   } finally {
     if (request === pdfRequest) pdfViewerBusy.value = false
   }
@@ -124,7 +126,7 @@ function closePdfDialog() {
 function resetPdfDialog() {
   pdfRequest += 1
   pdfViewerUrl.value = ''
-  presentationPreview.value = null
+  presentationUrl.value = ''
   pdfViewerError.value = ''
   pdfViewerBusy.value = false
 }
@@ -146,8 +148,9 @@ const bookDetails = computed(() => [
   { label: 'Jenjang', value: product.value?.educationLevel || 'Belum tersedia' },
   { label: 'Kelas', value: product.value?.grade || 'Belum tersedia' },
   { label: 'Mata pelajaran', value: product.value?.subject || 'Belum ditentukan' },
+  { label: 'Kurikulum', value: product.value?.curriculum || 'Belum tersedia' },
   { label: 'Tahun terbit', value: product.value?.publicationYear || 'Belum tersedia' },
-  { label: 'ISBN', value: 'Belum tersedia' },
+  { label: 'ISBN', value: product.value?.isbn || 'Belum tersedia' },
 ])
 
 watch(
@@ -160,9 +163,9 @@ watch(
 
 useSeoMeta({
   title: () => `${product.value?.title} | ${config.public.siteName}`,
-  description: () => product.value?.synopsis || product.value?.description,
+  description: () => product.value?.synopsis || `Informasi buku ${product.value?.title ?? ''}`,
   ogTitle: () => product.value?.title,
-  ogDescription: () => product.value?.synopsis || product.value?.description,
+  ogDescription: () => product.value?.synopsis || `Informasi buku ${product.value?.title ?? ''}`,
   ogImage: () => product.value?.imageUrl,
 })
 </script>
@@ -236,16 +239,13 @@ useSeoMeta({
 
     <section class="detail-resources" aria-labelledby="resources-title">
       <h2 id="resources-title">Materi Promosi</h2>
-      <p class="resources-intro">Tersedia untuk pengguna yang sudah masuk.</p>
-      <NuxtLink
-        v-if="!user"
-        :to="{ path: '/login', query: { returnTo: `/products/${product.slug}#flyer` } }"
-        >Login untuk membuka materi promosi</NuxtLink
-      >
-      <p v-if="user && resourceError" role="alert" class="resources-error">
+      <p class="resources-intro">
+        Flyer dan PPT Produk dapat dibuka tanpa login. Dummy Buku memerlukan login.
+      </p>
+      <p v-if="resourceError" role="alert" class="resources-error">
         Status materi belum dapat dimuat. Muat ulang halaman.
       </p>
-      <div v-if="user" class="resource-grid">
+      <div class="resource-grid">
         <article
           v-for="resource in resources"
           :id="resource.id"
@@ -296,6 +296,13 @@ useSeoMeta({
             <p v-else-if="!resourceStatus[resource.statusKey]" class="resource-state">
               Berkas belum tersedia
             </p>
+            <div v-else-if="resource.id === 'dummy' && !user" class="resource-actions">
+              <NuxtLink
+                :to="{ path: '/login', query: { returnTo: `/products/${product.slug}#dummy` } }"
+                class="resource-view"
+                >Login untuk membuka Dummy Buku</NuxtLink
+              >
+            </div>
             <div v-else class="resource-actions">
               <a
                 :href="`/api/products/${encodeURIComponent(product.slug)}/resources/${resource.id}?download=1`"
@@ -332,7 +339,7 @@ useSeoMeta({
     >
       <div class="flex h-full flex-col">
         <div
-          v-if="!pdfViewerUrl && !presentationPreview"
+          v-if="!pdfViewerUrl && !presentationUrl"
           class="flex items-center justify-between gap-4 border-b border-stone-200 px-5 py-4"
         >
           <h2 class="text-lg font-semibold">{{ pdfViewerTitle }}</h2>
@@ -359,9 +366,10 @@ useSeoMeta({
           >
             {{ pdfViewerError }}
           </div>
-          <PresentationSlideViewer
-            v-else-if="presentationPreview"
-            :slides="presentationPreview.slides"
+          <PowerPointViewer
+            v-else-if="presentationUrl"
+            :key="presentationUrl"
+            :url="presentationUrl"
             :title="pdfViewerTitle"
             :download-url="`/api/products/${encodeURIComponent(product.slug)}/resources/product-knowledge?download=1`"
             @close="closePdfDialog"

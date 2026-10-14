@@ -94,7 +94,7 @@ async function main() {
         book_code: `${Date.now()}${books.length}`,
         education_level: level,
         author: 'Pengujian favorit',
-        description: 'Buku sementara untuk verifikasi.',
+        synopsis: 'Buku sementara untuk verifikasi.',
         price: 12000,
         published,
         featured: false,

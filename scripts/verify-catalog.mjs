@@ -55,6 +55,23 @@ const input = {
   published: false,
 }
 assert.equal(bookInputSchema.parse(input).highlights, undefined, 'Legacy writes omit highlights')
+assert.equal(bookInputSchema.parse(input).curriculum, undefined)
+assert.equal(bookInputSchema.parse(input).isbn, undefined)
+assert.equal(
+  bookInputSchema.parse({ ...input, curriculum: '  Kurikulum Merdeka  ' }).curriculum,
+  'Kurikulum Merdeka',
+)
+assert.equal(bookInputSchema.parse({ ...input, isbn: '978-0-306-40615-7' }).isbn, '9780306406157')
+assert.equal(bookInputSchema.parse({ ...input, isbn: '0-306-40615-2' }).isbn, '0306406152')
+assert.equal(bookInputSchema.parse({ ...input, isbn: '123456789x' }).isbn, '123456789X')
+for (const isbn of ['', '123', '97803064061570', '12345678XX', 'ISBN 9780306406157', 9780306406157])
+  assert.equal(bookInputSchema.safeParse({ ...input, isbn }).success, false)
+for (const curriculum of ['', '   ', 'a'.repeat(201)])
+  assert.equal(bookInputSchema.safeParse({ ...input, curriculum }).success, false)
+assert.equal(
+  bookInputSchema.safeParse({ ...input, curriculum: 'a'.repeat(200), isbn: null }).success,
+  true,
+)
 assert.deepEqual(bookInputSchema.parse({ ...input, highlights: [] }).highlights, [])
 assert.deepEqual(
   bookInputSchema.parse({ ...input, highlights: [' Latihan bertingkat '] }).highlights,
@@ -153,7 +170,8 @@ const row = {
   slug: base.slug,
   title: base.title,
   author: base.author,
-  description: base.description,
+  curriculum: 'Kurikulum Merdeka',
+  isbn: '0306406152',
   price: base.price,
   image_path: null,
   featured: true,
@@ -164,6 +182,14 @@ const row = {
   publication_year: 2026,
 }
 assert.deepEqual(mapProductRow({}, row).highlights, [], 'Legacy row mapping defaults empty')
+assert.equal(mapProductRow({}, row).curriculum, 'Kurikulum Merdeka')
+assert.equal(mapProductRow({}, row).isbn, '0306406152')
+assert.equal(mapProductRow({}, row).description, '')
+assert.equal(
+  mapProductRow({}, { ...row, synopsis: 'Sinopsis buku' }).description,
+  'Sinopsis buku',
+  'Compatibility description derives from synopsis without the removed column',
+)
 assert.deepEqual(mapProductRow({}, { ...row, highlights: ['Point A', 'Point B'] }).highlights, [
   'Point A',
   'Point B',
@@ -325,10 +351,44 @@ assert.deepEqual(
 console.log(
   'PASS: highlights validation, public mapping, create/update roundtrip, empty-list clearing, and legacy-write preservation (repository stub).',
 )
+assert.equal(
+  editorRow.curriculum,
+  'Kurikulum Merdeka',
+  'Omitted metadata preserves saved curriculum',
+)
+assert.equal(editorRow.isbn, '0306406152', 'Omitted metadata preserves saved ISBN')
+assert.equal(Object.hasOwn(writes.at(-1), 'curriculum'), false)
+assert.equal(Object.hasOwn(writes.at(-1), 'isbn'), false)
+const metadata = await saveEditorBook(
+  {},
+  account,
+  bookInputSchema.parse({
+    ...input,
+    curriculum: ' Kurikulum sekolah khusus ',
+    isbn: '978-0-306-40615-7',
+  }),
+  row.id,
+)
+assert.equal(metadata.curriculum, 'Kurikulum sekolah khusus')
+assert.equal(metadata.isbn, '9780306406157')
+const clearedMetadata = await saveEditorBook(
+  {},
+  account,
+  bookInputSchema.parse({
+    ...input,
+    curriculum: null,
+    isbn: null,
+  }),
+  row.id,
+)
+assert.equal(clearedMetadata.curriculum, null)
+assert.equal(clearedMetadata.isbn, null)
+console.log(
+  'PASS: curriculum/ISBN normalization, bounds, leading zeros, optional legacy writes, metadata roundtrip, public mapping, and explicit clearing.',
+)
 editorRow = {
   ...editorRow,
   flyer_path: 'books/id/flyer/original.pdf',
-  flyer_slide_paths: ['legacy-flyer.png'],
   product_knowledge_path: 'books/id/product-knowledge/original.pptx',
   product_knowledge_slide_paths: ['old-presentation.png'],
 }
@@ -344,17 +404,15 @@ assert.deepEqual(writes.at(-1), {
   product_knowledge_slide_paths: [],
 })
 assert.equal(editorRow.flyer_path, 'books/id/flyer/original.pdf')
-assert.deepEqual(editorRow.flyer_slide_paths, ['legacy-flyer.png'])
 editorRow.product_knowledge_slide_paths = ['current-presentation.png']
 await setEditorBookMaterial({}, account, row.id, 'flyer', 'books/id/flyer/replacement.pdf')
 assert.deepEqual(writes.at(-1), {
   flyer_path: 'books/id/flyer/replacement.pdf',
-  flyer_slide_paths: [],
 })
 assert.equal(editorRow.product_knowledge_path, 'books/id/product-knowledge/new.pptx')
 assert.deepEqual(editorRow.product_knowledge_slide_paths, ['current-presentation.png'])
 console.log(
-  'PASS: replacing PPT Produk clears only presentation previews; replacing Flyer PDF preserves PPT Produk and clears legacy flyer metadata (repository stub).',
+  'PASS: replacing PPT Produk clears only presentation previews; replacing Flyer PDF preserves PPT Produk without writing removed columns (repository stub).',
 )
 console.log(
   'PASS: grade validation, legacy input, pagination beyond 60, sorting, multi-subject filters, facets, empty results, school counts, published-only query constraints, and database failure propagation.',
@@ -432,6 +490,19 @@ rpcBooks = [second, first]
 detailCalls.length = 0
 assert.equal((await getCatalogBrowse({}, 'level')).groups[0].products.length, 2)
 assert.equal(detailCalls.length, 0, 'Current RPC avoids extra queries')
+rpcBooks = [{ ...second }]
+delete rpcBooks[0].curriculum
+delete rpcBooks[0].isbn
+detailRows = [second]
+detailCalls.length = 0
+const metadataBrowse = await getCatalogBrowse({}, 'level')
+assert.equal(metadataBrowse.groups[0].products[0].curriculum, 'Kurikulum Merdeka')
+assert.equal(metadataBrowse.groups[0].products[0].isbn, '0306406152')
+assert.equal(
+  detailCalls.filter((call) => call[0] === 'select').length,
+  1,
+  'Previous RPC loads real curriculum/ISBN',
+)
 rpcError = { code: 'PGRST202' }
 await assert.rejects(getCatalogBrowse({}, 'level'), (error) => error.statusCode === 503)
 source = 'demo'

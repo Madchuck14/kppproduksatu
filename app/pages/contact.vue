@@ -111,7 +111,7 @@ const hours = [
 
 <style scoped>
 .contact-page {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-sans);
   color: #222;
   display: grid;
   gap: 40px;
@@ -142,7 +142,7 @@ const hours = [
 }
 .contact-heading h1 {
   margin: 16px 0 10px;
-  font-family: 'Lora', serif;
+  font-family: var(--font-sans);
   font-size: 46px;
   font-weight: 500;
   line-height: 1.2;
@@ -278,7 +278,7 @@ const hours = [
 }
 .opening-hours h2 {
   margin: 15px 0 8px;
-  font-family: 'Lora', serif;
+  font-family: var(--font-sans);
   font-size: 36px;
   line-height: 1.2;
   font-weight: 500;
@@ -316,7 +316,7 @@ const hours = [
 }
 .hours-card p {
   margin: 0 0 6px;
-  font-family: 'Lora', serif;
+  font-family: var(--font-sans);
   font-size: 26px;
   font-weight: 600;
   line-height: 33px;

@@ -8,14 +8,7 @@ useHead({
   link: [
     {
       rel: 'preload',
-      href: '/fonts/inter-latin.woff2',
-      as: 'font',
-      type: 'font/woff2',
-      crossorigin: 'anonymous',
-    },
-    {
-      rel: 'preload',
-      href: '/fonts/lora-latin.woff2',
+      href: '/fonts/plus-jakarta-sans-latin.woff2',
       as: 'font',
       type: 'font/woff2',
       crossorigin: 'anonymous',

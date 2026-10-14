@@ -1,10 +1,163 @@
 # Setup Supabase untuk demo online
 
+## Kurikulum dan ISBN buku
+
+Terapkan `supabase/migrations/202610140003_book_curriculum_isbn.sql` setelah migration sebelumnya,
+sebelum deploy aplikasi yang membaca kedua kolom secara eksplisit. Migration transaksional
+menambah metadata publik opsional dan memperbarui output RPC `catalog_browse_groups`.
+
+| Kolom        | Tipe             | Aturan                                                                        |
+| ------------ | ---------------- | ----------------------------------------------------------------------------- |
+| `curriculum` | `text`, nullable | Label bebas nonblank, maksimal 200 karakter, spasi tepi dibuang aplikasi.     |
+| `isbn`       | `text`, nullable | ISBN-10 (9 digit + digit/X) atau 13 digit, disimpan tanpa spasi/tanda hubung. |
+
+Kedua kolom memiliki nilai awal NULL pada buku lama. Tidak ada backfill dari judul/deskripsi,
+perubahan UUID, timestamp, referensi favorit/statistik, grant tabel, atau scope/RLS. ISBN tidak
+dijadikan angka, primary key, atau unique key; angka nol di depan tetap utuh. Aplikasi menerima
+spasi/tanda hubung dan X kecil, kemudian menormalisasi sebelum simpan. Validasi ISBN memeriksa
+format, bukan prefix/checksum penerbitan. Kurikulum tetap input teks, bukan daftar pilihan tetap.
+
+Form tambah/edit memakai nilai tersimpan, menampilkan error per field, dan mengirim NULL ketika
+dikosongkan. API lama yang menghilangkan field mempertahankan metadata yang sudah tersimpan;
+pada insert, nilai yang dihilangkan tetap NULL. Detail publik menampilkan Kurikulum dan ISBN
+dengan keadaan belum tersedia bila kosong. RPC ranking terbaru mengembalikan keduanya; aplikasi
+melengkapi RPC lama melalui pembacaan detail published, tanpa mengarang nilai metadata.
+
+Rollout: backup dan catat metadata/count/UUID/timestamp, terapkan migration melalui mekanisme
+yang mencatat versinya, verifikasi buku lama tetap sama dengan kedua field NULL, lalu deploy.
+Jika kolom pernah dibuat manual, tinjau isinya: nilai tidak valid menggagalkan transaksi tanpa
+koreksi otomatis. Pengulangan migration mempertahankan metadata valid yang sudah diisi.
+Verifikasi tambah/edit/muat ulang/kosongkan, ISBN dengan nol di depan, format/batas input,
+detail/ranking published, dan penolakan tulis Sales/Editor di luar scope.
+
+Rollback cukup deploy aplikasi sebelumnya dan pertahankan kolom, constraint, serta RPC agar
+metadata baru tidak hilang. Jangan drop kedua kolom saat rollback tampilan. Client lama tidak
+menulis kedua field dan mengabaikan tambahan key JSON dalam RPC.
+
+`node scripts/verify-catalog.mjs` memeriksa kontrak, normalisasi, mapping, roundtrip, pengosongan,
+writer lama, dan fallback RPC dengan query stub. `node scripts/verify-public-materials.mjs`
+(dengan `PGLITE_MODULE_PATH` seperti di bawah) juga menguji migration metadata pada PostgreSQL
+sementara: preservation, default NULL, retry, constraint, RPC, dan scope. Browser form diperiksa
+dengan API fixture; verifikasi ini tidak menggantikan persistensi/Auth/RLS Supabase live.
+Migration belum diterapkan ke database live oleh agent.
+
+## Flyer PPT publik dan preview PPTX di browser
+
+Persyaratan terbaru: Flyer dan PPT Produk milik buku published dapat dibuka tanpa login.
+Hanya Dummy Buku yang memerlukan sesi terverifikasi. Terapkan migration sebelumnya, lalu
+`supabase/migrations/202610140002_public_promotional_materials.sql` sebelum deploy aplikasi ini.
+Jangan mengubah bucket `book-materials` menjadi public: policy SELECT anon/authenticated
+memeriksa status published, UUID buku, folder Flyer/PPT, dan path asli yang tersimpan.
+Dummy, draft, bucket lain, dan objek tanpa referensi tidak mendapat akses anonim. Writer
+tetap membutuhkan Editor dan scope jenjang; tidak ada perubahan UUID, metadata, atau file.
+
+Editor mengunggah satu PPT/PPTX, maksimal 50 MB, tanpa mengekspor gambar slide. PPTX dirender
+langsung dalam browser dengan PptxViewJS 1.1.9, JSZip 3.10.1, dan Chart.js 4.5.1 yang dibundel
+lokal. Library mendukung PPTX; PPT lama tetap dapat diunduh dan harus disimpan ulang sebagai
+PPTX untuk preview. Materi PDF lama tetap menggunakan viewer PDF yang tersedia. Tidak ada
+iframe Microsoft, pengiriman file ke pihak ketiga, layanan konversi, atau container tambahan.
+
+Endpoint publik menggunakan client anonim dan query published. Dummy menggunakan
+`auth.getUser()` sebelum query file. Status materi hanya mengembalikan boolean/format.
+URL preview PPTX berlaku 600 detik agar bundle viewer sempat dimuat; URL Dummy/Flyer/unduhan
+berlaku 60 detik. Browser mengambil seluruh PPTX sekali untuk navigasi slide. Mode demo
+mengembalikan status berkas kosong dan 404 untuk Flyer/PPT; Dummy anonim tetap 401.
+
+Urutan rollout:
+
+1. Backup dan catat metadata/path produk serta policy Storage pada project tujuan.
+2. Terapkan migration melalui mekanisme yang mencatat versinya. Migration transaksional,
+   dapat diulang, dan tidak menghapus/memindahkan file. Jangan menjalankan migration cleanup
+   lama lagi setelah ini karena definisi fungsi lama mengembalikan akses login-only.
+3. Verifikasi anon dapat membuat signed URL/mengunduh Flyer/PPT untuk buku published,
+   tetapi Dummy/draft/objek lain ditolak. Periksa Sales tidak dapat menulis dan Editor
+   tetap dibatasi jenjang. Uji unpublish menghilangkan penerbitan URL baru.
+4. Deploy aplikasi. Uji unggahan satu PPTX, rendering file klien, navigasi/zoom, login
+   Dummy dengan returnTo, dan unduhan format asli. File/font/fitur PowerPoint yang kompleks
+   dapat berbeda dari hasil desktop; pengujian generated PPTX tidak membuktikan fidelity klien.
+
+Rollback: deploy aplikasi sebelumnya, lalu jalankan
+`supabase/rollback/202610140002_private_promotional_materials.sql`. Script memulihkan policy
+login-only tanpa menghapus file atau metadata. Signed URL yang sudah terbit tetap berlaku
+sampai kedaluwarsa; salinan materi yang sebelumnya diunduh publik tidak dapat ditarik kembali.
+Catat rollback pada riwayat migration. Catatan akses login-only dan gambar slide di bagian
+historis berikut menjelaskan versi sebelum migration publik ini.
+
+Verifikasi lokal:
+
+```powershell
+node scripts/verify-presentation.mjs
+$env:PGLITE_MODULE_PATH = '<temporary-install>/node_modules/@electric-sql/pglite/dist/index.js'
+node scripts/verify-public-materials.mjs
+$env:PLAYWRIGHT_MODULE_PATH = '<temporary-install>/node_modules/playwright/index.mjs'
+$env:PPTXGENJS_MODULE_PATH = '<temporary-install>/node_modules/pptxgenjs/dist/pptxgen.cjs.js'
+node scripts/verify-pptx-viewer.mjs
+```
+
+Script browser menghasilkan PPTX dengan teks/gambar/tabel/grafik dan mengintersep file/API;
+script RLS memakai PostgreSQL sementara dengan Auth/Storage simulasi. Tidak mengunggah data
+ke Supabase live. Migration dan Auth/Storage live belum diterapkan/diverifikasi oleh agent.
+
+## Penghapusan kolom produk lama (14 Oktober 2026)
+
+Migration `supabase/migrations/202610140001_remove_legacy_product_columns.sql`
+menghapus `products.description` dan `products.flyer_slide_paths`. Reader/writer aplikasi
+baru tidak membutuhkan kedua kolom, tetapi tetap mempertahankan field JSON `description`
+sebagai alias `synopsis` (string kosong jika belum diisi). SEO memakai sinopsis atau teks
+Indonesia berdasarkan judul buku. Isi deskripsi lama tidak otomatis dianggap sinopsis.
+
+Migration menyimpan nilai lama persis, termasuk daftar preview, ke tabel
+`catalog_cleanup_archive.product_legacy_columns`. Schema arsip tidak boleh dimasukkan
+ke exposed schemas Supabase. Akses schema/tabel dicabut dari PUBLIC, anon, dan authenticated;
+RLS aktif tanpa policy pengguna. Arsip hanya untuk pemulihan operator database.
+UUID, sinopsis, timestamp, favorit, statistik, serta objek Storage tidak diubah.
+Preview flyer lama tidak lagi mendapat akses runtime; preview PPT Produk tetap tersedia.
+
+Urutan penerapan:
+
+1. Ambil backup database dan simpan jumlah/UUID produk serta statistik/favorit.
+   Pastikan migration sebelumnya sudah diterapkan dan tinjau fungsi/constraint live
+   yang mungkin berbeda dari repository. Jangan menjalankan snapshot `schema.md` sebagai SQL.
+2. Hentikan sementara penulisan katalog/unggahan, deploy aplikasi baru, lalu pastikan
+   tidak ada server atau worker versi lama. Kolom lama tetap dapat berada di database
+   saat reader baru digunakan. Periksa konten lama yang akan diarsipkan; SEO tidak lagi
+   memakai deskripsi lama. Jangan mengisi sinopsis otomatis dari data tersebut.
+3. Jalankan seluruh migration melalui mekanisme yang mencatat versinya. Migration
+   transaksional, mengunci tabel produk, memverifikasi arsip, dan tidak menggunakan CASCADE.
+   Dependency yang tidak dikenal atau schema parsial menggagalkan transaksi.
+4. Pastikan kedua kolom hilang, semua UUID/count/timestamp tetap sama, arsip cocok,
+   pengguna anon/authenticated tidak dapat mengakses arsip, dan katalog/ranking,
+   SEO, CRUD Editor, unggah Flyer PDF, serta preview PPT Produk masih berfungsi.
+   Setelah pemeriksaan lulus, aktifkan kembali penulisan. Ambil ulang snapshot schema live.
+
+Rollback: hentikan penulisan, jalankan
+`supabase/rollback/202610140001_restore_legacy_product_columns.sql`, verifikasi, kemudian
+deploy aplikasi sebelumnya. Script mengembalikan nilai arsip, constraint preview lama,
+fungsi Storage, dan RPC tanpa menghapus arsip atau mengubah sinopsis/timestamp. Produk
+baru yang belum memiliki arsip mendapat default deskripsi/preview kosong. Jika Flyer
+PowerPoint lama sudah diganti PDF setelah cleanup, pemulihan daftar preview lama dapat
+melanggar constraint. Rollback gagal atomik; tinjau metadata dan pulihkan berkas asli
+yang sesuai sebelum mencoba ulang. Jangan memakai CASCADE atau menghapus berkas untuk
+mengatasi kegagalan. Catat rollback di riwayat migration agar tidak berbeda dari schema.
+
+Pengujian lokal:
+
+```powershell
+$env:PGLITE_MODULE_PATH = '<temporary-install>/node_modules/@electric-sql/pglite/dist/index.js'
+node scripts/verify-legacy-column-cleanup.mjs
+node scripts/verify-catalog.mjs
+node scripts/verify-presentation.mjs
+```
+
+Script cleanup menggunakan seluruh migration pada PostgreSQL sementara, dengan Auth/Storage
+simulasi. Tidak membaca `.env` dan tidak menghubungi database live. Pemeriksaan ini tidak
+menggantikan verifikasi Supabase live, sesi Editor, atau interaksi browser.
+
 ## Database
 
 1. Buat project Supabase milik vendor untuk staging. Jangan gunakan database produksi klien.
-2. Di SQL Editor, jalankan `supabase/migrations/202610040001_catalog.sql` satu kali.
-3. Jalankan `supabase/seed.sql` untuk tiga produk contoh. Ini opsional dan jangan dipakai sebagai inventory produksi.
+2. Terapkan seluruh migration `supabase/migrations/` berurutan melalui mekanisme yang mencatat versinya; perhatikan urutan deployment aplikasi untuk migration cleanup di atas.
+3. Setelah semua migration, jalankan `supabase/seed.sql` untuk tiga produk contoh. Ini opsional dan jangan dipakai sebagai inventory produksi.
 4. Dari project settings, ambil Project URL dan public publishable/anon key.
 5. Isi `.env`:
 

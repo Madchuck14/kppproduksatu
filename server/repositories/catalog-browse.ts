@@ -54,7 +54,9 @@ export async function getCatalogBrowse(
       rows
         .flatMap((row) => row.books)
         .filter((book) =>
-          ['division_code', 'synopsis', 'target_market'].some((key) => !(key in book)),
+          ['division_code', 'synopsis', 'target_market', 'curriculum', 'isbn'].some(
+            (key) => !(key in book),
+          ),
         )
         .map((book) => book.id),
     ),

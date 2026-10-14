@@ -9,6 +9,7 @@ import { createServer } from 'node:http'
 const require = createRequire(import.meta.url)
 const cache = new Map()
 let client
+let source = 'supabase'
 const request = { params: { slug: 'buku-uji', kind: 'product-knowledge' }, query: { preview: '1' } }
 function load(relative) {
   const filename = path.resolve(relative)
@@ -20,6 +21,7 @@ function load(relative) {
   }).outputText
   const resolve = (id) => {
     if (id === '#supabase/server') return { serverSupabaseClient: async () => client }
+    if (id.endsWith('/catalog-client')) return { getCatalogClient: () => client }
     if (id.startsWith('#shared/')) return load(`shared/${id.slice(8)}.ts`)
     if (id.startsWith('.')) return load(path.resolve(path.dirname(filename), `${id}.ts`))
     return require(id)
@@ -33,6 +35,7 @@ function load(relative) {
     'getRouterParam',
     'getQuery',
     'sendRedirect',
+    'useRuntimeConfig',
     code,
   )(
     resolve,
@@ -43,6 +46,7 @@ function load(relative) {
     (_, key) => request.params[key],
     () => request.query,
     (_, url, status) => ({ url, status }),
+    () => ({ catalogSource: source, public: { supabase: { url: '' } } }),
   )
   return module.exports
 }
@@ -162,9 +166,15 @@ let row = {
 let databaseError = null
 const operations = []
 const signedCalls = []
-let slideError = false
+let authCalls = 0
+let authError = null
 client = {
-  auth: { getUser: async () => ({ data: { user }, error: null }) },
+  auth: {
+    getUser: async () => {
+      authCalls += 1
+      return { data: { user }, error: authError }
+    },
+  },
   from() {
     const query = {}
     for (const method of ['select', 'eq'])
@@ -181,29 +191,25 @@ client = {
         signedCalls.push({ objectPath, expiry, options })
         return { data: { signedUrl: 'https://example.test/original' }, error: null }
       },
-      createSignedUrls: async (paths, expiry) => {
-        assert.equal(expiry, 60)
-        return {
-          data: paths.map((objectPath) => ({
-            signedUrl: `https://example.test/${objectPath}`,
-            error: slideError ? 'denied' : null,
-          })),
-          error: null,
-        }
-      },
     }),
   },
 }
+request.params.kind = 'dummy'
 await assert.rejects(handler({}), (error) => error.statusCode === 401)
 assert.equal(signedCalls.length, 0, 'Anonymous never receives signed URLs')
 assert.equal(operations.length, 0, 'Auth precedes material query')
-user = { id: 'sales-user' }
+request.params.kind = 'product-knowledge'
+authCalls = 0
 const result = await handler({})
 assert.equal(result.format, 'pptx')
-assert.deepEqual(result.slides, [
-  'https://example.test/slide-2.png',
-  'https://example.test/slide-1.png',
-])
+assert.equal(result.url, 'https://example.test/original')
+assert.equal(result.slides, undefined, 'Browser viewer reads original PPTX; no image exports')
+assert.equal(authCalls, 0, 'Public PPT preview never needs a user session')
+assert.equal(
+  signedCalls.at(-1).expiry,
+  600,
+  'Public PPTX allows time for lazy-loaded viewer assets',
+)
 assert.ok(
   operations.some(
     (operation) => operation[0] === 'eq' && operation[1] === 'published' && operation[2] === true,
@@ -215,33 +221,45 @@ assert.deepEqual(signedCalls.at(-1).options, { download: 'buku-uji-product-knowl
 row.product_knowledge_path = 'books/id/product-knowledge/original.ppt'
 await handler({})
 assert.equal(signedCalls.at(-1).options.download, 'buku-uji-product-knowledge.ppt')
+request.query = { preview: '1' }
+await assert.rejects(handler({}), (error) => error.statusCode === 415)
 row.product_knowledge_path = 'books/id/product-knowledge/legacy.pdf'
 request.query = { preview: '1' }
 assert.equal((await handler({})).format, 'pdf', 'Legacy PDFs keep their actual format')
 row.product_knowledge_path = 'books/id/product-knowledge/original.pptx'
-row.product_knowledge_slide_paths = []
-assert.deepEqual((await handler({})).slides, [], 'Original remains downloadable without preview')
-row.product_knowledge_slide_paths = ['slide.png']
-slideError = true
-await assert.rejects(handler({}), (error) => error.statusCode === 503)
-slideError = false
+assert.equal((await handler({})).format, 'pptx', 'PPTX preview works without slide images')
 row.flyer_path = 'books/id/flyer/original.pdf'
 request.params.kind = 'flyer'
 const flyer = await handler({})
 assert.equal(flyer.format, 'pdf')
 assert.equal(flyer.slides, undefined, 'Flyer never receives PPT Produk slides')
+assert.equal(authCalls, 0, 'Public Flyer never needs a session')
 request.query = { download: '1' }
 await handler({})
 assert.equal(signedCalls.at(-1).options.download, 'buku-uji-flyer.pdf')
 request.params.kind = 'product-knowledge'
 request.query = { preview: '1' }
+row.dummy_book_path = 'books/id/dummy/private.pdf'
+request.params.kind = 'dummy'
+user = { id: 'sales-user' }
+assert.equal((await handler({})).format, 'pdf')
+assert.equal(signedCalls.at(-1).expiry, 60, 'Dummy URLs retain the short private-file expiry')
+authError = { message: 'invalid session' }
+await assert.rejects(handler({}), (error) => error.statusCode === 401)
+request.params.kind = 'flyer'
+assert.equal((await handler({})).format, 'pdf', 'Public material works despite an invalid session')
+authError = null
+request.params.kind = 'product-knowledge'
 row = null
 await assert.rejects(handler({}), (error) => error.statusCode === 404)
 databaseError = { code: '42501' }
 await assert.rejects(handler({}), (error) => error.statusCode === 503)
+source = 'demo'
+request.params.slug = 'ruang-untuk-bertumbuh'
+await assert.rejects(handler({}), (error) => error.statusCode === 404)
 console.log(
-  'PASS: real upload MIME routing (Flyer/Dummy PDF, PPT Produk PPT/PPTX), signatures, ZIP type and macro rejection, image limits, anonymous denial, published-only query, ordered PPT Produk slides, isolated Flyer PDF, download extensions, legacy PDF, and error propagation.',
+  'PASS: upload MIME/signatures/macro rejection, public original PPTX and Flyer previews/downloads without auth, no slide images, PPT download/preview guidance, Dummy verified-session protection, published-only queries, legacy PDF, demo isolation, and error propagation.',
 )
 console.log(
-  'Repository/Storage use stubs. Live Auth, Storage, RLS, and Office rendering are not verified.',
+  'Repository/Storage use stubs. Live Auth, Storage, RLS, and client presentation fidelity are not verified.',
 )

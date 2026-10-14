@@ -531,10 +531,7 @@ async function logout() {
 .main-nav {
   display: flex;
   gap: 64px;
-  font:
-    16px Georgia,
-    'Times New Roman',
-    serif;
+  font: 16px var(--font-sans);
 }
 .main-nav a {
   display: inline-block;

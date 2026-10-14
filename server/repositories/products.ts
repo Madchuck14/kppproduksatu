@@ -4,6 +4,8 @@ import {
   bookSubjectSchema,
   bookHighlightsSchema,
   bookTargetMarketSchema,
+  bookCurriculumSchema,
+  bookIsbnSchema,
 } from '#shared/schemas/editor'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import { divisionCodeSchema } from '#shared/utils/book-divisions'
@@ -18,7 +20,8 @@ const rowSchema = z.object({
   slug: z.string(),
   title: z.string(),
   author: z.string(),
-  description: z.string(),
+  curriculum: bookCurriculumSchema.nullable().default(null),
+  isbn: bookIsbnSchema.nullable().default(null),
   division_code: divisionCodeSchema.nullable(),
   synopsis: z.string().nullable(),
   target_market: bookTargetMarketSchema,
@@ -33,7 +36,7 @@ const rowSchema = z.object({
   publication_year: z.number().int().nullable(),
 })
 export const productColumns =
-  'id,slug,title,author,description,division_code,synopsis,target_market,highlights,price,image_path,featured,book_code,education_level,grade,subject,publication_year'
+  'id,slug,title,author,curriculum,isbn,division_code,synopsis,target_market,highlights,price,image_path,featured,book_code,education_level,grade,subject,publication_year'
 
 function sourceFor(event: H3Event): ProductList['source'] {
   const source = useRuntimeConfig(event).catalogSource
@@ -50,7 +53,9 @@ export function mapProductRow(event: H3Event, value: unknown): Product {
     slug: row.slug,
     title: row.title,
     author: row.author,
-    description: row.description,
+    curriculum: row.curriculum,
+    isbn: row.isbn,
+    description: row.synopsis ?? '',
     divisionCode: row.division_code,
     synopsis: row.synopsis,
     targetMarket: row.target_market,

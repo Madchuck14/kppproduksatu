@@ -6,6 +6,7 @@ export interface EditorBook extends Omit<BookInput, 'bookCode' | 'educationLevel
   highlights: string[]
   id: string
   slug: string
+  /** Compatibility alias of synopsis; no separate database column. */
   description: string
   bookCode: string | null
   educationLevel: BookInput['educationLevel'] | null

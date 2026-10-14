@@ -52,7 +52,7 @@
       class="w-full h-[11.22%] bg-[url(/images/contact/89yzbqZH85.svg)] bg-[length:100%_100%] bg-no-repeat absolute top-[24.88%] left-0 z-[114]"
     />
     <span
-      class="flex h-[3.21%] justify-start items-start font-['Inter'] text-[11.880000114440918px] font-normal leading-[14px] text-[#7b847f] absolute top-[35.91%] left-[52%] text-left whitespace-nowrap z-[129]"
+      class="flex h-[3.21%] justify-start items-start font-sans text-[11.880000114440918px] font-normal leading-[14px] text-[#7b847f] absolute top-[35.91%] left-[52%] text-left whitespace-nowrap z-[129]"
       >Jl. H. Baping Raya</span
     >
     <div
@@ -80,7 +80,7 @@
       class="w-[19.17%] h-[13.64%] bg-[url(/images/contact/je0iFShCgb.svg)] bg-[length:100%_100%] bg-no-repeat absolute top-[51.14%] left-[77.5%] z-[107]"
     />
     <span
-      class="flex h-[3.21%] justify-start items-start font-['Inter'] text-[11.880000114440918px] font-normal leading-[14px] text-[#7b847f] absolute top-[56.82%] left-[6.67%] text-left whitespace-nowrap z-[130]"
+      class="flex h-[3.21%] justify-start items-start font-sans text-[11.880000114440918px] font-normal leading-[14px] text-[#7b847f] absolute top-[56.82%] left-[6.67%] text-left whitespace-nowrap z-[130]"
       >Ciracas</span
     >
     <div
@@ -90,7 +90,7 @@
       class="w-[24.83%] h-[6.59%] bg-[url(/images/contact/tiDSf7p38W.svg)] bg-[length:100%_100%] bg-no-repeat absolute top-[62.61%] left-[37.58%] z-[134]"
     />
     <span
-      class="flex w-[21.89%] h-[3.21%] justify-center items-start font-['Inter'] text-[11.880000114440918px] font-bold leading-[14px] text-[#222222] absolute top-[64.32%] left-[38.91%] text-center whitespace-nowrap z-[135]"
+      class="flex w-[21.89%] h-[3.21%] justify-center items-start font-sans text-[11.880000114440918px] font-bold leading-[14px] text-[#222222] absolute top-[64.32%] left-[38.91%] text-center whitespace-nowrap z-[135]"
       >Kantor Pusat Erlangga</span
     >
     <div
