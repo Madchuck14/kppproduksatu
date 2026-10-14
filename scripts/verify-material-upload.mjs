@@ -16,6 +16,7 @@ let stored
 let infoSize
 let infoType
 let pointer = 'previous.ppt'
+let requestedKind = 'product-knowledge'
 let signed = 0
 const bucket = {
   createSignedUploadUrl: async (objectPath) => {
@@ -52,7 +53,10 @@ function load(relative) {
         setEditorBookMaterial: async (_, editor, bookId, kind, objectPath) => {
           load('server/utils/require-editor.ts').assertBookScope(editor, level)
           pointer = objectPath
-          return { id: bookId, kind }
+          return {
+            id: bookId,
+            kind,
+          }
         },
       }
     if (name.startsWith('#shared/')) return load(`shared/${name.slice(8)}.ts`)
@@ -84,7 +88,7 @@ const complete = load('server/api/admin/books/[id]/materials/[kind]/complete.pos
 const app = createApp()
 app.use(
   eventHandler(async (event) => {
-    event.context.params = { id, kind: 'product-knowledge' }
+    event.context.params = { id, kind: requestedKind }
     return event.path === '/prepare' ? prepare(event) : complete(event)
   }),
 )
@@ -155,8 +159,25 @@ try {
   await post('complete', body, 200)
   assert.equal(pointer, upload.path)
   assert.ok(Buffer.byteLength(JSON.stringify(body)) < 500)
+  requestedKind = 'product-knowledge-preview'
+  const previewType = 'application/pdf'
+  const previewBytes = Buffer.from('%PDF-1.7\nmanual preview')
+  const previewUpload = await post('prepare', { type: previewType, size: previewBytes.length }, 200)
+  stored = previewBytes
+  infoSize = previewBytes.length
+  infoType = previewType
+  await post(
+    'complete',
+    {
+      path: previewUpload.path,
+      type: previewType,
+      size: previewBytes.length,
+    },
+    200,
+  )
+  assert.match(pointer, new RegExp(`^books/${id}/product-knowledge-preview/.+\\.pdf$`))
   console.log(
-    'PASS: 10.6 MiB material validation; small JSON API bodies; auth/scope recheck; path/type/size/signature rejection; previous material retained on failure.',
+    'PASS: 10.6 MiB PPT and PDF preview validation; small JSON API bodies; auth/scope recheck; path/type/size/signature rejection; previous material retained on failure.',
   )
 } finally {
   server.closeAllConnections()

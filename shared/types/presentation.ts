@@ -1,4 +1,1 @@
-export interface PresentationPreview {
-  slides: string[]
-  format: 'ppt' | 'pptx' | 'pdf'
-}
+export type PresentationFormat = 'ppt' | 'pptx' | 'pdf'

@@ -31,9 +31,8 @@ tersebut tidak dapat dibaca anonim. Hapus objek tanpa referensi melalui prosedur
 pemeliharaan Storage setelah memastikan tidak dipakai oleh produk.
 
 Setelah push perubahan ini, deploy commit terbaru di Vercel dan uji dengan akun
-editor serta berkas asli. Tidak diperlukan migrasi baru untuk perubahan transport
-ini; kebijakan Storage editor yang terdokumentasi di `docs/supabase.md` harus sudah
-terpasang.
+editor serta berkas asli. Terapkan migration PDF tampilan dan kebijakan Storage yang
+didokumentasikan di `docs/supabase.md`.
 
 Referensi: https://vercel.com/docs/functions/limitations
 
@@ -61,16 +60,18 @@ Referensi: https://developers.cloudflare.com/workers/framework-guides/web-apps/m
 
 ## Aplikasi di server klien
 
-Dockerfile menghasilkan Nuxt Node server dan menjalankannya sebagai non-root. Compose ini hanya menjalankan aplikasi; bukan seluruh stack Supabase dan bukan reverse proxy.
+Compose menjalankan Nuxt sebagai container non-root. Compose ini tidak menjalankan seluruh stack
+Supabase dan bukan reverse proxy.
 
 ```powershell
 Copy-Item .env.production.example .env.production
-# Isi URL/key Supabase milik klien dan domain produksinya terlebih dahulu.
+# Isi URL/key Supabase dan domain produksi terlebih dahulu.
 docker compose up -d --build
 docker compose ps
 ```
 
-App terikat ke `127.0.0.1:3000`. Pasang reverse proxy HTTPS yang dikelola klien ke alamat itu, misalnya Nginx atau Caddy. Contoh Caddy pada host:
+App terikat ke `127.0.0.1:3000`. Pasang reverse proxy HTTPS yang dikelola klien ke app, misalnya
+Nginx atau Caddy. Contoh Caddy:
 
 ```caddyfile
 catalog.example.com {
@@ -80,7 +81,8 @@ catalog.example.com {
 
 Sediakan DNS dan akses port 80/443 untuk TLS. Server perlu akses ke Supabase; jika nanti ada Midtrans/email, akses keluar ke layanan tersebut juga diperlukan. `/healthz` hanya liveness; verifikasi database dengan request katalog.
 
-Docker tidak tersedia di lingkungan penyiapan awal, jadi image dan Compose belum dijalankan. Jalankan build Node dan Docker pada mesin deployment sebelum handover.
+Jalankan `docker compose build`, cek healthcheck app, lalu uji pasangan PDF dan PPT/PPTX asli milik
+klien sebelum handover.
 
 ## Pilihan layanan Supabase klien
 

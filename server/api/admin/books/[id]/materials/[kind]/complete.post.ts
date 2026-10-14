@@ -46,5 +46,5 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'Ukuran berkas tidak sesuai dengan unggahan',
     })
   validateMaterialBytes(new Uint8Array(await data.arrayBuffer()), extension)
-  return await setEditorBookMaterial(event, account, id, kind, path)
+  return setEditorBookMaterial(event, account, id, kind, path)
 })

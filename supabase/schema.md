@@ -17,7 +17,8 @@
 | `slug` | `text` |  Unique |
 | `title` | `text` |  |
 | `author` | `text` |  |
-| `description` | `text` |  |
+| `curriculum` | `text` |  Nullable |
+| `isbn` | `text` |  Nullable |
 | `price` | `int4` |  |
 | `image_path` | `text` |  Nullable |
 | `featured` | `bool` |  |
@@ -30,14 +31,13 @@
 | `flyer_path` | `text` |  Nullable |
 | `dummy_book_path` | `text` |  Nullable |
 | `product_knowledge_path` | `text` |  Nullable |
+| `product_knowledge_preview_path` | `text` |  Nullable |
 | `subject` | `text` |  Nullable |
 | `grade` | `int2` |  Nullable |
 | `highlights` | `_text` |  |
 | `division_code` | `text` |  Nullable |
 | `synopsis` | `text` |  Nullable |
 | `target_market` | `_text` |  |
-| `flyer_slide_paths` | `_text` |  |
-| `product_knowledge_slide_paths` | `_text` |  |
 
 ## Table `account_memberships`
 

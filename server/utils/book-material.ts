@@ -1,7 +1,12 @@
 import { createError, getHeader, getRequestWebStream } from 'h3'
 import type { H3Event } from 'h3'
 
-export const materialKinds = ['flyer', 'dummy', 'product-knowledge'] as const
+export const materialKinds = [
+  'flyer',
+  'dummy',
+  'product-knowledge',
+  'product-knowledge-preview',
+] as const
 export type MaterialKind = (typeof materialKinds)[number]
 
 export async function readUploadBytes(event: H3Event, maxSize: number) {

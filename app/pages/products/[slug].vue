@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import type { PresentationPreview } from '#shared/types/presentation'
+import type { PresentationFormat } from '#shared/types/presentation'
 import { bookDivisions } from '#shared/utils/book-divisions'
 const route = useRoute()
 const config = useRuntimeConfig()
 const user = useSupabaseUser()
 type ResourceStatus = {
   flyer: boolean
-  flyerFormat: PresentationPreview['format'] | null
+  flyerFormat: PresentationFormat | null
   dummy: boolean
   productKnowledge: boolean
-  presentationFormat: PresentationPreview['format'] | null
+  productKnowledgePreview: boolean
   productKnowledgeFormat: 'PDF' | 'PPT' | 'PPTX' | null
 }
 const { data: product, error } = await useFetch(
@@ -34,7 +34,6 @@ const relatedProducts = computed(() =>
 const coverDialog = useTemplateRef<HTMLDialogElement>('cover-dialog')
 const pdfDialog = useTemplateRef<HTMLDialogElement>('pdf-dialog')
 const pdfViewerUrl = ref('')
-const presentationUrl = ref('')
 const pdfViewerTitle = ref('')
 const pdfViewerKind = ref<'product-knowledge' | 'flyer' | 'dummy'>('flyer')
 let pdfRequest = 0
@@ -77,21 +76,15 @@ async function openPdfResource(resource: (typeof resources)[number]) {
   pdfViewerKind.value = resource.id
   pdfViewerTitle.value = resource.title
   pdfViewerUrl.value = ''
-  presentationUrl.value = ''
   pdfViewerError.value = ''
   pdfViewerBusy.value = true
   pdfDialog.value?.showModal()
   try {
-    const result = await $fetch<{
-      url: string
-      format?: PresentationPreview['format']
-    }>(
+    const result = await $fetch<{ url: string }>(
       `/api/products/${encodeURIComponent(product.value!.slug)}/resources/${resource.id}?preview=1`,
     )
     if (request === pdfRequest) {
-      if (resource.id === 'product-knowledge' && result.format === 'pptx')
-        presentationUrl.value = result.url
-      else pdfViewerUrl.value = result.url
+      pdfViewerUrl.value = result.url
     }
   } catch (error) {
     if ((error as { statusCode?: number }).statusCode === 401) {
@@ -116,9 +109,6 @@ function resourceFormat(resourceId: (typeof resources)[number]['id']) {
     return resourceStatus.value?.productKnowledgeFormat ?? 'PPT/PPTX'
   return 'PDF'
 }
-function isPowerPointFormat(format: PresentationPreview['format'] | null | undefined) {
-  return format === 'ppt' || format === 'pptx'
-}
 function closePdfDialog() {
   pdfDialog.value?.close()
   resetPdfDialog()
@@ -126,7 +116,6 @@ function closePdfDialog() {
 function resetPdfDialog() {
   pdfRequest += 1
   pdfViewerUrl.value = ''
-  presentationUrl.value = ''
   pdfViewerError.value = ''
   pdfViewerBusy.value = false
 }
@@ -278,14 +267,11 @@ useSeoMeta({
             <h3>{{ resource.title }}</h3>
             <p class="resource-metadata">
               {{
-                resource.id === 'product-knowledge' &&
-                isPowerPointFormat(resourceStatus?.presentationFormat)
-                  ? 'PowerPoint \u00b7 Preview slide'
-                  : resource.id === 'product-knowledge'
-                    ? `Materi presentasi \u00b7 ${resourceFormat(resource.id)}`
-                    : resource.id === 'dummy'
-                      ? 'Pratinjau buku \u00b7 PDF'
-                      : 'PDF'
+                resource.id === 'product-knowledge'
+                  ? `Tampilan PDF \u00b7 Unduhan ${resourceFormat(resource.id)}`
+                  : resource.id === 'dummy'
+                    ? 'Pratinjau buku \u00b7 PDF'
+                    : 'PDF'
               }}
             </p>
             <p class="resource-description">{{ resource.description }}</p>
@@ -293,7 +279,13 @@ useSeoMeta({
             <p v-else-if="!resourceStatus" class="resource-state" role="status">
               Memeriksa berkas...
             </p>
-            <p v-else-if="!resourceStatus[resource.statusKey]" class="resource-state">
+            <p
+              v-else-if="
+                !resourceStatus[resource.statusKey] &&
+                !(resource.id === 'product-knowledge' && resourceStatus.productKnowledgePreview)
+              "
+              class="resource-state"
+            >
               Berkas belum tersedia
             </p>
             <div v-else-if="resource.id === 'dummy' && !user" class="resource-actions">
@@ -305,19 +297,20 @@ useSeoMeta({
             </div>
             <div v-else class="resource-actions">
               <a
+                v-if="resource.id !== 'product-knowledge' || resourceStatus.productKnowledge"
                 :href="`/api/products/${encodeURIComponent(product.slug)}/resources/${resource.id}?download=1`"
                 class="resource-download"
-                :aria-label="`Unduh ${resource.id === 'product-knowledge' && isPowerPointFormat(resourceStatus?.presentationFormat) ? 'PowerPoint' : resourceFormat(resource.id)}: ${resource.title}`"
+                :aria-label="`Unduh ${resource.id === 'product-knowledge' ? 'PowerPoint' : resourceFormat(resource.id)}: ${resource.title}`"
               >
                 <img src="/images/book-detail/download.svg" alt="" width="16" height="16" />
                 {{
-                  resource.id === 'product-knowledge' &&
-                  resourceStatus?.presentationFormat !== 'pdf'
+                  resource.id === 'product-knowledge'
                     ? 'Unduh PowerPoint'
                     : `Unduh ${resourceFormat(resource.id)}`
                 }}
               </a>
               <button
+                v-if="resource.id !== 'product-knowledge' || resourceStatus.productKnowledgePreview"
                 type="button"
                 class="resource-view"
                 :aria-label="`Lihat: ${resource.title}`"
@@ -339,7 +332,7 @@ useSeoMeta({
     >
       <div class="flex h-full flex-col">
         <div
-          v-if="!pdfViewerUrl && !presentationUrl"
+          v-if="!pdfViewerUrl"
           class="flex items-center justify-between gap-4 border-b border-stone-200 px-5 py-4"
         >
           <h2 class="text-lg font-semibold">{{ pdfViewerTitle }}</h2>
@@ -366,14 +359,6 @@ useSeoMeta({
           >
             {{ pdfViewerError }}
           </div>
-          <PowerPointViewer
-            v-else-if="presentationUrl"
-            :key="presentationUrl"
-            :url="presentationUrl"
-            :title="pdfViewerTitle"
-            :download-url="`/api/products/${encodeURIComponent(product.slug)}/resources/product-knowledge?download=1`"
-            @close="closePdfDialog"
-          />
           <PdfFlipbookViewer
             v-else-if="pdfViewerUrl"
             :key="pdfViewerUrl"

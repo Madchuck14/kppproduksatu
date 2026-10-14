@@ -7,22 +7,16 @@ export default defineEventHandler(async (event) => {
   const kind = bookResourceKindSchema.safeParse(getRouterParam(event, 'kind'))
   if (!slug.success || !kind.success)
     throw createError({ statusCode: 400, statusMessage: 'Buku atau jenis materi tidak valid' })
-  const { client, path, extension } = await getBookResource(event, slug.data, kind.data)
   const query = getQuery(event)
-  const isPresentationPowerPoint = kind.data === 'product-knowledge' && extension === 'pptx'
-  if (query.preview === '1' && extension !== 'pdf' && !isPresentationPowerPoint)
-    throw createError({
-      statusCode: 415,
-      statusMessage:
-        extension === 'ppt'
-          ? 'Simpan PowerPoint sebagai PPTX untuk membuka pratinjau. Berkas PPT tetap dapat diunduh.'
-          : 'Format materi ini tidak mendukung pratinjau',
-    })
+  const preview = query.preview === '1'
+  const { client, path, extension } = await getBookResource(event, slug.data, kind.data, preview)
+  if (preview && extension !== 'pdf')
+    throw createError({ statusCode: 415, statusMessage: 'Format materi tidak mendukung tampilan' })
   const signed = await client.storage
     .from('book-materials')
     .createSignedUrl(
       path,
-      query.preview === '1' && isPresentationPowerPoint ? 600 : 60,
+      60,
       query.download === '1' ? { download: `${slug.data}-${kind.data}.${extension}` } : undefined,
     )
   if (signed.error || !signed.data?.signedUrl)

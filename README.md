@@ -54,13 +54,14 @@ Pengunjung anonim diarahkan login; mode demo tidak menyimpan favorit.
 
 Pagination tersedia pada dashboard Editor dan katalog publik. Cart, checkout, Midtrans, blog,
 banner CMS, sitemap, dan structured data belum diimplementasikan.
-Editor cukup mengunggah satu PowerPoint: PPTX dirender langsung di browser memakai PptxViewJS,
-tanpa gambar hasil ekspor, iframe Microsoft, atau layanan konversi. Berkas PPT lama tetap dapat
-diunduh; simpan sebagai PPTX untuk pratinjau. Flyer dan Dummy Buku tetap PDF.
+Editor mengunggah dua berkas untuk PPT Produk: PDF untuk tombol **Tampilkan** dan PPT/PPTX asli
+untuk tombol **Unduh PowerPoint**. Keduanya disimpan langsung di Supabase tanpa converter atau
+server tambahan. Flyer dan Dummy Buku tetap PDF.
 Setelah migration `202610140002_public_promotional_materials.sql`, Flyer dan PPT Produk buku
 published dapat dibuka tanpa login; hanya Dummy Buku yang memerlukan login. Bucket `book-materials`
 tetap privat dan RLS melindungi draft serta akses Editor per jenjang. Terapkan migration sebelumnya
-terlebih dahulu dan ikuti [rollout materi publik](docs/supabase.md#flyer-ppt-publik-dan-preview-pptx-di-browser).
+terlebih dahulu, lalu migration `202610140005_manual_product_knowledge_pdf.sql` dan
+[rollout PDF tampilan](docs/supabase.md#pdf-tampilan-dan-powerpoint-unduhan).
 Migration ini belum diterapkan ke Supabase live oleh agent.
 
 ## Perintah

@@ -19,8 +19,13 @@ const materials = [
   { kind: 'dummy', label: 'Dummy Buku', help: 'PDF, maksimal 20 MB' },
   {
     kind: 'product-knowledge',
-    label: 'PPT Produk',
-    help: 'PPTX untuk pratinjau; PPT hanya dapat diunduh. Maksimal 50 MB.',
+    label: 'PPT Produk — file unduhan',
+    help: 'PPT/PPTX, maksimal 50 MB. Pengunjung mengunduh file ini.',
+  },
+  {
+    kind: 'product-knowledge-preview',
+    label: 'PPT Produk — file tampilan',
+    help: 'PDF, maksimal 20 MB. File ini dibuka oleh tombol Tampilkan.',
   },
   {
     kind: 'flyer',
@@ -64,10 +69,13 @@ const progress = ref('')
 const message = ref('')
 const errors = ref<Record<string, string>>({})
 const file = shallowRef<File | null>(null)
-const materialFiles = reactive<Record<'flyer' | 'dummy' | 'product-knowledge', File | null>>({
+const materialFiles = reactive<
+  Record<'flyer' | 'dummy' | 'product-knowledge' | 'product-knowledge-preview', File | null>
+>({
   flyer: null,
   dummy: null,
   'product-knowledge': null,
+  'product-knowledge-preview': null,
 })
 function materialType(kind: keyof typeof materialFiles, selected: File) {
   if (kind !== 'product-knowledge') return selected.type
@@ -163,10 +171,22 @@ async function save() {
       })
       file.value = null
     }
-    for (const kind of ['flyer', 'dummy', 'product-knowledge'] as const) {
+    for (const kind of [
+      'flyer',
+      'dummy',
+      'product-knowledge',
+      'product-knowledge-preview',
+    ] as const) {
       const material = materialFiles[kind]
       if (!material) continue
-      const label = kind === 'dummy' ? 'Dummy Buku' : kind === 'flyer' ? 'flyer' : 'PPT Produk'
+      const label =
+        kind === 'dummy'
+          ? 'Dummy Buku'
+          : kind === 'flyer'
+            ? 'flyer'
+            : kind === 'product-knowledge-preview'
+              ? 'PDF tampilan PPT Produk'
+              : 'PPT Produk'
       progress.value = `Mengunggah ${label}...`
       const type = materialType(kind, material)
       const endpoint = `/api/admin/books/${book.id}/materials/${kind}`
@@ -182,7 +202,7 @@ async function save() {
       if (uploadError)
         throw new Error(`Unggahan ${label} ke penyimpanan gagal. Periksa koneksi dan coba lagi.`)
       progress.value = `Memeriksa ${label}...`
-      await $fetch(`${endpoint}/complete`, {
+      await $fetch<EditorBook>(`${endpoint}/complete`, {
         method: 'POST',
         body: { path: upload.path, type, size: material.size },
       })
@@ -515,15 +535,21 @@ async function save() {
               /></label>
               <span class="file-name">{{
                 materialFiles[item.kind]?.name ??
-                (book?.resources[item.kind === 'product-knowledge' ? 'productKnowledge' : item.kind]
+                (book?.resources[
+                  item.kind === 'product-knowledge'
+                    ? 'productKnowledge'
+                    : item.kind === 'product-knowledge-preview'
+                      ? 'productKnowledgePreview'
+                      : item.kind
+                ]
                   ? 'Berkas sudah tersedia'
                   : 'Belum ada file')
               }}</span>
             </div>
           </div>
           <p class="privacy-note">
-            Flyer dan PPT Produk dapat dibuka publik setelah buku dipublikasikan. Dummy Buku
-            memerlukan login.
+            PDF tampilan dan PPT/PPTX unduhan dapat dibuka publik setelah buku dipublikasikan. Dummy
+            Buku memerlukan login.
           </p>
         </section>
         <section class="form-card publication-card" aria-labelledby="publication-heading">

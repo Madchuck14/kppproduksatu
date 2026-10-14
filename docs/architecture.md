@@ -5,9 +5,9 @@
 Setelah migration `202610140001_remove_legacy_product_columns.sql`, `description` dan
 `flyer_slide_paths` tidak lagi menjadi kolom produk. Repository membaca sinopsis;
 field JSON `description` tetap tersedia sebagai alias sinopsis demi kompatibilitas API.
-SEO memakai sinopsis atau teks berdasarkan judul. Flyer memakai PDF tanpa gambar preview;
-`product_knowledge_slide_paths` dipertahankan sebagai metadata preview lama untuk rollback;
-preview baru membaca PPTX asli melalui PptxViewJS.
+SEO memakai sinopsis atau teks berdasarkan judul. Flyer memakai PDF tanpa gambar preview.
+PPT Produk memakai `product_knowledge_preview_path` untuk PDF tampilan dan
+`product_knowledge_path` untuk PPT/PPTX unduhan.
 
 Nilai lama disimpan untuk rollback pada schema privat `catalog_cleanup_archive`, tanpa
 menyalin deskripsi menjadi sinopsis atau menghapus berkas Storage. Catatan di bagian
@@ -94,7 +94,7 @@ pengunjung. Flyer dan PPT Produk buku published dapat dibuka tanpa login; Dummy 
 Panel hijau berisi kartu Flyer Promosi, Presentasi Buku,
 dan Buku Dummy, dengan pratinjau, status berkas, serta tombol unduh dan Lihat.
 Aset flyer dan ikon unduh disimpan di `public/images/book-detail`; pratinjau dummy memakai
-sampul katalog. PPT Produk (Product Knowledge) memakai PPT/PPTX dengan preview PPTX langsung di browser,
+sampul katalog. PPT Produk (Product Knowledge) memakai PPT/PPTX dengan preview gambar statis,
 sedangkan Flyer dan Dummy Buku memakai PDF. Label unduhan mengikuti format nyata, termasuk PDF
 Product Knowledge lama yang tetap dapat dibuka.
 Ukuran contoh tidak ditampilkan karena metadata tersebut belum tersedia. Endpoint preview dan
@@ -105,12 +105,9 @@ mengambang. Isi serta jumlah halaman berasal dari PDF nyata; pembalikan halaman 
 StPageFlip yang sudah tersedia. Zoom dapat diganti lewat tombol atau pilihan persentase;
 halaman dapat digeser saat diperbesar. Tombol panah keyboard, Escape, dan fokus dialog
 tetap berfungsi. Aset toolbar disimpan lokal di `public/images/dummy-preview`.
-PPT Produk memakai PptxViewJS 1.1.9 dalam dialog canvas: navigasi tombol/panah keyboard,
-zoom 50–200%, dan unduh PowerPoint asli. Renderer, JSZip, dan Chart.js dimuat secara lazy dari
-bundle lokal; tidak mengirim dokumen ke Microsoft atau layanan konversi. File PPTX diambil
-sekali saat dialog dibuka, dengan batas 50 MB, lalu cache gambar dilepas saat ditutup.
-Preview ini statis. PPT lama hanya dapat diunduh; simpan ulang sebagai PPTX untuk preview.
-Flyer, Dummy Buku, dan Product Knowledge PDF lama memakai viewer PDF yang tersedia.
+PPT Produk menampilkan PDF yang diunggah Editor melalui viewer PDF yang sama dengan Flyer dan
+Dummy Buku. PPT/PPTX asli tersedia melalui tombol unduhan. Browser tidak mengurai atau menggambar
+isi PowerPoint.
 Favorit anonim menawarkan login
 dengan tujuan kembali ke buku. Tombol pemesanan menuju kontak pada footer beranda.
 
@@ -126,8 +123,8 @@ yang dikenal, serta `/products` dan `/favorites`. Login tanpa tujuan mengarahkan
 Login dari registrasi tanpa tujuan buku kembali ke katalog publik `/products`.
 Endpoint status hanya mengembalikan boolean dan format, tanpa URL/path privat. Endpoint preview
 dan unduhan Dummy memverifikasi `auth.getUser()`. Flyer/PPT menggunakan client anonim;
-seluruh pembacaan membatasi buku published sebelum membuat signed URL. URL preview PPTX
-berumur 600 detik agar bundle viewer sempat dimuat; URL Dummy, Flyer, dan unduhan berumur 60 detik.
+seluruh pembacaan membatasi buku published sebelum membuat signed URL. URL gambar slide
+berumur 600 detik agar viewer dapat menyimpannya lokal; URL Dummy, Flyer, dan unduhan berumur 60 detik.
 Dashboard Editor mengunggah satu PPT Produk PPT/PPTX serta
 Flyer dan Dummy Buku PDF ke bucket privat `book-materials`. Endpoint upload tetap memeriksa
 session, scope jenjang, MIME, signature, dan ukuran; RLS menutup akses Dummy/draft anonim.
@@ -211,14 +208,8 @@ Object baru memakai `books/{product UUID}/{random UUID}.{extension}`; RLS Storag
 ke buku tersebut. Tidak ada overwrite object. File lama tidak otomatis dihapus saat sampul diganti
 atau buku dihapus; pembersihan aset tak terpakai dilakukan terpisah oleh pengelola.
 
-PPT Produk dibatasi PPT/PPTX 50 MB tanpa unggahan gambar slide. PptxViewJS membaca PPTX asli
-untuk menggambar teks, gambar, tabel, dan grafik di canvas. Form menjelaskan bahwa PPT lama
-hanya dapat diunduh. Penggantian PowerPoint mengosongkan metadata preview gambar lama;
-endpoint unggah gambar legacy dipertahankan untuk kompatibilitas, tetapi tidak digunakan form baru.
-Fidelity font/layout harus ditinjau dengan presentasi klien; hasil browser tidak dijamin identik
-dengan PowerPoint desktop. Kegagalan renderer menampilkan pesan dan tautan unduh berkas asli.
-Flyer dan Dummy Buku dibatasi PDF 20 MB. Product Knowledge PDF lama tetap terbaca, tetapi unggahan
-baru memakai PPT/PPTX. Dummy Buku memakai PDF.js dan
+PPT Produk memakai dua upload independen: PPT/PPTX maksimal 50 MB untuk unduhan dan PDF maksimal
+20 MB untuk tampilan. Flyer dan Dummy Buku juga dibatasi PDF 20 MB. Dummy Buku memakai PDF.js dan
 StPageFlip (`page-flip`) dalam popup flipbook: dua halaman pada layar lebar, satu halaman pada layar
 sempit, dengan sampul, swipe/drag, tombol navigasi, dan panah keyboard. PDF diambil sekali sebelum
 halaman disiapkan agar navigasi tidak bergantung pada masa berlaku signed URL. Penampil hanya

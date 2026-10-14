@@ -14,8 +14,12 @@ export interface EditorBook extends Omit<BookInput, 'bookCode' | 'educationLevel
   synopsis: string | null
   targetMarket: string[]
   imageUrl: string
-  resources: { flyer: boolean; dummy: boolean; productKnowledge: boolean }
-  presentationSlideCount: number
+  resources: {
+    flyer: boolean
+    dummy: boolean
+    productKnowledge: boolean
+    productKnowledgePreview: boolean
+  }
   updatedAt: string
 }
 

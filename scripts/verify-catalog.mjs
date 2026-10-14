@@ -390,7 +390,7 @@ editorRow = {
   ...editorRow,
   flyer_path: 'books/id/flyer/original.pdf',
   product_knowledge_path: 'books/id/product-knowledge/original.pptx',
-  product_knowledge_slide_paths: ['old-presentation.png'],
+  product_knowledge_preview_path: 'books/id/product-knowledge-preview/original.pdf',
 }
 await setEditorBookMaterial(
   {},
@@ -401,18 +401,30 @@ await setEditorBookMaterial(
 )
 assert.deepEqual(writes.at(-1), {
   product_knowledge_path: 'books/id/product-knowledge/new.pptx',
-  product_knowledge_slide_paths: [],
 })
 assert.equal(editorRow.flyer_path, 'books/id/flyer/original.pdf')
-editorRow.product_knowledge_slide_paths = ['current-presentation.png']
+assert.equal(
+  editorRow.product_knowledge_preview_path,
+  'books/id/product-knowledge-preview/original.pdf',
+)
+await setEditorBookMaterial(
+  {},
+  account,
+  row.id,
+  'product-knowledge-preview',
+  'books/id/product-knowledge-preview/new.pdf',
+)
+assert.deepEqual(writes.at(-1), {
+  product_knowledge_preview_path: 'books/id/product-knowledge-preview/new.pdf',
+})
 await setEditorBookMaterial({}, account, row.id, 'flyer', 'books/id/flyer/replacement.pdf')
 assert.deepEqual(writes.at(-1), {
   flyer_path: 'books/id/flyer/replacement.pdf',
 })
 assert.equal(editorRow.product_knowledge_path, 'books/id/product-knowledge/new.pptx')
-assert.deepEqual(editorRow.product_knowledge_slide_paths, ['current-presentation.png'])
+assert.equal(editorRow.product_knowledge_preview_path, 'books/id/product-knowledge-preview/new.pdf')
 console.log(
-  'PASS: replacing PPT Produk clears only presentation previews; replacing Flyer PDF preserves PPT Produk without writing removed columns (repository stub).',
+  'PASS: PPT download and PDF preview update independently; replacing Flyer preserves both product files (repository stub).',
 )
 console.log(
   'PASS: grade validation, legacy input, pagination beyond 60, sorting, multi-subject filters, facets, empty results, school counts, published-only query constraints, and database failure propagation.',

@@ -14,14 +14,14 @@ export default defineEventHandler(async (event) => {
       flyerFormat: null,
       dummy: false,
       productKnowledge: false,
-      presentationFormat: null,
+      productKnowledgePreview: false,
       productKnowledgeFormat: null,
     }
   }
   const client = getCatalogClient(event)
   const { data, error } = await client
     .from('products')
-    .select('flyer_path,dummy_book_path,product_knowledge_path')
+    .select('flyer_path,dummy_book_path,product_knowledge_path,product_knowledge_preview_path')
     .eq('slug', slug.data)
     .eq('published', true)
     .maybeSingle()
@@ -41,11 +41,9 @@ export default defineEventHandler(async (event) => {
   return {
     flyer: Boolean(data.flyer_path),
     flyerFormat: flyerExtension?.success ? flyerExtension.data : null,
-    presentationFormat: data.product_knowledge_path
-      ? data.product_knowledge_path.split('.').pop()
-      : null,
     dummy: Boolean(data.dummy_book_path),
     productKnowledge: Boolean(data.product_knowledge_path),
+    productKnowledgePreview: Boolean(data.product_knowledge_preview_path),
     productKnowledgeFormat,
   }
 })

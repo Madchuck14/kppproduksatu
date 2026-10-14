@@ -253,11 +253,108 @@ try {
     publicId,
   ])
   await db.exec('reset role')
+  const conversionMigration = await readFile(
+    'supabase/migrations/202610140004_server_presentation_previews.sql',
+    'utf8',
+  )
+  const slidePath = `books/${publicId}/presentation-slides/88888888-8888-4888-8888-888888888888.jpg`
+  await db.exec(conversionMigration)
+  await db.query(
+    `update public.products
+      set product_knowledge_slide_paths = array[$1],
+        product_knowledge_preview_status = 'ready',
+        product_knowledge_preview_error = null
+      where id = $2`,
+    [slidePath, publicId],
+  )
+  await db.query("insert into storage.objects (bucket_id, name) values ('book-materials', $1)", [
+    slidePath,
+  ])
+  await db.exec('set role anon')
+  assert.ok((await visible()).includes(slidePath), 'Published generated slides are public')
+  await db.exec('reset role')
+  const conversionSnapshot = (
+    await db.query(
+      'select product_knowledge_slide_paths, product_knowledge_preview_status from public.products where id = $1',
+      [publicId],
+    )
+  ).rows[0]
+  await db.exec(conversionMigration)
+  assert.deepEqual(
+    (
+      await db.query(
+        'select product_knowledge_slide_paths, product_knowledge_preview_status from public.products where id = $1',
+        [publicId],
+      )
+    ).rows[0],
+    conversionSnapshot,
+    'Conversion migration retry preserves generated paths and status',
+  )
+  const manualPreviewMigration = await readFile(
+    'supabase/migrations/202610140005_manual_product_knowledge_pdf.sql',
+    'utf8',
+  )
+  const previewPath = `books/${publicId}/product-knowledge-preview/99999999-9999-4999-8999-999999999999.pdf`
+  await db.exec(manualPreviewMigration)
+  await db.query('update public.products set product_knowledge_preview_path = $1 where id = $2', [
+    previewPath,
+    publicId,
+  ])
+  await db.query("insert into storage.objects (bucket_id, name) values ('book-materials', $1)", [
+    previewPath,
+  ])
+  await assert.rejects(
+    db.query('update public.products set product_knowledge_preview_path = $1 where id = $2', [
+      `books/${publicId}/product-knowledge/99999999-9999-4999-8999-999999999999.pdf`,
+      publicId,
+    ]),
+    /products_product_knowledge_preview_path_valid/,
+  )
+  const columns = (
+    await db.query(
+      `select column_name from information_schema.columns
+       where table_schema = 'public' and table_name = 'products'`,
+    )
+  ).rows.map((row) => row.column_name)
+  assert.equal(columns.includes('product_knowledge_slide_paths'), false)
+  assert.equal(columns.includes('product_knowledge_preview_status'), false)
+  assert.equal(columns.includes('product_knowledge_preview_error'), false)
+  assert.deepEqual(
+    (
+      await db.query(
+        'select slide_paths, preview_status from catalog_cleanup_archive.presentation_converter_columns where product_id = $1',
+        [publicId],
+      )
+    ).rows[0],
+    { slide_paths: [slidePath], preview_status: 'ready' },
+  )
+  await db.exec('set role anon')
+  const manualVisible = await visible()
+  assert.ok(manualVisible.includes(previewPath), 'Published PDF preview is public')
+  assert.equal(
+    manualVisible.includes(slidePath),
+    false,
+    'Archived generated slides are no longer public',
+  )
+  await db.exec('reset role')
+  await db.exec(manualPreviewMigration)
+  assert.equal(
+    (
+      await db.query('select product_knowledge_preview_path from public.products where id = $1', [
+        publicId,
+      ])
+    ).rows[0].product_knowledge_preview_path,
+    previewPath,
+    'Manual preview migration retry preserves the uploaded PDF path',
+  )
   console.log(
     'PASS: curriculum/ISBN migration preserves existing rows/timestamps, defaults to NULL, retries preserve metadata, constraints enforce format/bounds, RPC includes public metadata, and Sales/Editor scopes remain enforced.',
   )
   console.log(
     'PASS: full migration chain, published Flyer/PPT anonymous reads only, Dummy login requirement, draft/bucket/unreferenced denial, Sales write denial, Editor scope, private bucket, retry preservation, Dummy alias protection, and unpublish.',
+  )
+  console.log(
+    'PASS: converter metadata is archived then removed; manual PDF preview path, RLS, constraints, and migration retry are verified.',
   )
   console.log('Isolated PostgreSQL with simulated Auth/Storage; live Supabase remains unverified.')
 } finally {

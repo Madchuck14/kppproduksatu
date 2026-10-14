@@ -6,6 +6,7 @@ const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE_PA
 const base = process.env.MATERIAL_TEST_BASE_URL ?? 'http://localhost:3000'
 const id = '11111111-1111-4111-8111-111111111111'
 const objectPath = `books/${id}/product-knowledge/22222222-2222-4222-8222-222222222222.ppt`
+const previewPath = `books/${id}/product-knowledge-preview/33333333-3333-4333-8333-333333333333.pdf`
 const account = {
   id,
   email: 'editor@example.test',
@@ -17,6 +18,7 @@ const size = Math.round(10.6 * 1024 * 1024)
 const bytes = Buffer.alloc(size)
 Buffer.from([208, 207, 17, 224, 161, 177, 26, 225]).copy(bytes)
 Buffer.from('PowerPoint Document', 'utf16le').copy(bytes, 8)
+const previewBytes = Buffer.from('%PDF-1.7\nmanual preview')
 const browser = await chromium.launch({
   executablePath:
     process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -35,16 +37,21 @@ try {
     const url = new URL(request.url())
     if (url.pathname.startsWith('/storage/v1/object/upload/sign/')) {
       assert.notEqual(url.origin, new URL(base).origin)
-      assert.ok(url.pathname.endsWith(objectPath))
-      assert.ok(request.postDataBuffer().length >= size)
+      const isPreview = url.pathname.endsWith(previewPath)
+      assert.ok(isPreview || url.pathname.endsWith(objectPath))
+      assert.ok(
+        isPreview
+          ? request.postDataBuffer().length >= previewBytes.length
+          : request.postDataBuffer().length >= size,
+      )
       uploadCount += 1
       return route.fulfill(
-        failUpload
+        failUpload && !isPreview
           ? {
               status: 500,
               json: { statusCode: '500', error: 'StorageError', message: 'test failure' },
             }
-          : { json: { Key: `book-materials/${objectPath}` } },
+          : { json: { Key: `book-materials/${isPreview ? previewPath : objectPath}` } },
       )
     }
     if (url.origin !== new URL(base).origin) return route.abort()
@@ -57,15 +64,20 @@ try {
       }
       if (url.pathname.endsWith('/upload-url')) {
         const payload = request.postDataJSON()
-        assert.equal(payload.size, size)
-        assert.equal(payload.type, 'application/vnd.ms-powerpoint')
+        const isPreview = payload.type === 'application/pdf'
+        assert.equal(payload.size, isPreview ? previewBytes.length : size)
+        if (!isPreview) assert.equal(payload.type, 'application/vnd.ms-powerpoint')
         prepareCount += 1
-        return route.fulfill({ json: { path: objectPath, token: 'test-token' } })
+        return route.fulfill({
+          json: { path: isPreview ? previewPath : objectPath, token: 'test-token' },
+        })
       }
       if (url.pathname.endsWith('/complete')) {
-        assert.equal(request.postDataJSON().path, objectPath)
+        assert.ok([objectPath, previewPath].includes(request.postDataJSON().path))
         completeCount += 1
-        return route.fulfill({ json: { id } })
+        return route.fulfill({
+          json: { id },
+        })
       }
       if (request.method() === 'POST' || request.method() === 'PUT')
         return route.fulfill({ json: { ...request.postDataJSON(), id } })
@@ -99,6 +111,11 @@ try {
   await page
     .locator('#new-book-product-knowledge')
     .setInputFiles({ name: 'produk.ppt', mimeType: 'application/octet-stream', buffer: bytes })
+  await page.locator('#new-book-product-knowledge-preview').setInputFiles({
+    name: 'produk-preview.pdf',
+    mimeType: 'application/pdf',
+    buffer: previewBytes,
+  })
   await page.getByRole('button', { name: 'Simpan buku', exact: true }).click()
   await page
     .getByRole('alert')
@@ -110,13 +127,13 @@ try {
   failUpload = false
   await page.getByRole('button', { name: 'Simpan buku', exact: true }).click()
   await page.waitForURL('**/admin?notice=saved')
-  assert.equal(uploadCount, 2)
-  assert.equal(prepareCount, 2)
-  assert.equal(completeCount, 1)
+  assert.equal(uploadCount, 3)
+  assert.equal(prepareCount, 3)
+  assert.equal(completeCount, 2)
   assert.ok(apiSizes.every((length) => length < 4096))
   assert.ok(!mutations.some((pathname) => pathname.endsWith('/materials/product-knowledge')))
   console.log(
-    'PASS: port 3000 browser sends 10.6 MiB directly to mocked Supabase; app requests <4 KiB; failure retains file and retry completes. No live mutations.',
+    'PASS: port 3000 browser uploads PPT and PDF preview directly to mocked Supabase; app requests stay small; failure retains files and retry completes. No live mutations.',
   )
 } finally {
   await browser.close()

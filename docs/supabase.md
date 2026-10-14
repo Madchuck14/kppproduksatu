@@ -41,7 +41,7 @@ sementara: preservation, default NULL, retry, constraint, RPC, dan scope. Browse
 dengan API fixture; verifikasi ini tidak menggantikan persistensi/Auth/RLS Supabase live.
 Migration belum diterapkan ke database live oleh agent.
 
-## Flyer PPT publik dan preview PPTX di browser
+## Flyer PPT publik dan preview gambar
 
 Persyaratan terbaru: Flyer dan PPT Produk milik buku published dapat dibuka tanpa login.
 Hanya Dummy Buku yang memerlukan sesi terverifikasi. Terapkan migration sebelumnya, lalu
@@ -51,16 +51,12 @@ memeriksa status published, UUID buku, folder Flyer/PPT, dan path asli yang ters
 Dummy, draft, bucket lain, dan objek tanpa referensi tidak mendapat akses anonim. Writer
 tetap membutuhkan Editor dan scope jenjang; tidak ada perubahan UUID, metadata, atau file.
 
-Editor mengunggah satu PPT/PPTX, maksimal 50 MB, tanpa mengekspor gambar slide. PPTX dirender
-langsung dalam browser dengan PptxViewJS 1.1.9, JSZip 3.10.1, dan Chart.js 4.5.1 yang dibundel
-lokal. Library mendukung PPTX; PPT lama tetap dapat diunduh dan harus disimpan ulang sebagai
-PPTX untuk preview. Materi PDF lama tetap menggunakan viewer PDF yang tersedia. Tidak ada
-iframe Microsoft, pengiriman file ke pihak ketiga, layanan konversi, atau container tambahan.
+Editor mengunggah PPT/PPTX maksimal 50 MB untuk unduhan dan PDF maksimal 20 MB untuk tampilan.
+Tidak ada iframe Microsoft, converter, atau layanan viewer pihak ketiga.
 
 Endpoint publik menggunakan client anonim dan query published. Dummy menggunakan
 `auth.getUser()` sebelum query file. Status materi hanya mengembalikan boolean/format.
-URL preview PPTX berlaku 600 detik agar bundle viewer sempat dimuat; URL Dummy/Flyer/unduhan
-berlaku 60 detik. Browser mengambil seluruh PPTX sekali untuk navigasi slide. Mode demo
+URL Dummy, Flyer, PDF tampilan, dan unduhan berlaku 60 detik. Mode demo
 mengembalikan status berkas kosong dan 404 untuk Flyer/PPT; Dummy anonim tetap 401.
 
 Urutan rollout:
@@ -72,9 +68,8 @@ Urutan rollout:
 3. Verifikasi anon dapat membuat signed URL/mengunduh Flyer/PPT untuk buku published,
    tetapi Dummy/draft/objek lain ditolak. Periksa Sales tidak dapat menulis dan Editor
    tetap dibatasi jenjang. Uji unpublish menghilangkan penerbitan URL baru.
-4. Deploy aplikasi. Uji unggahan satu PPTX, rendering file klien, navigasi/zoom, login
-   Dummy dengan returnTo, dan unduhan format asli. File/font/fitur PowerPoint yang kompleks
-   dapat berbeda dari hasil desktop; pengujian generated PPTX tidak membuktikan fidelity klien.
+4. Deploy aplikasi. Uji unggahan pasangan PDF dan PPT/PPTX, tombol Tampilkan, login Dummy dengan
+   returnTo, dan unduhan PowerPoint asli.
 
 Rollback: deploy aplikasi sebelumnya, lalu jalankan
 `supabase/rollback/202610140002_private_promotional_materials.sql`. Script memulihkan policy
@@ -86,17 +81,29 @@ historis berikut menjelaskan versi sebelum migration publik ini.
 Verifikasi lokal:
 
 ```powershell
-node scripts/verify-presentation.mjs
+node scripts/verify-material-upload.mjs
 $env:PGLITE_MODULE_PATH = '<temporary-install>/node_modules/@electric-sql/pglite/dist/index.js'
 node scripts/verify-public-materials.mjs
-$env:PLAYWRIGHT_MODULE_PATH = '<temporary-install>/node_modules/playwright/index.mjs'
-$env:PPTXGENJS_MODULE_PATH = '<temporary-install>/node_modules/pptxgenjs/dist/pptxgen.cjs.js'
-node scripts/verify-pptx-viewer.mjs
 ```
 
-Script browser menghasilkan PPTX dengan teks/gambar/tabel/grafik dan mengintersep file/API;
-script RLS memakai PostgreSQL sementara dengan Auth/Storage simulasi. Tidak mengunggah data
-ke Supabase live. Migration dan Auth/Storage live belum diterapkan/diverifikasi oleh agent.
+Script RLS memakai PostgreSQL sementara dengan Auth/Storage simulasi. Tidak mengunggah data ke
+Supabase live.
+
+## PDF tampilan dan PowerPoint unduhan
+
+Setelah migration converter `202610140004_server_presentation_previews.sql` yang sudah diterapkan,
+jalankan `supabase/migrations/202610140005_manual_product_knowledge_pdf.sql`. Migration menambah
+`product_knowledge_preview_path`, mengarsipkan metadata converter pada schema privat
+`catalog_cleanup_archive`, lalu menghapus kolom status dan slide yang tidak lagi digunakan.
+
+Editor mendapat dua input independen. Folder `product-knowledge-preview` hanya menerima PDF
+maksimal 20 MB untuk tombol **Tampilkan**. Folder `product-knowledge` menerima PPT/PPTX maksimal
+50 MB untuk tombol **Unduh PowerPoint**. Keduanya dapat dibaca anonim hanya pada buku published;
+Dummy Buku tetap membutuhkan login. Tidak diperlukan port 3001 atau environment converter.
+
+Rollback `supabase/rollback/202610140005_restore_presentation_converter_columns.sql` mengembalikan
+metadata converter dari arsip tanpa menghapus PDF tampilan. Object gambar lama juga tidak dihapus
+otomatis; bersihkan terpisah setelah memastikan rollback tidak diperlukan.
 
 ## Penghapusan kolom produk lama (14 Oktober 2026)
 
@@ -279,56 +286,6 @@ Jika migration akses akun pernah dijalankan, lanjutkan dengan
 baca menjadi publik hanya untuk materi milik buku published. Ini merupakan langkah historis;
 migration `202610130004_flyer_slide_previews.sql` berikutnya menggantinya dengan akses authenticated.
 Bucket tetap privat; object path harus sama dengan path yang tersimpan pada row produk.
-
-## Preview PPT Produk
-
-Terapkan migration sebelumnya termasuk `202610130004_flyer_slide_previews.sql`, lalu
-`supabase/migrations/202610130006_product_presentation_previews.sql` sebelum deploy aplikasi.
-Migration koreksi transaksional dapat diulang dan menambah `products.product_knowledge_slide_paths`
-sebagai daftar berurutan path PNG/JPG privat untuk PPT Produk. UUID, metadata/file lama, dan
-materi lain tetap utuh; tidak ada konversi, pemindahan konten, atau penghapusan file otomatis.
-Migration 004 merupakan implementasi awal yang salah menempatkan preview PPT pada Flyer;
-riwayatnya dipertahankan agar database yang sudah menerapkannya tetap dapat diperbarui.
-
-Migration memperluas kebijakan upload Editor untuk folder `presentation-slides`, memeriksa scope
-jenjang yang sama, dan mempertahankan pembacaan authenticated untuk seluruh materi.
-Hanya file yang terdaftar pada buku published dapat dibaca Sales/pengguna login;
-Editor tetap dapat mengelola materi dalam scope. Signed URL yang sudah terbit tetap berlaku
-sampai kedaluwarsa, maksimal 60 detik untuk URL yang dibuat aplikasi.
-
-Editor memilih PPT/PPTX dan gambar hasil ekspor PNG/JPG: maksimal 20 slide, 2 MB per gambar.
-Form menampilkan urutan numerik nama file dan tombol Naik/Turun. PPT Produk PPT/PPTX maksimal 50 MB;
-upload baru wajib disertai gambar pada form. Endpoint `POST /api/admin/books/:id/presentation-slides`
-menerima multipart dengan field `slides` berulang sesuai urutan. Total request dibatasi 41 MB;
-set preview diganti hanya setelah semua file berhasil diunggah. File PPT baru mengosongkan
-preview lama sehingga kegagalan upload gambar tidak menampilkan slide dari PPT sebelumnya.
-File lama yang tidak terpakai tetap memerlukan pembersihan operasional terpisah.
-Flyer kembali menerima PDF 20 MB; penggantian Flyer mengosongkan metadata preview Flyer lama.
-Jika sempat mengunggah PPT sebagai Flyer, unggah ulang PDF pada slot Flyer serta PPT/gambar
-pada slot PPT Produk. Jangan memindahkan file otomatis karena kedua slot memiliki makna berbeda.
-
-Urutan rollout: backup dan catat UUID/jumlah buku, jalankan migration, verifikasi data lama,
-lalu deploy aplikasi. Pada project pengujian periksa upload PPT/PPTX dan gambar, urutan setelah
-reload, zoom/fullscreen, nama/format unduhan, penolakan gambar palsu/lebih dari batas, akses
-anonim ditolak, Sales dapat membaca published, draft ditolak, serta Editor di luar scope ditolak.
-Periksa RLS Storage langsung untuk original dan slide; API saja tidak membuktikan kebijakan DB.
-
-Rollback ke versi sebelum koreksi dengan mempertahankan kolom/data/policy privat. Metadata dan
-folder preview Flyer lama dipertahankan untuk kompatibilitas; versi baru tidak memakainya.
-Jangan drop kolom atau membuka kembali akses anonim sebagai rollback. Hindari memakai aplikasi
-lama dan baru bersamaan untuk mengedit slot materi yang berbeda. Migration koreksi ini belum
-dijalankan oleh agent pada Supabase live. Pengguna mengonfirmasi SQL koreksi telah diterapkan
-di Supabase pada sesi ini; agent belum memverifikasi schema/RLS live. File koreksi awal bernama
-`202610130005_product_presentation_previews.sql` kini memakai versi `006` agar tidak berbenturan
-dengan migration `202610130005_catalog_browse_book_details.sql` dari UI terbaru. Isi SQL koreksi
-tetap sama dan idempotent; jangan menganggap migration browse sudah diterapkan hanya karena
-versi `005` pernah dicatat. Periksa riwayat migration sebelum menyelaraskan deployment.
-
-Verifikasi tanpa database: `node scripts/verify-presentation.mjs` menguji validasi format dan alur
-preview/unduhan dengan stub repository/Storage. `node scripts/verify-presentation-smoke.mjs` memakai
-server lokal di port 3100 (ubah lewat `PRESENTATION_TEST_BASE_URL`) untuk memeriksa SSR, route katalog,
-login, dan penolakan akses materi/admin anonim. Keduanya tidak membuktikan Auth/RLS/upload live
-atau interaksi browser.
 
 ## Divisi, sinopsis, dan target pasar
 
