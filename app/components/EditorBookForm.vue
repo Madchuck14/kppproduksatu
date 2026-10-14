@@ -13,6 +13,7 @@ const props = defineProps<{
   book?: EditorBook
   account: AccountSession
 }>()
+const storageClient = useSupabaseClient()
 const savedId = ref(props.book?.id)
 const materials = [
   { kind: 'dummy', label: 'Dummy Buku', help: 'PDF, maksimal 20 MB' },
@@ -167,20 +168,35 @@ async function save() {
       if (!material) continue
       const label = kind === 'dummy' ? 'Dummy Buku' : kind === 'flyer' ? 'flyer' : 'PPT Produk'
       progress.value = `Mengunggah ${label}...`
-      await $fetch(`/api/admin/books/${book.id}/materials/${kind}`, {
+      const type = materialType(kind, material)
+      const endpoint = `/api/admin/books/${book.id}/materials/${kind}`
+      const upload = await $fetch<{ path: string; token: string }>(`${endpoint}/upload-url`, {
         method: 'POST',
-        body: material,
-        headers: { 'Content-Type': materialType(kind, material) },
+        body: { type, size: material.size },
+      })
+      const { error: uploadError } = await storageClient.storage
+        .from('book-materials')
+        .uploadToSignedUrl(upload.path, upload.token, new Blob([material], { type }), {
+          contentType: type,
+        })
+      if (uploadError)
+        throw new Error(`Unggahan ${label} ke penyimpanan gagal. Periksa koneksi dan coba lagi.`)
+      progress.value = `Memeriksa ${label}...`
+      await $fetch(`${endpoint}/complete`, {
+        method: 'POST',
+        body: { path: upload.path, type, size: material.size },
       })
       materialFiles[kind] = null
     }
     await navigateTo('/admin?notice=saved')
   } catch (error) {
-    const detail = (error as { data?: { statusMessage?: string } }).data?.statusMessage
+    const detail =
+      (error as { data?: { statusMessage?: string } }).data?.statusMessage ??
+      (error instanceof Error && error.message.startsWith('Unggahan ') ? error.message : undefined)
     if (!metadataSaved && detail === 'Nama buku telah terpakai')
       window.alert('Nama buku telah terpakai.')
     message.value = metadataSaved
-      ? 'Informasi buku sudah tersimpan, tetapi satu atau lebih berkas gagal diunggah. Coba simpan kembali untuk mengulang unggahan.'
+      ? `Informasi buku sudah tersimpan. ${detail ?? 'Satu atau lebih berkas gagal diunggah.'} Coba simpan kembali untuk mengulang unggahan.`
       : (detail ?? 'Buku gagal disimpan. Silakan coba lagi.')
   } finally {
     busy.value = false

@@ -83,8 +83,7 @@ export function validateMaterialBytes(bytes: Uint8Array, extension: string) {
     })
 }
 
-export async function readBookMaterial(event: H3Event, kind: MaterialKind) {
-  const type = (getHeader(event, 'content-type') ?? '').split(';')[0]?.trim() ?? ''
+export function bookMaterialFormat(kind: MaterialKind, type: string) {
   const extension =
     kind === 'product-knowledge'
       ? (
@@ -103,6 +102,12 @@ export async function readBookMaterial(event: H3Event, kind: MaterialKind) {
         kind === 'product-knowledge' ? 'Gunakan berkas PPT atau PPTX' : 'Gunakan berkas PDF',
     })
   const maxSize = kind === 'product-knowledge' ? 50 * 1024 * 1024 : 20 * 1024 * 1024
+  return { type, extension, maxSize }
+}
+
+export async function readBookMaterial(event: H3Event, kind: MaterialKind) {
+  const type = (getHeader(event, 'content-type') ?? '').split(';')[0]?.trim() ?? ''
+  const { extension, maxSize } = bookMaterialFormat(kind, type)
   const bytes = await readUploadBytes(event, maxSize)
   validateMaterialBytes(bytes, extension)
   return { bytes, type, extension }

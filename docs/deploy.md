@@ -15,6 +15,28 @@ Build lokal tidak membuktikan deployment Vercel atau database/auth/RLS Supabase 
 
 Referensi: https://vercel.com/docs/frameworks/full-stack/nuxt dan https://vercel.com/docs/project-configuration/vercel-json
 
+### Unggahan materi besar
+
+Vercel Functions membatasi body request hingga 4,5 MB. Form editor mengunggah Flyer,
+Dummy Buku, dan PPT Produk langsung dari browser ke Supabase Storage menggunakan
+signed upload token; API aplikasi hanya menerima JSON kecil untuk persiapan dan
+penyelesaian. Batas aplikasi tetap 20 MB untuk PDF dan 50 MB untuk PowerPoint.
+Sampul maksimal 2 MB tetap melalui API aplikasi.
+
+Kedua endpoint memeriksa sesi editor dan lingkup buku. Endpoint penyelesaian memeriksa
+path, ukuran, MIME, dan isi berkas dari Storage sebelum mengganti referensi materi.
+Bucket tetap private, dan aturan akses materi yang sudah ada tetap berlaku.
+Unggahan terputus atau gagal validasi dapat menyisakan objek tanpa referensi; objek
+tersebut tidak dapat dibaca anonim. Hapus objek tanpa referensi melalui prosedur
+pemeliharaan Storage setelah memastikan tidak dipakai oleh produk.
+
+Setelah push perubahan ini, deploy commit terbaru di Vercel dan uji dengan akun
+editor serta berkas asli. Tidak diperlukan migrasi baru untuk perubahan transport
+ini; kebijakan Storage editor yang terdokumentasi di `docs/supabase.md` harus sudah
+terpasang.
+
+Referensi: https://vercel.com/docs/functions/limitations
+
 ## Cloudflare Workers staging
 
 Setelah `npm install` dan setup Supabase selesai:

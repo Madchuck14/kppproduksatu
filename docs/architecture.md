@@ -420,3 +420,21 @@ tetap diverifikasi server-side pada endpoint dan halaman terproteksi. Tidak ada 
 untuk data akun dan setiap respons tetap terikat pengguna aktif. Nuxt DevTools dinonaktifkan
 untuk mengurangi overhead development; Vite/HMR tetap tersedia. Latensi Supabase tetap
 mempengaruhi SSR dan hasil pengukuran lokal bukan jaminan performa deployment produksi.
+
+### Transport unggahan materi
+
+Form editor memakai `POST /api/admin/books/:id/materials/:kind/upload-url` untuk
+meminta path unik dan signed upload token, kemudian `uploadToSignedUrl` untuk
+mengirim berkas langsung ke Supabase Storage. Setelah unggah berhasil,
+`POST /api/admin/books/:id/materials/:kind/complete` memeriksa ulang akses editor,
+lingkup buku, path, metadata Storage, serta signature berkas sebelum menyimpan
+referensi materi. API hanya menerima JSON kecil sehingga unggahan materi tidak
+melewati batas body Vercel Functions. Endpoint POST biner sebelumnya dipertahankan
+untuk kompatibilitas; form baru tidak memakainya. Sampul tetap memakai endpoint lama.
+
+`node scripts/verify-material-upload.mjs` memeriksa alur server dengan fixture
+Storage, termasuk berkas 10,6 MiB dan kegagalan yang mempertahankan materi lama.
+`PLAYWRIGHT_MODULE_PATH` menunjuk modul Playwright eksternal untuk
+`node scripts/verify-material-upload-browser.mjs`; uji browser memakai port 3000
+(default) atau `MATERIAL_TEST_BASE_URL`, dan mengintersep semua mutasi admin serta
+unggahan Storage. Kedua uji tidak membuktikan unggahan atau RLS Supabase live.
