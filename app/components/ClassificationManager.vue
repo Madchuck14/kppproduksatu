@@ -91,7 +91,12 @@ async function save() {
 </script>
 
 <template>
-  <UButton type="button" variant="outline" :disabled="!levels.length" @click="open">
+  <UButton
+    type="button"
+    class="classification-manager-button"
+    :disabled="!levels.length"
+    @click="open"
+  >
     Edit Klasifikasi Buku
   </UButton>
   <dialog

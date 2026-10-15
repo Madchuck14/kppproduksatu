@@ -39,6 +39,10 @@ dan menolak opsi yang dipakai buku termasuk draf di luar scope.
 Migration `202610150006_delete_all_book_classifications.sql` menghapus perlindungan opsi
 awal: semua opsi dapat dihapus permanen dari registry melalui konfirmasi yang sama.
 Tidak ada alur ubah nama opsi. `GET /api/catalog/classifications` membaca opsi publik, bukan data buku draf.
+Kartu divisi tambahan memakai 12 pilihan ikon Lucide dan delapan palet pastel dari
+`shared/utils/book-divisions.ts`. Ikon dan palet dipilih secara pseudo-acak berdasarkan kode
+divisi, terpisah satu sama lain, sehingga tetap konsisten pada SSR, hydration, dan refresh.
+Kombinasi dapat berulang; enam divisi awal mempertahankan tampilan semula.
 Form tambah/edit, filter mapel publik/Editor, nama divisi detail, dan `/divisi` memakai
 registry ini. Kurikulum tetap menerima teks lama dan menyediakan saran dari registry.
 Landing memakai irisan enam kode awal dan registry saat ini sehingga divisi yang dihapus

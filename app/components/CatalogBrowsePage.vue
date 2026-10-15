@@ -324,6 +324,62 @@ h1 {
   --division-icon-bg: #eee8d3;
   --division-shape: #eee7cf;
 }
+.division-teal {
+  --division-bg: #e6f7f5;
+  --division-fg: #17645f;
+  --division-border: #bce2dd;
+  --division-icon-bg: #cff0ea;
+  --division-shape: #c5eae5;
+}
+.division-coral {
+  --division-bg: #fff0eb;
+  --division-fg: #963f32;
+  --division-border: #f1cfc4;
+  --division-icon-bg: #ffe0d6;
+  --division-shape: #f8d9ce;
+}
+.division-indigo {
+  --division-bg: #eef0ff;
+  --division-fg: #48458c;
+  --division-border: #d5d8f4;
+  --division-icon-bg: #dfe3fc;
+  --division-shape: #d9ddf7;
+}
+.division-lime {
+  --division-bg: #f2f7e5;
+  --division-fg: #536924;
+  --division-border: #dbe7bc;
+  --division-icon-bg: #e5efcd;
+  --division-shape: #e0eac5;
+}
+.division-fuchsia {
+  --division-bg: #fbedf8;
+  --division-fg: #883e7a;
+  --division-border: #eecde6;
+  --division-icon-bg: #f6ddf0;
+  --division-shape: #efd5e9;
+}
+.division-sky {
+  --division-bg: #eaf7fc;
+  --division-fg: #28647e;
+  --division-border: #c7e4ef;
+  --division-icon-bg: #d7eff8;
+  --division-shape: #cfe8f2;
+}
+.division-amber {
+  --division-bg: #fff7e3;
+  --division-fg: #825b16;
+  --division-border: #efdfb3;
+  --division-icon-bg: #ffedc4;
+  --division-shape: #f5e5bc;
+}
+.division-slate {
+  --division-bg: #eef2f6;
+  --division-fg: #45566b;
+  --division-border: #d4dee8;
+  --division-icon-bg: #dfe7ef;
+  --division-shape: #d8e1eb;
+}
 .collection-heading,
 .shelf-heading {
   display: flex;

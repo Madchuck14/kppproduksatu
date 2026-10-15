@@ -622,7 +622,8 @@ const fieldClass =
   flex-wrap: wrap;
   gap: 10px;
 }
-.featured-manager-button {
+.featured-manager-button,
+:deep(.classification-manager-button) {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
@@ -637,7 +638,8 @@ const fieldClass =
   line-height: 24px;
   white-space: nowrap;
 }
-.featured-manager-button:hover {
+.featured-manager-button:hover,
+:deep(.classification-manager-button:hover) {
   background: #f4f8f5;
 }
 .featured-dialog {

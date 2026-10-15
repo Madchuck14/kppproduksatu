@@ -1,4 +1,4 @@
-import { bookDivisions } from '#shared/utils/book-divisions'
+import { getDivisionAppearance } from '#shared/utils/book-divisions'
 
 export async function useClassifications() {
   const { data, error, refresh, status } = await useFetch('/api/catalog/classifications', {
@@ -10,12 +10,7 @@ export async function useClassifications() {
       .map((item) => ({
         code: item.code,
         name: item.name,
-        icon:
-          bookDivisions.find((division) => division.code === item.code)?.icon ??
-          'i-lucide-book-open',
-        style:
-          bookDivisions.find((division) => division.code === item.code)?.style ??
-          'division-vocational',
+        ...getDivisionAppearance(item.code),
       })),
   )
   const curricula = computed(() =>
