@@ -1,5 +1,63 @@
 # Setup Supabase untuk demo online
 
+## URL detail dengan kode buku
+
+Route detail baru menggunakan kode buku sebagai identifier yang terlihat, misalnya
+`/products/123456`. Kode buku tetap unique business key; UUID internal dan seluruh foreign key
+tidak berubah. API detail dan materi juga menerima slug lama agar bookmark tidak langsung rusak.
+Judul buku tidak lagi harus unik sehingga edisi dengan judul sama dapat dibuat pada tahun berbeda.
+
+Sebelum deploy aplikasi, terapkan migration
+`supabase/migrations/202610150002_allow_duplicate_book_titles.sql` setelah migration katalog
+Editor `202610050002_editor_catalog.sql`. Migration hanya menghapus unique index judul;
+unique index kode buku dan unique constraint slug tetap berlaku. Slug buku baru diberi kode buku
+sebagai akhiran. Slug yang sudah ada dipertahankan ketika buku diedit.
+
+Untuk deployment existing, backup schema terlebih dahulu, terapkan migration melalui mekanisme
+yang mencatat versinya, lalu verifikasi judul duplikat dengan kode berbeda, kode duplikat ditolak,
+link baru `/products/{kode-buku}`, serta link slug lama. Belum diterapkan ke database live oleh
+agent.
+
+## Buku pilihan beranda
+
+Sebelum deploy pengelolaan buku pilihan, terapkan migration
+`supabase/migrations/202610150001_featured_books_limit.sql` setelah migration katalog dan Editor.
+Migration mempertahankan flag `products.featured` yang sudah ada, menambahkan batas global
+delapan buku melalui trigger database, serta fungsi RPC untuk membaca jumlah dan menyimpan
+perubahan pilihan secara atomik. Perubahan massal Editor hanya menyentuh buku dalam jenjang
+yang boleh dikelolanya; role Editor diperiksa ulang di fungsi database. Sales tidak dapat
+memanggil fungsi tersebut.
+
+Carousel beranda mengambil buku `featured` melalui API katalog publik, yang tetap membatasi
+hasil ke `published=true`. Buku draf dapat ditandai dari modal, tetapi baru muncul setelah
+dipublikasikan. Modal dashboard menjadi satu-satunya tempat Editor memilih buku dari halaman
+katalog berpaginasi dan mencari judul,
+kode, atau penulis. Jumlah terpilih di jenjang lain tetap dihitung terhadap batas global;
+Editor tidak dapat mengubah pilihan di luar scope-nya. Editor super dapat mengelola semua jenjang.
+
+Rollout: periksa jumlah pilihan yang sudah ada dengan
+`select count(*) from public.products where featured;`. Deploy migration lebih dulu, lalu
+aplikasi. Jika jumlah lama lebih dari delapan, gunakan modal sebagai Editor super untuk
+mengurangi pilihan menjadi delapan sebelum mengubah buku pilihan lainnya. Verifikasi perubahan
+lewat modal, form edit satu buku, batas 8, batas scope Editor, serta tampilan carousel hanya
+untuk buku published.
+Migration belum diterapkan ke database live oleh agent.
+
+Rollback: deploy aplikasi sebelumnya. Trigger dan fungsi dapat dipertahankan tanpa mengganggu
+flag pilihan yang ada; jika perlu menghapusnya, lakukan melalui migration rollback terpisah
+setelah memastikan tidak ada versi aplikasi yang memanggil RPC tersebut.
+
+## Mengembalikan opsi mapel dan divisi tetap
+
+Jika migration opsi mapel/divisi dinamis sudah diterapkan tetapi tidak jadi digunakan, jangan
+mengedit atau menghapus migration yang sudah tercatat. Setelah memastikan tidak ada buku yang
+memakai nilai di luar daftar tetap lama, terapkan
+`supabase/migrations/202610150003_restore_fixed_catalog_options.sql` sebagai migration baru.
+Migration ini mengembalikan constraint mapel dan divisi, memulihkan RPC katalog dengan daftar
+divisi tetap, lalu menghapus tabel opsi dinamis. Opsi tambahan yang hanya tersimpan di tabel
+tersebut akan hilang. Jika data produk tidak cocok dengan constraint lama, transaksi akan gagal
+dan seluruh rollback dibatalkan; koreksi nilai produk sebelum mencoba kembali.
+
 ## Kurikulum dan ISBN buku
 
 Terapkan `supabase/migrations/202610140003_book_curriculum_isbn.sql` setelah migration sebelumnya,
@@ -583,7 +641,8 @@ urutan ranking tetap berasal dari statistik. Tetap terapkan migration
 `202610130005_catalog_browse_book_details.sql` untuk menghindari query tambahan; jangan reset
 counter atau ledger untuk memperbaiki kontrak metadata. Perubahan ini tidak menulis database.
 Endpoint
-`POST /api/products/:slug/access` menerima `{ "visitor": "UUID" }`, memvalidasi Zod, dan
+`POST /api/products/:identifier/access` menerima kode buku atau slug lama serta
+`{ "visitor": "UUID" }`, memvalidasi Zod, dan
 tidak dicache. Client mencatat setelah detail berhasil tampil; kegagalan statistik tidak
 menghalangi detail. Storage browser yang dinonaktifkan menyebabkan akses tidak dicatat.
 Ranking kumulatif bukan jumlah manusia unik: browser berbeda, penghapusan storage, dan

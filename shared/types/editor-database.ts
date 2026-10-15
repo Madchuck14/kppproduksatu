@@ -40,6 +40,15 @@ export type EditorDatabase = {
       }
     }
     Views: Record<never, never>
-    Functions: Record<never, never>
+    Functions: {
+      featured_products_count: {
+        Args: Record<never, never>
+        Returns: number
+      }
+      set_featured_books: {
+        Args: { selected_book_ids: string[] }
+        Returns: number
+      }
+    }
   }
 }

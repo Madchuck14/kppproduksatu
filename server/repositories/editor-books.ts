@@ -3,8 +3,13 @@ import type { H3Event } from 'h3'
 import type { EditorDatabase } from '#shared/types/editor-database'
 import { z } from 'zod'
 import type { AccountSession } from '#shared/types/account'
-import type { EditorBook, EditorDashboard } from '#shared/types/editor'
-import type { BookInput, EditorQuery } from '#shared/schemas/editor'
+import type {
+  EditorBook,
+  EditorDashboard,
+  FeaturedBookOption,
+  FeaturedBooksPage,
+} from '#shared/types/editor'
+import type { BookInput, EditorQuery, FeaturedBooksQuery } from '#shared/schemas/editor'
 import {
   bookSubjectSchema,
   bookHighlightsSchema,
@@ -48,12 +53,12 @@ const rowSchema = z.object({
 
 function fail(error: { code?: string; message?: string } | null) {
   if (!error) return
+  if (error.code === 'P0001' && error.message === 'featured_product_limit_exceeded')
+    throw createError({ statusCode: 409, statusMessage: 'Maksimal 8 buku pilihan.' })
   if (error.code === '23505')
     throw createError({
       statusCode: 409,
-      statusMessage: error.message?.includes('products_title_unique')
-        ? 'Nama buku telah terpakai'
-        : 'Kode buku atau alamat halaman sudah digunakan',
+      statusMessage: 'Kode buku atau alamat halaman sudah digunakan',
     })
   if (error.code === '42501')
     throw createError({
@@ -65,6 +70,98 @@ function fail(error: { code?: string; message?: string } | null) {
     statusMessage:
       'Data buku belum dapat diproses. Pastikan migration Editor, divisi, sinopsis, target pasar, kurikulum, dan ISBN sudah diterapkan.',
   })
+}
+
+const featuredBookSchema = z.object({
+  id: z.string().uuid(),
+  slug: z.string(),
+  title: z.string(),
+  author: z.string(),
+  book_code: z.string().nullable(),
+  education_level: educationLevelSchema.nullable(),
+  image_path: z.string().nullable(),
+  featured: z.boolean(),
+  published: z.boolean(),
+})
+
+export async function listFeaturedBooks(
+  event: H3Event,
+  account: AccountSession,
+  options: FeaturedBooksQuery,
+): Promise<FeaturedBooksPage> {
+  const client = await serverSupabaseClient<EditorDatabase>(event)
+  const pageSize = 12
+  const search = options.q.replace(/[^\p{L}\p{N}\s._-]/gu, '').trim()
+  const scopedBooks = () => {
+    let query = client
+      .from('products')
+      .select('id,slug,title,author,book_code,education_level,image_path,featured,published', {
+        count: 'exact',
+      })
+    if (!account.isSuper) query = query.in('education_level', account.educationLevels)
+    if (search)
+      query = query.or(
+        `title.ilike.%${search}%,book_code.ilike.%${search}%,author.ilike.%${search}%`,
+      )
+    return query
+  }
+  const listQuery = scopedBooks()
+    .order('title')
+    .order('id')
+    .range((options.page - 1) * pageSize, options.page * pageSize - 1)
+  const selectedQuery = () => {
+    let query = client.from('products').select('id').eq('featured', true)
+    if (!account.isSuper) query = query.in('education_level', account.educationLevels)
+    return query
+  }
+  const [list, selected, count] = await Promise.all([
+    listQuery,
+    selectedQuery(),
+    client.rpc('featured_products_count'),
+  ])
+  if (count.error?.code === 'PGRST202')
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Migration pengelolaan buku pilihan belum diterapkan',
+    })
+  for (const result of [list, selected, count]) fail(result.error)
+  const rows = z.array(featuredBookSchema).parse(list.data ?? [])
+  const selectedRows = z.array(z.object({ id: z.string().uuid() })).parse(selected.data ?? [])
+  const selectedCount = z.number().int().nonnegative().parse(count.data)
+  const config = useRuntimeConfig(event)
+  const books: FeaturedBookOption[] = rows.map((row) => ({
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    author: row.author,
+    bookCode: row.book_code,
+    educationLevel: row.education_level,
+    imageUrl: getProductImageUrl(config.public.supabase.url, row.image_path),
+    featured: row.featured,
+    published: row.published,
+  }))
+  return {
+    books,
+    selectedIds: selectedRows.map((row) => row.id),
+    selectedCount,
+    total: list.count ?? 0,
+    page: options.page,
+    pageSize,
+  }
+}
+
+export async function saveFeaturedBooks(event: H3Event, bookIds: string[]) {
+  const client = await serverSupabaseClient<EditorDatabase>(event)
+  const { data, error } = await client.rpc('set_featured_books', {
+    selected_book_ids: bookIds,
+  })
+  if (error?.code === 'PGRST202')
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Migration pengelolaan buku pilihan belum diterapkan',
+    })
+  fail(error)
+  return { selectedCount: z.number().int().nonnegative().parse(data) }
 }
 
 function mapBook(event: H3Event, value: unknown): EditorBook {
@@ -101,18 +198,20 @@ function mapBook(event: H3Event, value: unknown): EditorBook {
 }
 
 function makeSlug(title: string, bookCode: string) {
-  const slug = title
+  const suffix = bookCode.toLowerCase()
+  const maxTitleLength = 99 - suffix.length
+  const titleSlug = title
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
-    .slice(0, 100)
+    .slice(0, maxTitleLength)
     .replace(/-$/g, '')
-  return slug || `buku-${bookCode}`
+  return `${titleSlug || 'buku'}-${suffix}`
 }
 
-function toRow(input: BookInput) {
+function toRow(input: BookInput, existingSlug?: string) {
   return {
     book_code: input.bookCode,
     education_level: input.educationLevel,
@@ -120,7 +219,7 @@ function toRow(input: BookInput) {
     subject: input.subject,
     ...(input.grade !== undefined ? { grade: input.grade } : {}),
     title: input.title,
-    slug: makeSlug(input.title, input.bookCode),
+    slug: existingSlug ?? makeSlug(input.title, input.bookCode),
     author: input.author,
     ...(input.curriculum !== undefined ? { curriculum: input.curriculum } : {}),
     ...(input.isbn !== undefined ? { isbn: input.isbn } : {}),
@@ -129,7 +228,6 @@ function toRow(input: BookInput) {
     ...(input.highlights !== undefined ? { highlights: input.highlights } : {}),
     price: input.price,
     publication_year: input.publicationYear,
-    featured: input.featured,
     published: input.published,
   }
 }
@@ -206,19 +304,13 @@ export async function saveEditorBook(
   input: BookInput,
   id?: string,
 ) {
-  if (id) await getEditorBook(event, account, id)
+  const existingBook = id ? await getEditorBook(event, account, id) : null
   assertBookScope(account, input.educationLevel)
   const client = await serverSupabaseClient<EditorDatabase>(event)
-  const escapedTitle = input.title.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
-  let duplicateQuery = client.from('products').select('id,title').ilike('title', escapedTitle)
-  if (id) duplicateQuery = duplicateQuery.neq('id', id)
-  const duplicate = await duplicateQuery.limit(1).maybeSingle()
-  fail(duplicate.error)
-  if (duplicate.data)
-    throw createError({ statusCode: 409, statusMessage: 'Nama buku telah terpakai' })
+  const row = toRow(input, existingBook?.slug)
   const query = id
-    ? client.from('products').update(toRow(input)).eq('id', id)
-    : client.from('products').insert(toRow(input))
+    ? client.from('products').update(row).eq('id', id)
+    : client.from('products').insert(row)
   const { data, error } = await query.select(columns).maybeSingle()
   fail(error)
   if (!data)

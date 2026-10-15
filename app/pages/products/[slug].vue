@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PresentationFormat } from '#shared/types/presentation'
 import { bookDivisions } from '#shared/utils/book-divisions'
+import { getProductIdentifier, getProductPath } from '#shared/utils/product-path'
 const route = useRoute()
 const config = useRuntimeConfig()
 const user = useSupabaseUser()
@@ -25,6 +26,8 @@ if (error.value || !product.value) {
 
 const { data: catalog, error: relatedError } = await useFetch('/api/products')
 useBookAccess(() => product.value?.slug)
+const getProductApiPath = (suffix = '') =>
+  `/api/products/${encodeURIComponent(getProductIdentifier(product.value!))}${suffix}`
 const { data: resourceStatus, error: resourceError } = await useFetch<ResourceStatus>(
   () => `/api/products/${encodeURIComponent(String(route.params.slug))}/resources`,
 )
@@ -68,7 +71,7 @@ async function openPdfResource(resource: (typeof resources)[number]) {
   if (resource.id === 'dummy' && !user.value) {
     await navigateTo({
       path: '/login',
-      query: { returnTo: `/products/${product.value!.slug}#${resource.id}` },
+      query: { returnTo: `${getProductPath(product.value!)}#${resource.id}` },
     })
     return
   }
@@ -81,7 +84,7 @@ async function openPdfResource(resource: (typeof resources)[number]) {
   pdfDialog.value?.showModal()
   try {
     const result = await $fetch<{ url: string }>(
-      `/api/products/${encodeURIComponent(product.value!.slug)}/resources/${resource.id}?preview=1`,
+      getProductApiPath(`/resources/${resource.id}?preview=1`),
     )
     if (request === pdfRequest) {
       pdfViewerUrl.value = result.url
@@ -91,7 +94,7 @@ async function openPdfResource(resource: (typeof resources)[number]) {
       closePdfDialog()
       await navigateTo({
         path: '/login',
-        query: { returnTo: `/products/${product.value!.slug}#${resource.id}` },
+        query: { returnTo: `${getProductPath(product.value!)}#${resource.id}` },
       })
       return
     }
@@ -205,26 +208,6 @@ useSeoMeta({
         </dl>
       </div>
     </div>
-    <section aria-label="Informasi lengkap buku" class="detail-content">
-      <div>
-        <h2>Sinopsis</h2>
-        <p>{{ product.synopsis || 'Informasi sinopsis buku belum tersedia.' }}</p>
-      </div>
-      <div>
-        <h2>Keunggulan</h2>
-        <ul v-if="product.highlights?.length" class="detail-highlights">
-          <li v-for="(item, index) in product.highlights" :key="index">{{ item }}</li>
-        </ul>
-        <p v-else>Informasi keunggulan buku belum tersedia.</p>
-      </div>
-      <div>
-        <h2>Target pasar</h2>
-        <ul v-if="product.targetMarket?.length" class="detail-highlights">
-          <li v-for="(item, index) in product.targetMarket" :key="index">{{ item }}</li>
-        </ul>
-        <p v-else>Informasi target pasar buku belum tersedia.</p>
-      </div>
-    </section>
 
     <section class="detail-resources" aria-labelledby="resources-title">
       <h2 id="resources-title">Materi Promosi</h2>
@@ -290,7 +273,7 @@ useSeoMeta({
             </p>
             <div v-else-if="resource.id === 'dummy' && !user" class="resource-actions">
               <NuxtLink
-                :to="{ path: '/login', query: { returnTo: `/products/${product.slug}#dummy` } }"
+                :to="{ path: '/login', query: { returnTo: `${getProductPath(product)}#dummy` } }"
                 class="resource-view"
                 >Login untuk membuka Dummy Buku</NuxtLink
               >
@@ -298,7 +281,7 @@ useSeoMeta({
             <div v-else class="resource-actions">
               <a
                 v-if="resource.id !== 'product-knowledge' || resourceStatus.productKnowledge"
-                :href="`/api/products/${encodeURIComponent(product.slug)}/resources/${resource.id}?download=1`"
+                :href="getProductApiPath(`/resources/${resource.id}?download=1`)"
                 class="resource-download"
                 :aria-label="`Unduh ${resource.id === 'product-knowledge' ? 'PowerPoint' : resourceFormat(resource.id)}: ${resource.title}`"
               >
@@ -321,6 +304,27 @@ useSeoMeta({
             </div>
           </div>
         </article>
+      </div>
+    </section>
+
+    <section aria-label="Informasi lengkap buku" class="detail-content">
+      <div>
+        <h2>Sinopsis</h2>
+        <p>{{ product.synopsis || 'Informasi sinopsis buku belum tersedia.' }}</p>
+      </div>
+      <div>
+        <h2>Keunggulan</h2>
+        <ul v-if="product.highlights?.length" class="detail-highlights">
+          <li v-for="(item, index) in product.highlights" :key="index">{{ item }}</li>
+        </ul>
+        <p v-else>Informasi keunggulan buku belum tersedia.</p>
+      </div>
+      <div>
+        <h2>Target pasar</h2>
+        <ul v-if="product.targetMarket?.length" class="detail-highlights">
+          <li v-for="(item, index) in product.targetMarket" :key="index">{{ item }}</li>
+        </ul>
+        <p v-else>Informasi target pasar buku belum tersedia.</p>
       </div>
     </section>
 
@@ -365,7 +369,7 @@ useSeoMeta({
             :url="pdfViewerUrl"
             :filename="`${pdfViewerKind}-${product.slug}.pdf`"
             :title="pdfViewerTitle"
-            :download-url="`/api/products/${encodeURIComponent(product.slug)}/resources/${pdfViewerKind}?download=1`"
+            :download-url="getProductApiPath(`/resources/${pdfViewerKind}?download=1`)"
             @close="closePdfDialog"
           />
         </div>
@@ -395,7 +399,7 @@ useSeoMeta({
         <button
           type="submit"
           autofocus
-          class="mb-4 rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm"
+          class="mb-4 rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm text-stone-900"
         >
           Tutup <span aria-hidden="true">×</span>
         </button>
@@ -582,6 +586,7 @@ useSeoMeta({
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 36px;
+  padding-top: 48px;
 }
 .detail-content h2 {
   font: 500 22px/1.3 var(--font-landing-serif);

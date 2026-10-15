@@ -1,15 +1,17 @@
 import { z } from 'zod'
-import { productSlugSchema } from '#shared/schemas/catalog'
+import { productIdentifierSchema } from '#shared/schemas/catalog'
 import { recordProductAccess } from '../../../repositories/catalog-browse'
+import { getProduct } from '../../../repositories/products'
 
 export default defineEventHandler(async (event) => {
-  const slug = productSlugSchema.safeParse(getRouterParam(event, 'slug'))
+  const identifier = productIdentifierSchema.safeParse(getRouterParam(event, 'slug'))
   const body = z
     .object({ visitor: z.string().uuid() })
     .strict()
     .safeParse(await readBody(event))
-  if (!slug.success || !body.success)
+  if (!identifier.success || !body.success)
     throw createError({ statusCode: 400, statusMessage: 'Data akses buku tidak valid' })
   setResponseHeader(event, 'Cache-Control', 'no-store')
-  return recordProductAccess(event, slug.data, body.data.visitor)
+  const product = await getProduct(event, identifier.data)
+  return recordProductAccess(event, product.slug, body.data.visitor)
 })

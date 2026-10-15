@@ -29,8 +29,12 @@ Katalog sekarang khusus buku sesuai PRD awal, namun penamaan entitas `products` 
 
 ## Beranda dan pencarian katalog
 
-Beranda mengikuti desain Figma dengan hero Grow with English, logo Erlangga dan Phibeta,
+Beranda memakai hero dengan carousel sampul buku pilihan, logo Erlangga dan Phibeta,
 pencarian, maksimal empat buku terbaru dari API publik, dan empat kartu jenjang sekolah.
+Carousel menampilkan buku `featured` yang sudah dipublikasikan, berganti setiap lima detik,
+berulang tanpa henti, dan dapat digeser dengan mouse atau sentuhan; tombol panah keyboard juga
+tersedia. Jika tidak ada pilihan publik, hero menampilkan keadaan kosong. Maksimal delapan buku
+dapat ditandai sebagai pilihan; Editor mengelola pilihan hanya melalui modal dashboard.
 Kartu jenjang dan enam divisi menuju halaman `/jenjang?level=...` dan
 `/divisi?division=...`. Navigasi Jenjang/Divisi membuka halaman masing-masing tanpa pilihan.
 Kedua halaman menampilkan kartu jumlah buku published dan maksimal empat buku paling sering
@@ -79,6 +83,10 @@ Blog atau Tentang pada aplikasi ini. Bagian kategori berjudul “Jenjang Sekolah
 Endpoint `GET /api/catalog/subject-counts` lama tetap tersedia untuk kompatibilitas konsumen API.
 Migration Editor menambahkan kode buku serta jenjang tanpa mengubah UUID atau referensi lama;
 kode buku menjadi business key unik, UUID tetap primary key.
+URL detail publik memakai kode buku, sementara API tetap menerima slug lama sebagai fallback.
+Migration `202610150002_allow_duplicate_book_titles.sql` menghapus unique index judul agar
+edisi berbeda boleh memakai judul sama. Kode buku tetap unik; slug internal buku baru diberi
+akhiran kode buku untuk menjaga unique constraint slug.
 
 ## Detail buku dan tujuan login
 
@@ -184,7 +192,10 @@ tepercaya dan scope, bukan metadata pengguna. RLS memeriksa jenjang asal dan tuj
 Daftar Editor tidak mencakup buku di luar scope meskipun buku published dapat dibaca publik.
 
 Dashboard `/admin` menyediakan ringkasan, daftar berpaginasi 12 buku, pencarian judul/kode/penulis,
-filter jenjang/status, tambah/edit buku, publikasi, dan konfirmasi hapus dengan mengetik judul.
+filter jenjang/status, tambah/edit buku, publikasi, pengaturan massal buku pilihan lewat modal
+dengan pencarian, serta konfirmasi hapus dengan mengetik judul. Buku pilihan dibatasi delapan
+secara global; Editor hanya dapat mengubah buku dalam jenjang aksesnya. Trigger PostgreSQL
+menegakkan batas ini untuk perubahan dari form edit maupun endpoint pengelolaan massal.
 Tampilan dashboard mengikuti ekspor `figmatocode/dashboard`, memakai header/footer dan font
 Plus Jakarta Sans yang sama dengan katalog. Panel akses hijau muda, empat kartu statistik, serta
 form filter memakai data dan scope akun nyata. Tabel HTML dengan tujuh kolom tetap menyelaraskan
@@ -193,6 +204,8 @@ Presentasi, dan Dummy dengan indikator serta teks aksesibel. Pada layar sempit h
 yang bergeser horizontal; panel dan filter mengikuti lebar layar. Konfirmasi hapus tetap
 memerlukan judul yang cocok persis dan tidak berubah menjadi tindakan langsung.
 Endpoint `/api/admin/books` memakai GET/POST; `/api/admin/books/:id` memakai GET/PUT/DELETE.
+`GET/PUT /api/admin/featured-books` memuat pilihan berpaginasi dan menyimpan perubahan secara
+atomik melalui fungsi database.
 `POST /api/admin/books/:id/image` menerima bytes gambar dengan Content-Type yang sesuai.
 Semua input metadata divalidasi Zod; duplicate kode atau slug mengembalikan 409.
 Kode buku baru hanya menerima 1–50 digit. Buku lama tetap memiliki kode/jenjang NULL sampai
@@ -344,6 +357,8 @@ Dengan `page`, respons menambah `total`, `page`, `pageSize`, dan `subjectCounts`
 mengikuti pencarian/jenjang/kelas sebelum filter mapel, membaca metadata subject bertahap
 1000 row tanpa batas 60 produk. Urutan hasil memiliki UUID sebagai penentu urutan kedua.
 Request lama tanpa `page` mempertahankan kontrak `products`/`source`.
+`GET /api/products/:identifier` menerima kode buku maupun slug historis. Link UI membentuk
+route `/products/{kode-buku}`; slug tetap tersedia untuk link lama.
 
 Migration `202610090001_book_grades.sql` menambah `products.grade` nullable; SD 1–6, SMP 7–9,
 SMA/SMK 10–12. Editor mengisi kelas opsional; pergantian jenjang mengosongkan kelas yang

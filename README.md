@@ -35,10 +35,17 @@ mengosongkan kedua field; detail publik menampilkan nilainya. ISBN disimpan seba
 tanpa spasi/tanda hubung agar nol di depan tidak hilang. Ikuti [rollout metadata](docs/supabase.md#kurikulum-dan-isbn-buku).
 
 - Halaman beranda, katalog dengan pencarian, dan detail produk.
-- API `GET /api/products` dan `GET /api/products/:slug`, dengan validasi Zod.
+- URL detail memakai kode buku yang unik; URL slug lama tetap didukung untuk kompatibilitas.
+  Judul boleh sama untuk edisi atau tahun terbit berbeda. Terapkan migration
+  `202610150002_allow_duplicate_book_titles.sql` sebelum deploy.
+- Carousel sampul buku pilihan di hero beranda, berganti setiap 5 detik; Editor mengelolanya
+  hanya lewat modal dashboard, maksimal 8 buku, dan dapat digeser pada carousel. Terapkan migration
+  `202610150001_featured_books_limit.sql` sebelum mengelola pilihan buku di Supabase.
+- API `GET /api/products` dan `GET /api/products/:identifier`, dengan validasi Zod.
 - Pilihan data fixture atau Supabase; kegagalan Supabase tidak diam-diam diganti fixture.
 - Login email/password dan dashboard Editor `/admin`: ringkasan, pencarian, filter jenjang/status,
-  tambah/edit/hapus buku, publikasi, dan unggah sampul. Akses dibatasi di server dan RLS.
+  tambah/edit/hapus buku, publikasi, unggah sampul, dan pengelolaan buku pilihan. Akses dibatasi
+  di server dan RLS.
 - Tampilan registrasi Sales/Editor tetap tersedia; pengiriman registrasi mandiri dinonaktifkan.
 - Provisioning akun Sales/Editor super melalui script lokal dan membership RLS; Editor super
   memiliki SD/SMP/SMA/SMK serta akses admin, Sales tidak memiliki akses admin.

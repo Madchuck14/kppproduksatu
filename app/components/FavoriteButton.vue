@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Product } from '#shared/types/product'
+import { getProductPath } from '#shared/utils/product-path'
 
 const props = defineProps<{
   product: Product
@@ -25,7 +26,7 @@ async function toggle() {
     if (props.iconOnly) {
       await navigateTo({
         path: '/login',
-        query: { returnTo: `/products/${props.product.slug}` },
+        query: { returnTo: getProductPath(props.product) },
       })
       return
     }
@@ -101,7 +102,7 @@ async function toggle() {
       <p role="status" class="mt-2 text-sm text-stone-600">{{ message }}</p>
       <NuxtLink
         v-if="message && !user"
-        :to="{ path: '/login', query: { returnTo: `/products/${product.slug}` } }"
+        :to="{ path: '/login', query: { returnTo: getProductPath(product) } }"
         class="mt-2 inline-block text-sm font-semibold text-emerald-800 underline"
       >
         Login dan kembali ke buku

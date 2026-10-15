@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict'
+import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
@@ -35,9 +35,11 @@ function load(relative) {
   return module.exports
 }
 const { catalogQuerySchema } = load('shared/schemas/catalog.ts')
+const { productIdentifierSchema } = load('shared/schemas/catalog.ts')
 const { bookInputSchema } = load('shared/schemas/editor.ts')
+const { getProductPath } = load('shared/utils/product-path.ts')
 const { demoProducts } = load('server/data/products.ts')
-const { listProducts, getLandingLevelCounts, mapProductRow } = load(
+const { listProducts, getLandingLevelCounts, mapProductRow, getProduct } = load(
   'server/repositories/products.ts',
 )
 const input = {
@@ -51,12 +53,31 @@ const input = {
   divisionCode: null,
   price: 0,
   publicationYear: null,
-  featured: false,
   published: false,
 }
 assert.equal(bookInputSchema.parse(input).highlights, undefined, 'Legacy writes omit highlights')
 assert.equal(bookInputSchema.parse(input).curriculum, undefined)
 assert.equal(bookInputSchema.parse(input).isbn, undefined)
+assert.equal(
+  bookInputSchema.safeParse({ ...input, featured: true }).success,
+  false,
+  'Book editor input cannot change featured status',
+)
+assert.equal(productIdentifierSchema.safeParse('1001').success, true)
+assert.equal(productIdentifierSchema.safeParse('ruang-untuk-bertumbuh').success, true)
+assert.equal(productIdentifierSchema.safeParse('../products').success, false)
+assert.equal(getProductPath(demoProducts[0]), '/products/1001')
+assert.equal(
+  getProductPath({ ...demoProducts[0], bookCode: null }),
+  '/products/ruang-untuk-bertumbuh',
+)
+assert.equal((await getProduct({}, '1001')).id, demoProducts[0].id)
+assert.equal((await getProduct({}, 'ruang-untuk-bertumbuh')).id, demoProducts[0].id)
+assert.equal(
+  bookInputSchema.parse({ ...input, title: 'Judul Sama' }).title,
+  bookInputSchema.parse({ ...input, bookCode: '456', title: 'Judul Sama' }).title,
+  'Different book codes may use the same title',
+)
 assert.equal(
   bookInputSchema.parse({ ...input, curriculum: '  Kurikulum Merdeka  ' }).curriculum,
   'Kurikulum Merdeka',
@@ -214,6 +235,63 @@ client = {
     return query
   },
 }
+let lookupIdentifier = '123'
+const lookupCalls = []
+client = {
+  from() {
+    const operations = []
+    const query = {}
+    query.select = (...args) => {
+      operations.push(['select', ...args])
+      return query
+    }
+    query.eq = (...args) => {
+      operations.push(['eq', ...args])
+      return query
+    }
+    query.maybeSingle = async () => {
+      lookupCalls.push(operations)
+      const match = operations.find(
+        ([method, field, value]) =>
+          method === 'eq' &&
+          (field === 'book_code' || field === 'slug') &&
+          value === lookupIdentifier,
+      )
+      return { data: match ? row : null, error: null }
+    }
+    return query
+  },
+}
+assert.equal((await getProduct({}, '123')).bookCode, '123')
+assert.equal(lookupCalls.length, 1, 'Book code resolves before any legacy slug lookup')
+lookupIdentifier = 'ruang-untuk-bertumbuh'
+assert.equal((await getProduct({}, lookupIdentifier)).slug, 'ruang-untuk-bertumbuh')
+assert.equal(lookupCalls.length, 2, 'Legacy slug resolves after a code lookup misses')
+assert.ok(
+  lookupCalls.every((operations) =>
+    operations.some((operation) => operation[0] === 'eq' && operation[1] === 'published'),
+  ),
+)
+client = {
+  rpc: async () => ({ data: null, error: { code: 'PGRST202' } }),
+  from() {
+    const operations = []
+    calls.push(operations)
+    const query = {}
+    for (const method of ['select', 'eq', 'in', 'or', 'order', 'range', 'limit'])
+      query[method] = (...args) => {
+        operations.push([method, ...args])
+        return query
+      }
+    query.then = (resolve) =>
+      resolve({
+        data: operations[0][1] === 'subject' ? [{ subject: 'Matematika' }] : [row],
+        count: 70,
+        error: null,
+      })
+    return query
+  },
+}
 result = await list({ level: 'SD', grade: 1, page: 5, subject: ['Matematika'], sort: 'title-asc' })
 assert.equal(result.total, 70)
 assert.equal(result.products[0].grade, 1)
@@ -317,10 +395,16 @@ assert.deepEqual(
   (await saveEditorBook({}, account, bookInputSchema.parse(input), row.id)).highlights,
   ['Existing point'],
 )
+assert.equal(editorRow.featured, true, 'Editing a book preserves its featured status')
 assert.equal(
   Object.hasOwn(writes.at(-1), 'highlights'),
   false,
   'Legacy update must not overwrite highlights',
+)
+assert.equal(
+  Object.hasOwn(writes.at(-1), 'featured'),
+  false,
+  'Book editor updates cannot change featured status',
 )
 assert.deepEqual(
   (
@@ -338,18 +422,43 @@ assert.deepEqual(
     .highlights,
   [],
 )
+await saveEditorBook(
+  {},
+  account,
+  bookInputSchema.parse({ ...input, title: 'Judul Diperbarui' }),
+  row.id,
+)
+assert.equal(writes.at(-1).slug, row.slug, 'Editing retains the existing legacy slug')
 assert.deepEqual(
   (
     await saveEditorBook(
       {},
       account,
-      bookInputSchema.parse({ ...input, highlights: ['New book point'] }),
+      bookInputSchema.parse({
+        ...input,
+        bookCode: '456',
+        highlights: ['New book point'],
+      }),
     )
   ).highlights,
   ['New book point'],
 )
+assert.equal(
+  Object.hasOwn(writes.at(-1), 'featured'),
+  false,
+  'New books use the database default and are not implicitly featured',
+)
+assert.equal(writes.at(-1).slug, 'contoh-456', 'New slugs include the unique book code')
+const sameTitleNewEdition = await saveEditorBook(
+  {},
+  account,
+  bookInputSchema.parse({ ...input, bookCode: '789', title: 'Judul Sama' }),
+)
+assert.equal(sameTitleNewEdition.title, 'Judul Sama')
+assert.equal(writes.at(-1).slug, 'judul-sama-789')
+assert.equal(editorRow.slug, 'judul-sama-789')
 console.log(
-  'PASS: highlights validation, public mapping, create/update roundtrip, empty-list clearing, and legacy-write preservation (repository stub).',
+  'PASS: highlights, duplicate titles with unique book codes, code-based slugs, legacy slug preservation, and editor roundtrip (repository stub).',
 )
 assert.equal(
   editorRow.curriculum,

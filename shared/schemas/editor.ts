@@ -18,6 +18,19 @@ export const editorQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(100000).default(1),
 })
 
+export const maxFeaturedBooks = 8
+export const featuredBooksQuerySchema = z.object({
+  q: z.string().trim().max(100).default(''),
+  page: z.coerce.number().int().min(1).max(100000).default(1),
+})
+export const setFeaturedBooksSchema = z.object({
+  bookIds: z
+    .array(z.string().uuid())
+    .max(maxFeaturedBooks, `Maksimal ${maxFeaturedBooks} buku pilihan.`)
+    .refine((ids) => new Set(ids).size === ids.length, 'Daftar buku pilihan tidak valid.'),
+})
+export type FeaturedBooksQuery = z.infer<typeof featuredBooksQuerySchema>
+
 export const bookHighlightsSchema = z.array(z.string().trim().min(1).max(200)).max(6)
 export const bookTargetMarketSchema = z.array(z.string().trim().min(1).max(200)).max(10)
 export const bookCurriculumSchema = z
@@ -64,7 +77,6 @@ export const bookInputSchema = z
     highlights: bookHighlightsSchema.optional(),
     price: z.number().int().min(0, 'Harga tidak boleh negatif.').max(2147483647),
     publicationYear: z.number().int().min(1000).max(9999).nullable(),
-    featured: z.boolean(),
     published: z.boolean(),
   })
   .strict()

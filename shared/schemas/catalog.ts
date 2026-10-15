@@ -32,8 +32,8 @@ export const catalogQuerySchema = z
     }
   })
 
-export const productSlugSchema = z
+export const productIdentifierSchema = z
   .string()
   .min(1)
   .max(100)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+  .regex(/^(?:[a-z0-9]+(?:-[a-z0-9]+)*|[A-Z0-9][A-Z0-9._-]{0,49})$/)

@@ -48,7 +48,6 @@ const form = reactive({
   highlights: props.book?.highlights?.length ? [...props.book.highlights] : ['', ''],
   price: props.book?.price ?? 0,
   publicationYear: props.book?.publicationYear ?? null,
-  featured: props.book?.featured ?? false,
   published: props.book?.published ?? false,
 })
 const levels = computed(() =>
@@ -213,8 +212,6 @@ async function save() {
     const detail =
       (error as { data?: { statusMessage?: string } }).data?.statusMessage ??
       (error instanceof Error && error.message.startsWith('Unggahan ') ? error.message : undefined)
-    if (!metadataSaved && detail === 'Nama buku telah terpakai')
-      window.alert('Nama buku telah terpakai.')
     message.value = metadataSaved
       ? `Informasi buku sudah tersimpan. ${detail ?? 'Satu atau lebih berkas gagal diunggah.'} Coba simpan kembali untuk mengulang unggahan.`
       : (detail ?? 'Buku gagal disimpan. Silakan coba lagi.')
@@ -558,15 +555,6 @@ async function save() {
             ><input v-model="form.published" type="checkbox" /><span
               ><strong>Publikasikan buku</strong
               ><span>Tampil di katalog dan dapat dibuka oleh Sales.</span></span
-            ></label
-          >
-          <label class="publication-option"
-            ><input v-model="form.featured" type="checkbox" /><span
-              ><strong>Jadikan buku pilihan</strong
-              ><span
-                >Ditampilkan pada beranda dan diberi label Buku Pilihan jika sudah
-                dipublikasikan.</span
-              ></span
             ></label
           >
         </section>

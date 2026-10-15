@@ -9,7 +9,7 @@ Repository menyertakan `vercel.json` yang menetapkan framework Nuxt, instalasi `
 3. Pastikan Framework Preset adalah Nuxt dan matikan override Output Directory. Jangan isi `dist` atau `.output/public`; `outputDirectory: null` di konfigurasi memakai default framework.
 4. Di Environment Variables, tetapkan `NUXT_CATALOG_SOURCE=demo` untuk katalog fixture dan `NUXT_PUBLIC_SITE_URL` ke URL deployment. Untuk katalog online, ikuti `docs/supabase.md`, gunakan `NUXT_CATALOG_SOURCE=supabase`, lalu tambahkan `NUXT_PUBLIC_SUPABASE_URL` dan `NUXT_PUBLIC_SUPABASE_KEY`. Atur environment Production dan Preview sesuai kebutuhan. File `.env` lokal tidak diunggah.
 5. Commit dan push konfigurasi ini, lalu deploy commit terbaru. Redeploy deployment lama tetap memakai sumber dari commit lama. Setelah perubahan setting dashboard, redeploy commit yang sudah memuat konfigurasi ini; untuk pemeriksaan awal, nonaktifkan Use existing Build Cache.
-6. Setelah status Ready, uji `/`, `/products`, detail produk, produk tidak ditemukan (404), `/api/products` beserta pencarian, `/api/products/:slug`, dan `/healthz`. Login dan admin membutuhkan Supabase yang sudah dikonfigurasi, termasuk Site URL/redirect allowlist domain deployment.
+6. Setelah status Ready, uji `/`, `/products`, detail produk melalui `/products/{kode-buku}` dan slug lama, produk tidak ditemukan (404), `/api/products` beserta pencarian, `/api/products/:identifier`, dan `/healthz`. Login dan admin membutuhkan Supabase yang sudah dikonfigurasi, termasuk Site URL/redirect allowlist domain deployment.
 
 Build lokal tidak membuktikan deployment Vercel atau database/auth/RLS Supabase sudah bekerja. `/healthz` hanya memeriksa liveness aplikasi.
 

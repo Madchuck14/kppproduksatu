@@ -1,14 +1,14 @@
-import { productSlugSchema } from '#shared/schemas/catalog'
+import { productIdentifierSchema } from '#shared/schemas/catalog'
 import { getCatalogClient } from '../../../utils/catalog-client'
 import { bookResourceExtensionSchema } from '../../../utils/book-resource'
 import { getProduct } from '../../../repositories/products'
 
 export default defineEventHandler(async (event) => {
-  const slug = productSlugSchema.safeParse(getRouterParam(event, 'slug'))
-  if (!slug.success)
+  const identifier = productIdentifierSchema.safeParse(getRouterParam(event, 'slug'))
+  if (!identifier.success)
     throw createError({ statusCode: 400, statusMessage: 'Alamat buku tidak valid' })
+  const product = await getProduct(event, identifier.data)
   if (useRuntimeConfig(event).catalogSource === 'demo') {
-    await getProduct(event, slug.data)
     return {
       flyer: false,
       flyerFormat: null,
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   const { data, error } = await client
     .from('products')
     .select('flyer_path,dummy_book_path,product_knowledge_path,product_knowledge_preview_path')
-    .eq('slug', slug.data)
+    .eq('id', product.id)
     .eq('published', true)
     .maybeSingle()
   if (error)

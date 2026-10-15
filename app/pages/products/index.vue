@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { educationLevelSchema } from '#shared/schemas/auth'
 import { bookSubjectSchema } from '#shared/schemas/editor'
 import { getSubjectsForLevel, subjectsByLevel } from '#shared/utils/book-subjects'

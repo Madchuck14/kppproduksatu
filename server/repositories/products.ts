@@ -203,21 +203,28 @@ export async function listProducts(
   return { source, products, total, page, pageSize, subjectCounts }
 }
 
-export async function getProduct(event: H3Event, slug: string): Promise<Product> {
+export async function getProduct(event: H3Event, identifier: string): Promise<Product> {
   if (sourceFor(event) === 'demo') {
-    const product = demoProducts.find((item) => item.slug === slug)
+    const product = demoProducts.find(
+      (item) => item.bookCode === identifier || item.slug === identifier,
+    )
     if (!product) throw createError({ statusCode: 404, statusMessage: 'Produk tidak ditemukan' })
     return product
   }
-  const { data, error } = await getCatalogClient(event)
-    .from('products')
-    .select(productColumns)
-    .eq('published', true)
-    .eq('slug', slug)
+  const client = getCatalogClient(event)
+  const selectPublicProduct = () =>
+    client.from('products').select(productColumns).eq('published', true)
+  const { data: codeMatch, error: codeError } = await selectPublicProduct()
+    .eq('book_code', identifier)
     .maybeSingle()
-  if (error) throw createError({ statusCode: 503, statusMessage: 'Katalog tidak tersedia' })
-  if (!data) throw createError({ statusCode: 404, statusMessage: 'Produk tidak ditemukan' })
-  return mapProductRow(event, data)
+  if (codeError) throw createError({ statusCode: 503, statusMessage: 'Katalog tidak tersedia' })
+  if (codeMatch) return mapProductRow(event, codeMatch)
+  const { data: slugMatch, error: slugError } = await selectPublicProduct()
+    .eq('slug', identifier)
+    .maybeSingle()
+  if (slugError) throw createError({ statusCode: 503, statusMessage: 'Katalog tidak tersedia' })
+  if (!slugMatch) throw createError({ statusCode: 404, statusMessage: 'Produk tidak ditemukan' })
+  return mapProductRow(event, slugMatch)
 }
 
 // Count the same search results used by category links, without the list's 60-row cap.

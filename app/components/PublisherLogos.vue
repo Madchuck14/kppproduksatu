@@ -17,7 +17,7 @@ defineProps<{ phibeta?: boolean }>()
     />
     <img
       v-if="phibeta"
-      src="/images/intelecto.png"
+      src="/images/logo-intelecto.png"
       alt="Intelecto"
       width="112"
       height="50"

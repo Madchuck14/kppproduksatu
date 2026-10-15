@@ -8,7 +8,7 @@ import { getProduct } from './products'
 
 export async function getBookResource(
   event: H3Event,
-  slug: string,
+  identifier: string,
   kind: BookResourceKind,
   preview = false,
 ) {
@@ -26,8 +26,8 @@ export async function getBookResource(
       })
   }
   const source = useRuntimeConfig(event).catalogSource
+  const product = await getProduct(event, identifier)
   if (source === 'demo') {
-    await getProduct(event, slug)
     throw createError({ statusCode: 404, statusMessage: 'Materi belum tersedia dalam mode demo' })
   }
   if (source !== 'supabase')
@@ -36,7 +36,7 @@ export async function getBookResource(
   const { data, error } = await client
     .from('products')
     .select('flyer_path,dummy_book_path,product_knowledge_path,product_knowledge_preview_path')
-    .eq('slug', slug)
+    .eq('id', product.id)
     .eq('published', true)
     .maybeSingle()
   if (error) throw createError({ statusCode: 503, statusMessage: 'Materi belum dapat dibuka' })

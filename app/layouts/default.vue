@@ -311,13 +311,13 @@ async function logout() {
               <template v-if="isShowcase">
                 <h2>Tentang</h2>
                 <a
-                  href="https://erlangga.co.id/tentang-kami/lini-bisnis"
+                  href="https://www.erlangga.co.id/lini-bisnis"
                   target="_blank"
                   rel="noopener noreferrer"
                   >Tentang Kami</a
                 >
                 <a
-                  href="https://www2.erlangga.co.id/berita/tipe/article"
+                  href="https://www.erlangga.co.id/berita/tipe/article"
                   target="_blank"
                   rel="noopener noreferrer"
                   >Blog</a
@@ -357,7 +357,7 @@ async function logout() {
               >Facebook</a
             >
             <a
-              href="https://www.youtube.com/@PenerbitErlanggaOfficial"
+              href="https://www.youtube.com/@buku.erlangga"
               target="_blank"
               rel="noopener noreferrer"
               >YouTube</a

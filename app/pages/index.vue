@@ -2,6 +2,7 @@
 import { educationLevelSchema } from '#shared/schemas/auth'
 import { bookDivisions } from '#shared/utils/book-divisions'
 import { getSubjectsForLevel, subjectsByLevel, type BookSubject } from '#shared/utils/book-subjects'
+import { getProductPath } from '#shared/utils/product-path'
 
 const config = useRuntimeConfig()
 useHead({
@@ -24,11 +25,47 @@ const level = ref('')
 const subject = ref<BookSubject | ''>('')
 const subjectSearch = ref('')
 const subjectOpen = ref(false)
-const [{ data, error, status, refresh }, { data: levelCounts }] = await Promise.all([
+const featuredPosition = ref(1)
+const featuredDragOffset = ref(0)
+const featuredDragging = ref(false)
+const featuredTransitioning = ref(false)
+const featuredSnapping = ref(false)
+let featuredPointerStartX = 0
+let featuredPointerId: number | null = null
+let suppressFeaturedClick = false
+const [
+  { data, error, status, refresh },
+  { data: levelCounts },
+  { data: featuredData, error: featuredLoadError },
+] = await Promise.all([
   useFetch('/api/products'),
   useFetch('/api/catalog/level-counts'),
+  useFetch('/api/products', { query: { featured: 'true', pageSize: 60 } }),
 ])
 const latestBooks = computed(() => data.value?.products.slice(0, 4) ?? [])
+const featuredBooks = computed(() => featuredData.value?.products ?? [])
+const featuredTrack = computed(() => {
+  const books = featuredBooks.value
+  if (books.length < 2) return books.map((book) => ({ book, key: book.id }))
+  const first = books[0]
+  const last = books[books.length - 1]
+  if (!first || !last) return []
+  return [
+    { book: last, key: `clone-last-${last.id}` },
+    ...books.map((book) => ({ book, key: book.id })),
+    { book: first, key: `clone-first-${first.id}` },
+  ]
+})
+const activeFeaturedBook = computed(() => {
+  const books = featuredBooks.value
+  if (!books.length) return null
+  const index = (featuredPosition.value - 1 + books.length) % books.length
+  return books[index] ?? null
+})
+const featuredTrackStyle = computed(() => ({
+  width: `${featuredTrack.value.length * 100}%`,
+  transform: `translate3d(calc(-${featuredTrack.value.length ? (featuredPosition.value * 100) / featuredTrack.value.length : 0}% + ${featuredDragOffset.value}px), 0, 0)`,
+}))
 const schoolLevels = educationLevelSchema.options
 const divisions = bookDivisions
 const subjectOptions = computed(() =>
@@ -39,6 +76,99 @@ const subjectOptions = computed(() =>
 watch(level, () => {
   if (!subjectOptions.value.some((item) => item === subject.value)) subject.value = ''
 })
+watch(
+  () => featuredBooks.value.length,
+  () => {
+    featuredPosition.value = featuredBooks.value.length > 1 ? 1 : 0
+    featuredDragOffset.value = 0
+  },
+  { immediate: true },
+)
+let featuredRotationTimer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  featuredRotationTimer = setInterval(() => {
+    if (featuredBooks.value.length < 2 || featuredDragging.value || featuredTransitioning.value)
+      return
+    featuredTransitioning.value = true
+    featuredPosition.value += 1
+  }, 5000)
+})
+onBeforeUnmount(() => {
+  if (featuredRotationTimer) clearInterval(featuredRotationTimer)
+})
+function moveFeaturedBook(direction: number) {
+  if (featuredBooks.value.length < 2 || featuredTransitioning.value) return
+  featuredTransitioning.value = true
+  featuredPosition.value += direction
+}
+function finishFeaturedTransition(event: TransitionEvent) {
+  if (event.target !== event.currentTarget) return
+  const count = featuredBooks.value.length
+  if (count > 1 && (featuredPosition.value === 0 || featuredPosition.value === count + 1)) {
+    featuredSnapping.value = true
+    featuredPosition.value = featuredPosition.value === 0 ? count : 1
+    nextTick(() => {
+      requestAnimationFrame(() => {
+        featuredSnapping.value = false
+        featuredTransitioning.value = false
+      })
+    })
+    return
+  }
+  featuredTransitioning.value = false
+}
+function startFeaturedDrag(event: PointerEvent) {
+  if (
+    featuredBooks.value.length < 2 ||
+    featuredTransitioning.value ||
+    (event.pointerType === 'mouse' && event.button !== 0)
+  )
+    return
+  featuredPointerId = event.pointerId
+  featuredPointerStartX = event.clientX
+  featuredDragging.value = true
+  if (event.currentTarget instanceof HTMLElement)
+    event.currentTarget.setPointerCapture(event.pointerId)
+}
+function updateFeaturedDrag(event: PointerEvent) {
+  if (!featuredDragging.value || event.pointerId !== featuredPointerId) return
+  const rawOffset = event.clientX - featuredPointerStartX
+  const width = event.currentTarget instanceof HTMLElement ? event.currentTarget.clientWidth : 0
+  featuredDragOffset.value = Math.max(-width, Math.min(width, rawOffset))
+  if (Math.abs(featuredDragOffset.value) > 8) {
+    suppressFeaturedClick = true
+    event.preventDefault()
+  }
+}
+function endFeaturedDrag(event: PointerEvent) {
+  if (!featuredDragging.value || event.pointerId !== featuredPointerId) return
+  const offset = featuredDragOffset.value
+  featuredDragging.value = false
+  featuredPointerId = null
+  if (Math.abs(offset) > 48) moveFeaturedBook(offset < 0 ? 1 : -1)
+  featuredDragOffset.value = 0
+  if (suppressFeaturedClick) {
+    window.setTimeout(() => {
+      suppressFeaturedClick = false
+    }, 0)
+  }
+}
+function cancelFeaturedDrag(event: PointerEvent) {
+  if (event.pointerId !== featuredPointerId) return
+  featuredDragging.value = false
+  featuredPointerId = null
+  featuredDragOffset.value = 0
+}
+function handleFeaturedKeydown(event: KeyboardEvent) {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+  event.preventDefault()
+  moveFeaturedBook(event.key === 'ArrowLeft' ? -1 : 1)
+}
+function handleFeaturedClick(event: MouseEvent) {
+  if (!suppressFeaturedClick) return
+  event.preventDefault()
+  event.stopPropagation()
+}
 async function searchCatalog() {
   const q = search.value.trim()
   await navigateTo({
@@ -65,15 +195,56 @@ async function searchCatalog() {
           >Jelajahi Buku <span aria-hidden="true">→</span></NuxtLink
         >
       </div>
-      <div class="hero-image">
-        <img
-          src="/images/landing/hero-books.png"
-          alt="Buku Grow with English dari Penerbit Erlangga"
-          width="437"
-          height="350"
-          fetchpriority="high"
-          class="hero-books"
-        />
+      <div
+        class="hero-image"
+        role="region"
+        aria-roledescription="carousel"
+        aria-label="Buku pilihan. Gunakan tombol panah atau geser ke kiri dan kanan."
+        tabindex="0"
+        @pointerdown="startFeaturedDrag"
+        @pointermove="updateFeaturedDrag"
+        @pointerup="endFeaturedDrag"
+        @pointercancel="cancelFeaturedDrag"
+        @keydown="handleFeaturedKeydown"
+        @click.capture="handleFeaturedClick"
+      >
+        <template v-if="activeFeaturedBook">
+          <div class="hero-carousel-viewport">
+            <div
+              class="hero-carousel-track"
+              :class="{ 'is-dragging': featuredDragging, 'is-snapping': featuredSnapping }"
+              :style="featuredTrackStyle"
+              @transitionend="finishFeaturedTransition"
+            >
+              <NuxtLink
+                v-for="(slide, index) in featuredTrack"
+                :key="slide.key"
+                :to="getProductPath(slide.book)"
+                class="hero-book-link"
+                :style="{ flex: `0 0 ${100 / featuredTrack.length}%` }"
+                :aria-label="`Lihat detail buku pilihan ${slide.book.title}`"
+                :aria-hidden="index !== featuredPosition"
+                :tabindex="index === featuredPosition ? undefined : -1"
+                draggable="false"
+                @dragstart.prevent
+              >
+                <img
+                  :src="slide.book.imageUrl"
+                  :alt="`Sampul buku ${slide.book.title}`"
+                  width="320"
+                  height="350"
+                  :fetchpriority="index === featuredPosition ? 'high' : 'auto'"
+                  class="hero-book"
+                  draggable="false"
+                />
+              </NuxtLink>
+            </div>
+          </div>
+        </template>
+        <p v-else-if="featuredLoadError" role="alert" class="hero-carousel-empty">
+          Buku pilihan tidak dapat dimuat. Silakan muat ulang halaman.
+        </p>
+        <p v-else class="hero-carousel-empty">Buku pilihan akan segera hadir.</p>
       </div>
     </section>
     <form id="pencarian" class="landing-search" @submit.prevent="searchCatalog">
@@ -268,16 +439,59 @@ async function searchCatalog() {
   font: 600 20px/28px var(--font-landing-sans);
 }
 .hero-image {
+  position: relative;
+  display: grid;
+  place-items: center;
   width: 500px;
   height: 350px;
+  align-self: center;
+  overflow: hidden;
+  touch-action: pan-y;
+  cursor: grab;
+}
+.hero-image:focus-visible {
+  outline: 2px solid #1f5c3f;
+  outline-offset: -2px;
+}
+.hero-image:active {
+  cursor: grabbing;
+}
+.hero-carousel-viewport {
+  width: 100%;
+  height: 100%;
   overflow: hidden;
 }
-.hero-books {
-  width: 437px;
-  height: 350px;
-  max-width: none;
-  object-fit: cover;
-  margin-left: 97px;
+.hero-carousel-track {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  transition: transform 450ms cubic-bezier(0.22, 0.68, 0, 1);
+  will-change: transform;
+}
+.hero-carousel-track.is-dragging,
+.hero-carousel-track.is-snapping {
+  transition: none;
+}
+.hero-book-link {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+.hero-book {
+  width: auto;
+  height: min(338px, calc(100% - 12px));
+  max-width: min(340px, calc(100% - 12px));
+  object-fit: contain;
+  filter: drop-shadow(8px 12px 12px rgb(0 0 0 / 22%));
+}
+.hero-carousel-empty {
+  max-width: 240px;
+  color: #687169;
+  font-size: 14px;
+  text-align: center;
 }
 .landing-search {
   display: flex;
@@ -678,10 +892,6 @@ async function searchCatalog() {
     height: 240px;
     display: flex;
     justify-content: center;
-  }
-  .hero-books {
-    width: 300px;
-    height: 240px;
   }
   .landing-search {
     height: auto;
