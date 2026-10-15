@@ -9,6 +9,11 @@ Fondasi katalog produk dengan Nuxt 4, Vue 3, TypeScript, Tailwind CSS, Nuxt UI, 
 
 ## Mulai di Windows
 
+Untuk menyiapkan database Supabase baru lewat satu file, gunakan
+[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 29 migrasi
+dengan komentar section dan penjelasan singkat. Ikuti [panduan file gabungan](docs/supabase.md#setup-satu-file-untuk-database-baru).
+Database yang sudah terpasang tetap memakai migrasi incremental; jangan jalankan ulang file setup.
+
 Gunakan Node.js 22.12+ (Node 22 LTS disarankan). Jalankan dari folder project:
 
 ```powershell
@@ -28,6 +33,14 @@ Build Vercel dan typecheck lulus; lint memiliki warning gaya HTML, tanpa error. 
 Docker, dan pemeriksaan interaksi browser belum diverifikasi untuk dashboard ini.
 
 ## Yang tersedia
+
+Dashboard menyediakan modal **Edit Klasifikasi Buku** untuk menambah kurikulum, divisi,
+dan mata pelajaran per jenjang, serta menghapus opsi tambahan yang belum dipakai buku melalui
+konfirmasi. Seluruh opsi termasuk divisi dan mapel awal dapat dihapus bila tidak dipakai buku.
+Terapkan `202610150004_book_classifications.sql`, `202610150005_delete_book_classifications.sql`,
+dan `202610150006_delete_all_book_classifications.sql` sebelum deploy. Beranda menampilkan
+hanya divisi awal yang belum dihapus; `/divisi` menampilkan seluruh divisi
+terdaftar, termasuk yang belum memiliki buku. Lihat [rollout klasifikasi](docs/supabase.md#klasifikasi-buku-dinamis).
 
 ISBN dan kurikulum tersedia sebagai metadata buku opsional setelah migration
 `202610140003_book_curriculum_isbn.sql`. Form Editor dapat menyimpan, mengedit, dan

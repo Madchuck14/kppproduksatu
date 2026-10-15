@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { editorQuerySchema, maxFeaturedBooks } from '#shared/schemas/editor'
-import { getSubjectsForLevel, type BookSubject } from '#shared/utils/book-subjects'
-import { bookDivisions } from '#shared/utils/book-divisions'
+import type { BookSubject } from '#shared/utils/book-subjects'
 import { getProductPath } from '#shared/utils/product-path'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import type { EditorBook, FeaturedBookOption, FeaturedBooksPage } from '#shared/types/editor'
@@ -9,6 +8,7 @@ import type { EditorBook, FeaturedBookOption, FeaturedBooksPage } from '#shared/
 definePageMeta({ middleware: 'admin' })
 useSeoMeta({ title: 'Dashboard Editor', robots: 'noindex, nofollow' })
 const route = useRoute()
+const { divisions: bookDivisions, subjectsForLevel } = await useClassifications()
 const filters = computed(() => {
   const parsed = editorQuerySchema.safeParse(route.query)
   return parsed.success ? parsed.data : editorQuerySchema.parse({})
@@ -31,7 +31,7 @@ const levels = computed(() =>
 )
 const subjectOptions = computed(() => {
   const selectedLevels = level.value ? [level.value] : levels.value
-  return [...new Set(selectedLevels.flatMap((item) => getSubjectsForLevel(item)))]
+  return [...new Set(selectedLevels.flatMap((item) => subjectsForLevel(item)))]
 })
 watch(level, () => {
   if (!subjectOptions.value.some((item) => item === subject.value)) subject.value = ''
@@ -196,6 +196,7 @@ const fieldClass =
         </p>
       </div>
       <div class="dashboard-header-actions">
+        <ClassificationManager :levels="levels" />
         <UButton
           type="button"
           class="featured-manager-button"
@@ -204,7 +205,7 @@ const fieldClass =
           >Atur Buku Pilihan</UButton
         >
         <UButton to="/admin/books/new" class="dashboard-primary" :disabled="!levels.length"
-          >+ Tambah buku</UButton
+          >Tambah buku</UButton
         >
       </div>
     </div>

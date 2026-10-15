@@ -53,7 +53,7 @@ export const subjectsByLevel = {
 } as const
 
 export type EducationLevel = z.infer<typeof educationLevelSchema>
-export type BookSubject = (typeof subjectsByLevel)[EducationLevel][number]
+export type BookSubject = string
 
 export function getSubjectsForLevel(level: string | null | undefined): readonly BookSubject[] {
   if (!level || !Object.hasOwn(subjectsByLevel, level)) return []

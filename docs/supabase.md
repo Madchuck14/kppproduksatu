@@ -1,5 +1,45 @@
 # Setup Supabase untuk demo online
 
+## Setup satu file untuk database baru
+
+[`supabase/setup.sql`](../supabase/setup.sql) menggabungkan seluruh 29 migrasi sampai
+`202610150006_delete_all_book_classifications.sql`. Setiap bagian memiliki judul,
+komentar penjelasan singkat tepat di bawahnya, serta nama file sumber. Urutan SQL sama
+dengan migrasi berurutan; definisi historis yang diganti bagian berikutnya tetap diberi
+penjelasan agar hasil akhir sesuai aplikasi terbaru.
+
+Pada project Supabase **baru**, buka SQL Editor sebagai database owner, salin seluruh
+isi `setup.sql`, lalu jalankan sekaligus. Auth, Storage, dan role bawaan Supabase harus
+sudah tersedia. File memakai satu transaksi; kegagalan membatalkan seluruh setup.
+Pelindung awal menolak database yang sudah memiliki tabel aplikasi. Jangan menjalankan
+sebagian section secara terpisah pada database existing, terutama bagian cleanup historis.
+
+File tidak menyertakan seed contoh, provisioning akun, rollback, diagnostics, atau isi
+`schema.md` historis. Bila diperlukan, jalankan `supabase/seed.sql` secara terpisah setelah
+setup untuk data demo; akun Editor/Sales tetap disiapkan melalui alur provisioning.
+File gabungan sudah diuji pada PostgreSQL sementara dengan simulasi Auth/Storage,
+belum dijalankan ke Supabase live.
+
+File ini disimpan di luar `supabase/migrations/` agar CLI tidak menjalankan gabungan
+bersama sumbernya. Riwayat migrasi lama tetap dipertahankan, dan setup manual ini **tidak**
+mengisi `supabase_migrations.schema_migrations`. Untuk database existing atau workflow
+Supabase CLI, gunakan file versioned sesuai riwayat yang tercatat. Jangan menjalankan
+`db push` berisi seluruh migrasi lama setelah setup manual; rekonsiliasi baseline dan
+riwayat melalui workflow migration yang dipakai tim terlebih dahulu.
+
+Perbarui file gabungan secara mekanis setelah sumber migrasi berubah:
+
+```powershell
+node scripts/build-supabase-setup.mjs
+node scripts/build-supabase-setup.mjs --check
+$env:PGLITE_MODULE_PATH = '<temporary-install>/node_modules/@electric-sql/pglite/dist/index.js'
+node scripts/verify-supabase-setup.mjs
+```
+
+Generator meminta judul dan penjelasan untuk setiap migrasi baru. Verifikasi membandingkan
+schema, constraint, indeks, RLS, grant, fungsi, trigger, registry, dan bucket dengan migrasi
+berurutan; juga memeriksa penolakan database existing dan rollback atomik saat SQL gagal.
+
 ## URL detail dengan kode buku
 
 Route detail baru menggunakan kode buku sebagai identifier yang terlihat, misalnya
@@ -49,6 +89,9 @@ setelah memastikan tidak ada versi aplikasi yang memanggil RPC tersebut.
 
 ## Mengembalikan opsi mapel dan divisi tetap
 
+Bagian ini merupakan catatan rollback historis. Jangan menjalankan migration penghapusan
+registry pada aplikasi klasifikasi dinamis di bawah.
+
 Jika migration opsi mapel/divisi dinamis sudah diterapkan tetapi tidak jadi digunakan, jangan
 mengedit atau menghapus migration yang sudah tercatat. Setelah memastikan tidak ada buku yang
 memakai nilai di luar daftar tetap lama, terapkan
@@ -57,6 +100,99 @@ Migration ini mengembalikan constraint mapel dan divisi, memulihkan RPC katalog 
 divisi tetap, lalu menghapus tabel opsi dinamis. Opsi tambahan yang hanya tersimpan di tabel
 tersebut akan hilang. Jika data produk tidak cocok dengan constraint lama, transaksi akan gagal
 dan seluruh rollback dibatalkan; koreksi nilai produk sebelum mencoba kembali.
+
+## Klasifikasi buku dinamis
+
+Terapkan `supabase/migrations/202610150004_book_classifications.sql` setelah migration
+katalog, mapel, divisi, popularitas, kurikulum/ISBN, dan buku pilihan. Migration baru
+memperluas schema dengan registry `book_classifications`; tidak mengubah UUID, data buku,
+timestamp, favorit, statistik, atau file. Enam divisi dan seluruh mapel bawaan disalin ke
+registry. Kurikulum dari buku published menjadi opsi; metadata buku draf tidak dibaca publik.
+Kurikulum bebas pada buku lama tetap didukung.
+
+Server tetap menggunakan public key dengan sesi Editor. RLS mengizinkan baca publik,
+menolak tulis Sales/anon, dan hanya mengizinkan Editor menambah opsi. Mapel baru harus
+berada pada scope jenjang Editor; divisi/kurikulum bersifat global. Editor tanpa scope
+dan tanpa status super tidak dapat menambah opsi. UPDATE/DELETE langsung pada registry tidak diizinkan.
+Nama duplikat pada jenis/jenjang sama ditolak tanpa membedakan kapital; kode divisi unik
+dibuat server dari nama. Trigger menggantikan CHECK daftar tetap, memeriksa divisi
+terdaftar dan pasangan mapel/jenjang pada setiap penulisan produk. Scope buku tetap
+berdasarkan jenjang, bukan divisi. RPC ranking memakai registry dengan filter published.
+
+Urutan rollout: backup schema/data, catat jumlah/UUID/timestamp produk, jalankan seluruh
+migration melalui mekanisme pencatatan versi, lalu deploy aplikasi. Migration dapat diulang
+tanpa menghapus opsi tambahan atau mengubah buku. Verifikasi data lama tetap identik,
+enam divisi awal tetap ada, tambah tiga jenis opsi, reload, pemakaian pada tambah/edit buku,
+penolakan duplikat, akses Sales/anon, dan scope mapel Editor. Beranda harus tetap memiliki
+enam kartu; halaman Divisi menampilkan kartu tambahan walaupun jumlah buku nol.
+Endpoint klasifikasi mengembalikan 503 jika migration belum tersedia, tanpa fallback demo.
+
+Rollback aplikasi dapat memakai versi sebelumnya sambil mempertahankan tabel dan opsi baru.
+Versi lama tidak dapat membaca buku dengan divisi/mapel baru karena enum lamanya; hentikan
+penambahan opsi dan pemakaian nilai baru selama jendela rollback. Untuk rollback setelah
+nilai baru dipakai, gunakan versi yang sudah mendukung registry atau siapkan pemetaan data
+yang disetujui terlebih dahulu. Jangan menghapus tabel atau memulihkan CHECK lama secara
+langsung karena dapat membuang opsi atau menolak metadata yang sudah disimpan.
+
+`node scripts/verify-classifications.mjs` memakai `PGLITE_MODULE_PATH` seperti pengujian
+PostgreSQL sementara lain. Script memeriksa seluruh rantai migration, preservation, retry,
+daftar bawaan, constraint, hak akses, scope, dan kelompok divisi baru. Tidak menghubungi
+Supabase live. `scripts/verify-classifications-browser.mjs` memakai `PLAYWRIGHT_MODULE_PATH`
+dan port 3000; mutasi klasifikasi diintersep fixture. Migration live belum diterapkan
+atau diverifikasi oleh agent.
+
+### Penghapusan opsi tambahan
+
+Perlindungan bawaan pada migration `202610150005` di bagian ini bersifat historis;
+migration `202610150006` di bawah menggantinya dengan izin hapus seluruh opsi.
+
+Terapkan `202610150005_delete_book_classifications.sql` setelah migration registry di atas,
+lalu deploy aplikasi. Migration menambahkan penanda bawaan yang tidak dapat ditulis melalui
+API pengguna dan RPC `delete_book_classification`. Tidak ada opsi atau buku yang dihapus
+saat migration dijalankan; pengulangan tetap mempertahankan data.
+
+Popup menampilkan tombol Hapus hanya untuk opsi tambahan dan meminta konfirmasi. Endpoint
+DELETE memverifikasi sesi Editor dan scope mapel; RPC SECURITY DEFINER memeriksa ulang akses,
+menolak enam divisi awal dan mapel bawaan, serta membaca seluruh produk untuk memblokir
+referensi termasuk buku draf di luar scope. Error tidak membocorkan identitas atau jumlah
+buku tersebut. Penghapusan mengambil lock tabel produk selama transaksi agar pemeriksaan
+referensi dan penghapusan tidak berlomba dengan penulisan buku; penulisan katalog lain
+dapat menunggu singkat. Opsi yang tidak ditemukan mengembalikan 404, opsi terpakai 409.
+Kurikulum lama tetap merupakan teks bebas; hapus opsi tidak mengubah metadata buku.
+
+Uji lokal pada script klasifikasi mencakup tiga jenis penghapusan, penolakan bawaan,
+Sales/anon/scope, referensi draf tersembunyi, retry migration, dan hilangnya kelompok divisi.
+Uji browser port 3000 mengintersep DELETE sebagai fixture, termasuk batal dan error terpakai.
+Migration/penghapusan Supabase live belum dijalankan oleh agent.
+
+Rollback aplikasi dengan versi sebelum tombol hapus; biarkan kolom dan RPC tetap tersedia.
+Opsi yang sengaja dihapus tidak otomatis pulih. Untuk memulihkannya, tambahkan kembali nama
+dan jenjang yang sama melalui popup atau backup yang disetujui. Jangan menjalankan ulang
+migration registry lama untuk memulihkan satu opsi karena dapat menambah label kurikulum lagi.
+
+### Penghapusan seluruh opsi klasifikasi
+
+Terapkan `202610150006_delete_all_book_classifications.sql` setelah `202610150005`, lalu
+deploy aplikasi. Migration mengganti RPC penghapusan agar seluruh kurikulum, divisi, dan
+mapel termasuk daftar awal dapat dihapus. Tidak ada label Bawaan pada popup. Field lama
+`is_builtin` dipertahankan untuk kompatibilitas schema tetapi tidak lagi membatasi akses.
+Migration tidak otomatis menghapus klasifikasi atau mengubah produk. DELETE setelah
+konfirmasi benar-benar menghapus row registry, bukan menyembunyikannya.
+
+Pemeriksaan role Editor, scope mapel, referensi semua buku termasuk draf tersembunyi,
+dan lock transaksi tetap berlaku. Lepas klasifikasi dari buku terlebih dahulu bila
+mendapat 409. Penghapusan divisi menghilangkan kartu di `/divisi`; landing hanya membaca
+divisi awal yang masih terdaftar, sehingga tidak menampilkan kartu menuju divisi terhapus.
+Divisi tambahan tetap tidak dimasukkan ke landing.
+
+Uji PostgreSQL sementara memeriksa penghapusan row divisi/mapel awal, scope, opsi terpakai,
+preservation produk, dan retry migration tanpa memunculkan opsi terhapus. Uji browser
+port 3000 memakai fixture untuk seluruh mutasi. Belum diterapkan ke Supabase live.
+
+Rollback aplikasi tidak mengembalikan opsi yang telah dihapus. Tambahkan opsi lagi melalui
+popup bila diperlukan. Jangan menjalankan ulang migration seed lama karena dapat
+memunculkan opsi yang sengaja dihapus; gunakan riwayat migration berurutan. Pengulangan
+migration `202610150006` sendiri tidak menambah atau menghapus opsi apa pun.
 
 ## Kurikulum dan ISBN buku
 

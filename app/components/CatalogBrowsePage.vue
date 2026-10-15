@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { bookDivisions } from '#shared/utils/book-divisions'
+const {
+  divisions,
+  error: classificationError,
+  refresh: refreshClassifications,
+} = await useClassifications()
 
 const props = defineProps<{ kind: 'level' | 'division' }>()
 const route = useRoute()
@@ -13,16 +17,16 @@ const levels = [
   { code: 'SMA', name: 'Buku SMA', icon: 'i-lucide-school' },
   { code: 'SMK', name: 'Buku SMK', icon: 'i-lucide-school' },
 ]
-const items = props.kind === 'level' ? levels : bookDivisions
+const items = computed(() => (props.kind === 'level' ? levels : divisions.value))
 const selection = computed(() => {
   const value = route.query[parameter]
-  return items.some((item) => item.code === value) ? String(value) : ''
+  return items.value.some((item) => item.code === value) ? String(value) : ''
 })
 const { data, error, status, refresh } = await useFetch('/api/catalog/browse', {
   query: { kind: props.kind },
 })
 const shelves = computed(() =>
-  items.filter((item) => !selection.value || item.code === selection.value),
+  items.value.filter((item) => !selection.value || item.code === selection.value),
 )
 function group(code: string) {
   return data.value?.groups.find((item) => item.code === code)
@@ -40,6 +44,10 @@ useSeoMeta({
       <span aria-current="page">{{ title }}</span>
     </nav>
     <h1>{{ title }}</h1>
+    <div v-if="kind === 'division' && classificationError" class="message" role="alert">
+      <p>Daftar divisi belum dapat dimuat.</p>
+      <UButton variant="outline" @click="refreshClassifications()">Coba lagi</UButton>
+    </div>
     <div :class="['group-grid', { 'division-grid': kind === 'division' }]">
       <NuxtLink
         v-for="(item, index) in items"

@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { bookInputSchema } from '#shared/schemas/editor'
-import { getSubjectsForLevel } from '#shared/utils/book-subjects'
 import type { BookSubject } from '#shared/utils/book-subjects'
-import { bookDivisions } from '#shared/utils/book-divisions'
 import type { DivisionCode } from '#shared/utils/book-divisions'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import { getGradesForLevel } from '#shared/utils/book-grades'
@@ -16,21 +14,21 @@ const props = defineProps<{
 const storageClient = useSupabaseClient()
 const savedId = ref(props.book?.id)
 const materials = [
-  { kind: 'dummy', label: 'Dummy Buku', help: 'PDF, maksimal 20 MB' },
+  { kind: 'dummy', label: 'Dummy Buku', help: 'Format file dalam bentuk PDF, maksimal 20 MB' },
   {
     kind: 'product-knowledge',
-    label: 'PPT Produk — file unduhan',
-    help: 'PPT/PPTX, maksimal 50 MB. Pengunjung mengunduh file ini.',
+    label: 'PPT Produk untuk diunduh',
+    help: 'Format file dalam bentuk PPT/PPTX, maksimal 50 MB. Pengunjung mengunduh file ini.',
   },
   {
     kind: 'product-knowledge-preview',
-    label: 'PPT Produk — file tampilan',
-    help: 'PDF, maksimal 20 MB. File ini dibuka oleh tombol Tampilkan.',
+    label: 'PPT Produk untuk pratinjau',
+    help: 'Format file dalam bentuk PDF, maksimal 20 MB. File ini dibuka oleh tombol "Tampilkan".',
   },
   {
     kind: 'flyer',
     label: 'Flyer',
-    help: 'PDF, maksimal 20 MB',
+    help: 'Format file dalam bentuk PDF, maksimal 20 MB',
   },
 ] as const
 const form = reactive({
@@ -53,8 +51,16 @@ const form = reactive({
 const levels = computed(() =>
   props.account.isSuper ? educationLevelSchema.options : props.account.educationLevels,
 )
-const divisionOptions = bookDivisions
-const subjectOptions = computed(() => getSubjectsForLevel(form.educationLevel))
+const {
+  divisions: divisionOptions,
+  curricula,
+  subjectsForLevel,
+  error: classificationError,
+  refresh: refreshClassifications,
+} = await useClassifications()
+const subjectOptions = computed(() =>
+  form.educationLevel ? subjectsForLevel(form.educationLevel) : [],
+)
 const gradeOptions = computed(() => getGradesForLevel(form.educationLevel))
 watch(
   () => form.educationLevel,
@@ -385,10 +391,18 @@ async function save() {
                 v-model="form.curriculum"
                 type="text"
                 maxlength="200"
+                list="book-curricula"
                 placeholder="Contoh: Kurikulum Merdeka"
                 :aria-invalid="!!errors.curriculum"
               />
               <p v-if="errors.curriculum" class="field-error">{{ errors.curriculum }}</p>
+              <datalist id="book-curricula">
+                <option v-for="item in curricula" :key="item" :value="item" />
+              </datalist>
+              <p v-if="classificationError" role="alert" class="field-error">
+                Klasifikasi gagal dimuat.
+                <button type="button" @click="refreshClassifications()">Coba lagi</button>
+              </p>
             </div>
           </div>
           <div class="field-row">

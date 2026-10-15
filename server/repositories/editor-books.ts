@@ -20,6 +20,7 @@ import {
 import { educationLevelSchema } from '#shared/schemas/auth'
 import { divisionCodeSchema } from '#shared/utils/book-divisions'
 import { assertBookScope } from '../utils/require-editor'
+import { validateBookClassifications } from './classifications'
 import { getProductImageUrl } from '../utils/storage'
 
 const columns =
@@ -306,6 +307,7 @@ export async function saveEditorBook(
 ) {
   const existingBook = id ? await getEditorBook(event, account, id) : null
   assertBookScope(account, input.educationLevel)
+  await validateBookClassifications(event, input)
   const client = await serverSupabaseClient<EditorDatabase>(event)
   const row = toRow(input, existingBook?.slug)
   const query = id

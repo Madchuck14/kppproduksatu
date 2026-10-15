@@ -1,14 +1,9 @@
 import { z } from 'zod'
 import { educationLevelSchema } from './auth'
 import { getGradesForLevel } from '../utils/book-grades'
-import { isSubjectForLevel, subjectsByLevel, type BookSubject } from '../utils/book-subjects'
 import { divisionCodeSchema } from '../utils/book-divisions'
 
-const subjectNames = [...new Set(Object.values(subjectsByLevel).flat())] as [
-  BookSubject,
-  ...BookSubject[],
-]
-export const bookSubjectSchema = z.enum(subjectNames)
+export const bookSubjectSchema = z.string().trim().min(1).max(200)
 
 export const editorQuerySchema = z.object({
   q: z.string().trim().max(100).default(''),
@@ -86,13 +81,6 @@ export const bookInputSchema = z
         code: 'custom',
         path: ['grade'],
         message: 'Kelas tidak sesuai dengan jenjang pendidikan.',
-      })
-    }
-    if (book.subject && !isSubjectForLevel(book.educationLevel, book.subject)) {
-      context.addIssue({
-        code: 'custom',
-        path: ['subject'],
-        message: 'Mata pelajaran tidak sesuai dengan jenjang pendidikan.',
       })
     }
   })

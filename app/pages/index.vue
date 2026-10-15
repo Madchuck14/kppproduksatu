@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { educationLevelSchema } from '#shared/schemas/auth'
 import { bookDivisions } from '#shared/utils/book-divisions'
-import { getSubjectsForLevel, subjectsByLevel, type BookSubject } from '#shared/utils/book-subjects'
+import type { BookSubject } from '#shared/utils/book-subjects'
 import { getProductPath } from '#shared/utils/product-path'
 
 const config = useRuntimeConfig()
+const { subjectsForLevel, divisions: registeredDivisions } = await useClassifications()
 useHead({
   link: [
     {
@@ -67,12 +68,12 @@ const featuredTrackStyle = computed(() => ({
   transform: `translate3d(calc(-${featuredTrack.value.length ? (featuredPosition.value * 100) / featuredTrack.value.length : 0}% + ${featuredDragOffset.value}px), 0, 0)`,
 }))
 const schoolLevels = educationLevelSchema.options
-const divisions = bookDivisions
-const subjectOptions = computed(() =>
-  level.value
-    ? getSubjectsForLevel(level.value)
-    : [...new Set(Object.values(subjectsByLevel).flat())],
+const divisions = computed(() =>
+  bookDivisions.filter((item) =>
+    registeredDivisions.value.some((division) => division.code === item.code),
+  ),
 )
+const subjectOptions = computed(() => subjectsForLevel(level.value))
 watch(level, () => {
   if (!subjectOptions.value.some((item) => item === subject.value)) subject.value = ''
 })

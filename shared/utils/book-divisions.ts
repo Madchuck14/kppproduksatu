@@ -1,13 +1,10 @@
 import { z } from 'zod'
 
-export const divisionCodeSchema = z.enum([
-  'sd-1-mipa',
-  'sd-2-ips-bhs',
-  'smp-sma-mipa',
-  'smk',
-  'phibeta',
-  'intelecto',
-])
+export const divisionCodeSchema = z
+  .string()
+  .min(1)
+  .max(100)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
 export type DivisionCode = z.infer<typeof divisionCodeSchema>
 
 export const bookDivisions = [

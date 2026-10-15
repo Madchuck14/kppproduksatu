@@ -1,17 +1,25 @@
 <script setup lang="ts">
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
-const props = defineProps<{ url: string }>()
+const props = withDefaults(defineProps<{ url: string; zoom?: number }>(), { zoom: 100 })
 const pages = useTemplateRef<HTMLDivElement>('pages')
 const loading = ref(false)
 const errorMessage = ref('')
 let renderVersion = 0
+const pageSizes: Array<{ canvas: HTMLCanvasElement; width: number; height: number }> = []
+function applyZoom() {
+  for (const page of pageSizes) {
+    page.canvas.style.width = `${Math.floor((page.width * props.zoom) / 100)}px`
+    page.canvas.style.height = `${Math.floor((page.height * props.zoom) / 100)}px`
+  }
+}
 
 async function renderPdf() {
   const container = pages.value
   if (!container || !props.url) return
   const version = ++renderVersion
   container.replaceChildren()
+  pageSizes.length = 0
   loading.value = true
   errorMessage.value = ''
   try {
@@ -31,7 +39,9 @@ async function renderPdf() {
       canvas.height = Math.floor(viewport.height * pixelRatio)
       canvas.style.width = `${Math.floor(viewport.width)}px`
       canvas.style.height = `${Math.floor(viewport.height)}px`
-      canvas.className = 'mx-auto block max-w-full rounded bg-white shadow-sm'
+      canvas.className = 'mx-auto block rounded bg-white shadow-sm'
+      pageSizes.push({ canvas, width: viewport.width, height: viewport.height })
+      applyZoom()
       const context = canvas.getContext('2d')
       if (!context) throw new Error('Canvas tidak tersedia')
       container.append(canvas)
@@ -52,13 +62,19 @@ async function renderPdf() {
 
 onMounted(renderPdf)
 watch(() => props.url, renderPdf)
+watch(() => props.zoom, applyZoom)
 onBeforeUnmount(() => {
   renderVersion += 1
 })
 </script>
 
 <template>
-  <div class="relative h-full overflow-auto bg-stone-200 p-3 sm:p-5">
+  <div
+    role="region"
+    aria-label="Halaman PDF"
+    tabindex="0"
+    class="relative h-full overflow-auto bg-stone-200 p-3 sm:p-5"
+  >
     <p
       v-if="loading"
       role="status"

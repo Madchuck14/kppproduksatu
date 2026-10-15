@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PresentationFormat } from '#shared/types/presentation'
-import { bookDivisions } from '#shared/utils/book-divisions'
 import { getProductIdentifier, getProductPath } from '#shared/utils/product-path'
+const { divisions: bookDivisions } = await useClassifications()
 const route = useRoute()
 const config = useRuntimeConfig()
 const user = useSupabaseUser()
@@ -38,6 +38,7 @@ const coverDialog = useTemplateRef<HTMLDialogElement>('cover-dialog')
 const pdfDialog = useTemplateRef<HTMLDialogElement>('pdf-dialog')
 const pdfViewerUrl = ref('')
 const pdfViewerTitle = ref('')
+const pdfViewerZoom = ref(100)
 const pdfViewerKind = ref<'product-knowledge' | 'flyer' | 'dummy'>('flyer')
 let pdfRequest = 0
 const pdfViewerBusy = ref(false)
@@ -78,6 +79,7 @@ async function openPdfResource(resource: (typeof resources)[number]) {
   const request = ++pdfRequest
   pdfViewerKind.value = resource.id
   pdfViewerTitle.value = resource.title
+  pdfViewerZoom.value = 100
   pdfViewerUrl.value = ''
   pdfViewerError.value = ''
   pdfViewerBusy.value = true
@@ -133,7 +135,7 @@ const bookDetails = computed(() => [
   {
     label: 'Divisi',
     value:
-      bookDivisions.find((division) => division.code === product.value?.divisionCode)?.name ??
+      bookDivisions.value.find((division) => division.code === product.value?.divisionCode)?.name ??
       'Belum tersedia',
   },
   { label: 'Penulis', value: product.value?.author },
@@ -335,19 +337,17 @@ useSeoMeta({
       @close="resetPdfDialog"
     >
       <div class="flex h-full flex-col">
-        <div
-          v-if="!pdfViewerUrl"
-          class="flex items-center justify-between gap-4 border-b border-stone-200 px-5 py-4"
-        >
-          <h2 class="text-lg font-semibold">{{ pdfViewerTitle }}</h2>
-          <button
-            type="button"
-            class="rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium"
-            @click="closePdfDialog"
-          >
-            Tutup
-          </button>
-        </div>
+        <PdfViewerHeader
+          v-if="!pdfViewerUrl || pdfViewerKind !== 'dummy'"
+          v-model:zoom="pdfViewerZoom"
+          :filename="`${pdfViewerKind}-${product.slug}.pdf`"
+          :title="pdfViewerTitle"
+          :disabled="!pdfViewerUrl"
+          :download-url="
+            pdfViewerUrl ? getProductApiPath(`/resources/${pdfViewerKind}?download=1`) : undefined
+          "
+          @close="closePdfDialog"
+        />
         <div class="min-h-0 flex-1">
           <div
             v-if="pdfViewerBusy"
@@ -364,13 +364,19 @@ useSeoMeta({
             {{ pdfViewerError }}
           </div>
           <PdfFlipbookViewer
-            v-else-if="pdfViewerUrl"
+            v-else-if="pdfViewerUrl && pdfViewerKind === 'dummy'"
             :key="pdfViewerUrl"
             :url="pdfViewerUrl"
             :filename="`${pdfViewerKind}-${product.slug}.pdf`"
             :title="pdfViewerTitle"
             :download-url="getProductApiPath(`/resources/${pdfViewerKind}?download=1`)"
             @close="closePdfDialog"
+          />
+          <PdfCanvasViewer
+            v-else-if="pdfViewerUrl"
+            :key="pdfViewerUrl"
+            :url="pdfViewerUrl"
+            :zoom="pdfViewerZoom"
           />
         </div>
       </div>

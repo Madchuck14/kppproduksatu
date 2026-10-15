@@ -1,11 +1,12 @@
+import type { Classification } from '../schemas/classifications'
+
 // Runtime rows are also validated in the repository. Keep this write contract aligned
 // with the catalog migrations until generated database types replace it.
 type BookRow = {
   id: string
   book_code: string | null
   education_level: 'SD' | 'SMP' | 'SMA' | 'SMK' | null
-  division_code:
-    'sd-1-mipa' | 'sd-2-ips-bhs' | 'smp-sma-mipa' | 'smk' | 'phibeta' | 'intelecto' | null
+  division_code: string | null
   subject: string | null
   grade: number | null
   title: string
@@ -32,6 +33,12 @@ type BookRow = {
 export type EditorDatabase = {
   public: {
     Tables: {
+      book_classifications: {
+        Row: Classification & { position: number }
+        Insert: Classification
+        Update: never
+        Relationships: []
+      }
       products: {
         Row: BookRow
         Insert: Partial<BookRow> & Pick<BookRow, 'title' | 'slug'>
@@ -41,6 +48,10 @@ export type EditorDatabase = {
     }
     Views: Record<never, never>
     Functions: {
+      delete_book_classification: {
+        Args: { option_kind: string; option_code: string; option_level: string }
+        Returns: boolean
+      }
       featured_products_count: {
         Args: Record<never, never>
         Returns: number

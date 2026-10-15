@@ -134,7 +134,7 @@ for (const query of [
   { page: 0 },
   { pageSize: 100 },
   { sort: 'invalid' },
-  { subject: 'invalid' },
+  { subject: '' },
 ])
   assert.equal(catalogQuerySchema.safeParse(query).success, false)
 assert.equal(catalogQuerySchema.parse({ level: 'SMP', grade: '8' }).grade, 8)
@@ -372,7 +372,17 @@ let editorRow = {
 }
 const writes = []
 client = {
-  from() {
+  from(table) {
+    if (table === 'book_classifications') {
+      const query = {}
+      for (const method of ['select', 'order', 'range']) query[method] = () => query
+      query.then = (resolve) =>
+        resolve({
+          data: load('shared/schemas/classifications.ts').defaultClassifications,
+          error: null,
+        })
+      return query
+    }
     let duplicate = false
     const query = {}
     for (const method of ['select', 'eq', 'in', 'neq', 'limit']) query[method] = () => query

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { educationLevelSchema } from '#shared/schemas/auth'
 import { bookSubjectSchema } from '#shared/schemas/editor'
-import { getSubjectsForLevel, subjectsByLevel } from '#shared/utils/book-subjects'
 import { getGradesForLevel } from '#shared/utils/book-grades'
-import { bookDivisions, divisionCodeSchema } from '#shared/utils/book-divisions'
+import { divisionCodeSchema } from '#shared/utils/book-divisions'
 
 const config = useRuntimeConfig()
+const { divisions: bookDivisions, subjectsForLevel } = await useClassifications()
 const route = useRoute()
 const appliedSearch = computed(() =>
   typeof route.query.q === 'string' ? route.query.q.trim().slice(0, 100) : '',
@@ -30,7 +30,7 @@ const division = computed(() => {
   return parsed.success ? parsed.data : undefined
 })
 const divisionName = computed(
-  () => bookDivisions.find((item) => item.code === division.value)?.name,
+  () => bookDivisions.value.find((item) => item.code === division.value)?.name,
 )
 const grade = computed(() => {
   const value = Number(route.query.grade)
@@ -88,11 +88,7 @@ const pageItems = computed(() => {
   }
   return items
 })
-const allSubjects = computed(() =>
-  level.value
-    ? [...getSubjectsForLevel(level.value)]
-    : [...new Set(Object.values(subjectsByLevel).flat())],
-)
+const allSubjects = computed(() => subjectsForLevel(level.value))
 const preferredSubjects = [
   'Matematika',
   'Bahasa Indonesia',
@@ -129,7 +125,7 @@ function selectLevel(value: string) {
     level: value || undefined,
     grade: undefined,
     subject: subjects.value.filter(
-      (subject) => !value || getSubjectsForLevel(value).includes(subject),
+      (subject) => !value || subjectsForLevel(value).includes(subject),
     ),
   })
 }

@@ -29,6 +29,24 @@ Katalog sekarang khusus buku sesuai PRD awal, namun penamaan entitas `products` 
 
 ## Beranda dan pencarian katalog
 
+Setelah migration `202610150004_book_classifications.sql`, opsi kurikulum, divisi,
+dan mapel disimpan di `book_classifications`. Modal **Edit Klasifikasi Buku** pada
+dashboard menambah opsi melalui `POST /api/admin/classifications`; server memverifikasi
+sesi Editor dan scope jenjang mapel, disertai RLS insert yang sama. Penghapusan opsi tambahan
+memakai konfirmasi dan `DELETE /api/admin/classifications` setelah migration
+`202610150005_delete_book_classifications.sql`. RPC database memeriksa ulang role/scope,
+dan menolak opsi yang dipakai buku termasuk draf di luar scope.
+Migration `202610150006_delete_all_book_classifications.sql` menghapus perlindungan opsi
+awal: semua opsi dapat dihapus permanen dari registry melalui konfirmasi yang sama.
+Tidak ada alur ubah nama opsi. `GET /api/catalog/classifications` membaca opsi publik, bukan data buku draf.
+Form tambah/edit, filter mapel publik/Editor, nama divisi detail, dan `/divisi` memakai
+registry ini. Kurikulum tetap menerima teks lama dan menyediakan saran dari registry.
+Landing memakai irisan enam kode awal dan registry saat ini sehingga divisi yang dihapus
+tidak tampil lagi; divisi baru tetap hanya ada di halaman Divisi. RPC ranking membaca semua divisi
+dari registry, termasuk kelompok kosong. Validasi mapel per jenjang dan divisi terdaftar
+berada pada repository server serta trigger database; Zod memvalidasi bentuk/batas input.
+Mode demo memakai daftar bawaan dan tidak menyimpan klasifikasi.
+
 Beranda memakai hero dengan carousel sampul buku pilihan, logo Erlangga dan Phibeta,
 pencarian, maksimal empat buku terbaru dari API publik, dan empat kartu jenjang sekolah.
 Carousel menampilkan buku `featured` yang sudah dipublikasikan, berganti setiap lima detik,
@@ -113,8 +131,13 @@ mengambang. Isi serta jumlah halaman berasal dari PDF nyata; pembalikan halaman 
 StPageFlip yang sudah tersedia. Zoom dapat diganti lewat tombol atau pilihan persentase;
 halaman dapat digeser saat diperbesar. Tombol panah keyboard, Escape, dan fokus dialog
 tetap berfungsi. Aset toolbar disimpan lokal di `public/images/dummy-preview`.
-PPT Produk menampilkan PDF yang diunggah Editor melalui viewer PDF yang sama dengan Flyer dan
-Dummy Buku. PPT/PPTX asli tersedia melalui tombol unduhan. Browser tidak mengurai atau menggambar
+Flyer dan PPT Produk menampilkan PDF sebagai halaman berurutan yang dapat di-scroll vertikal
+di dalam popup, tanpa animasi membalik halaman. Dummy Buku tetap memakai flipbook.
+Ketiganya memakai header bersama: tombol tutup, label PDF, nama file, zoom 50–200%,
+dan tombol Unduh. Zoom Flyer/PPT memperbesar halaman dalam area scroll tanpa mengambil
+ulang PDF; header tetap berada di atas area baca dan mengikuti tata letak mobile Dummy.
+PPT Produk memakai PDF yang diunggah Editor; PPT/PPTX asli tersedia melalui tombol unduhan.
+Browser tidak mengurai atau menggambar
 isi PowerPoint.
 Favorit anonim menawarkan login
 dengan tujuan kembali ke buku. Tombol pemesanan menuju kontak pada footer beranda.
