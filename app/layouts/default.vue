@@ -5,6 +5,7 @@ const config = useRuntimeConfig()
 const route = useRoute()
 const isLanding = computed(() => route.path === '/')
 const isCatalog = computed(() => route.path === '/products')
+const isFavorites = computed(() => route.path === '/favorites')
 const isBrowse = computed(() => route.path === '/jenjang' || route.path === '/divisi')
 const isBookDetail = computed(() => /^\/products\/[^/]+$/.test(route.path))
 const isBookForm = computed(() => /^\/admin\/books\/[^/]+$/.test(route.path))
@@ -20,6 +21,7 @@ const isShowcase = computed(
   () =>
     isLanding.value ||
     isCatalog.value ||
+    isFavorites.value ||
     isBrowse.value ||
     isBookDetail.value ||
     isBookForm.value ||
@@ -280,7 +282,13 @@ async function logout() {
           ? 'landing-main'
           : isAuthPage
             ? 'login-main'
-            : isCatalog || isBrowse || isBookDetail || isBookForm || isDashboard || isContact
+            : isCatalog ||
+                isFavorites ||
+                isBrowse ||
+                isBookDetail ||
+                isBookForm ||
+                isDashboard ||
+                isContact
               ? 'catalog-main'
               : 'mx-auto max-w-6xl px-6 py-12'
       "

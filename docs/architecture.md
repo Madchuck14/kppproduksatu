@@ -306,6 +306,14 @@ memastikan tidak ada buku SMK dengan subject terisi.
 
 ## Favorit buku
 
+Halaman `/favorites` mengikuti `designreferences/favorites` dan `favoritesempty`:
+breadcrumb, judul Buku Favorit, grid empat kolom pada desktop dan dua kolom pada mobile,
+serta kartu katalog dengan tombol hati, mapel, judul, penulis, jenjang, dan kelas.
+Kondisi kosong menampilkan ajakan Jelajahi Katalog. Banner Masuk hanya ditampilkan bagi
+pengunjung anonim; koleksi akun tetap memerlukan login. Pencarian, filter jenjang, pagination,
+error/retry, dan penghapusan favorit mempertahankan alur data yang tersedia. Hasil pencarian
+kosong menawarkan Hapus semua filter, terpisah dari koleksi yang belum berisi buku.
+
 Semua user terautentikasi dapat menyimpan favorit, termasuk Sales, Editor, dan akun tanpa
 membership. Favorit tidak memberikan hak Editor. Pengunjung anonim mendapat penjelasan login
 dan tautan kembali ke detail buku atau `/favorites`; penyimpanan dilakukan setelah pengguna
