@@ -13,6 +13,13 @@ export const editorQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(100000).default(1),
 })
 
+export const bookMaterialMaxBytes = {
+  dummy: 15 * 1024 * 1024,
+  flyer: 10 * 1024 * 1024,
+  'product-knowledge': 10 * 1024 * 1024,
+  'product-knowledge-preview': 10 * 1024 * 1024,
+} as const
+
 export const maxFeaturedBooks = 8
 export const featuredBooksQuerySchema = z.object({
   q: z.string().trim().max(100).default(''),

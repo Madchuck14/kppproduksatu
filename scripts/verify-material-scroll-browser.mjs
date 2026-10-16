@@ -1,9 +1,7 @@
-import assert from 'node:assert/strict'
+﻿import assert from 'node:assert/strict'
 import { pathToFileURL } from 'node:url'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { loadEnvFile } from 'node:process'
-import { createServerClient } from '@supabase/ssr'
 
 if (!process.env.PLAYWRIGHT_MODULE_PATH) throw new Error('PLAYWRIGHT_MODULE_PATH belum ditentukan.')
 const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE_PATH).href)
@@ -38,7 +36,6 @@ pdf += offsets
   .join('')
 pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
-let authClient
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
   page.setDefaultTimeout(30000)
@@ -65,7 +62,8 @@ try {
   await page.route('**/__viewer-test__/material.pdf', (route) =>
     route.fulfill({ contentType: 'application/pdf', body: Buffer.from(pdf) }),
   )
-  await page.goto(`${base}/login`, { waitUntil: 'networkidle' })
+  await page.goto(`${base}/login`, { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(() => Boolean(document.querySelector('#__nuxt')?.__vue_app__))
   await page.evaluate(
     (identifier) =>
       document
@@ -139,38 +137,7 @@ try {
       await dialog.waitFor({ state: 'hidden' })
     }
   }
-  await page.getByRole('link', { name: 'Login untuk membuka Dummy Buku', exact: true }).click()
-  await page.waitForURL(/\/login\?returnTo=/)
-  // Verify the shared header also preserves the authenticated Dummy flipbook.
-  loadEnvFile('.env')
-  const jar = new Map()
-  authClient = createServerClient(
-    process.env.NUXT_PUBLIC_SUPABASE_URL,
-    process.env.NUXT_PUBLIC_SUPABASE_KEY,
-    {
-      cookieOptions: { name: 'sb-kppproduksatu' },
-      cookies: {
-        getAll: () => Array.from(jar, ([name, value]) => ({ name, value })),
-        setAll: (entries) => entries.forEach(({ name, value }) => jar.set(name, value)),
-      },
-    },
-  )
-  const login = await authClient.auth.signInWithPassword({
-    email: process.env.SUPER_ACCOUNT_EDITOR_EMAIL,
-    password: process.env.SUPER_ACCOUNT_EDITOR_PASSWORD,
-  })
-  assert.equal(login.error, null, 'Existing Editor login required for Dummy regression check')
-  await page
-    .context()
-    .addCookies(Array.from(jar, ([name, value]) => ({ name, value, url: base, sameSite: 'Lax' })))
-  await page.goto(`${base}/login`, { waitUntil: 'networkidle' })
-  await page.evaluate(
-    (identifier) =>
-      document
-        .querySelector('#__nuxt')
-        .__vue_app__.config.globalProperties.$router.push(`/products/${identifier}`),
-    book.bookCode || book.slug,
-  )
+  assert.equal(await page.getByRole('link', { name: 'Login untuk membuka Dummy Buku' }).count(), 0)
   await page.getByRole('button', { name: 'Lihat: File Dummy Buku', exact: true }).click()
   const dummy = page.getByRole('dialog', { name: 'Penampil File Dummy Buku', exact: true })
   await dummy.locator('.dummy-pagination').waitFor()
@@ -189,9 +156,8 @@ try {
   await dummy.waitFor({ state: 'hidden' })
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: shared header, filename, zoom 50–200%, download/close/Escape, Flyer/PPT scroll on desktop/mobile, anonymous Dummy login, authenticated Dummy flipbook/zoom/page turn. Fixture PDFs; no live catalog writes.',
+    'PASS: shared header, filename, zoom 50â€“200%, download/close/Escape, Flyer/PPT scroll on desktop/mobile, anonymous Dummy flipbook/zoom/page turn. Fixture PDFs; no live catalog writes.',
   )
 } finally {
   await browser.close()
-  await authClient?.auth.signOut({ scope: 'local' })
 }

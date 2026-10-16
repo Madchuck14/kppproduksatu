@@ -1,0 +1,4 @@
+- Dummy Buku open untuk public
+- Tambah Akun untuk editor, 1 untuk masing masing divisi
+- Yang bisa akses klasifikasi buku dan atur buku pilihan hanya admin super
+- Rapihkan semua dropdown di section klasifikasi pada editor book form, buat sama seperti dropdown pilih jenjang. hapus opsi naik turunkan angka pada kolom input tahun dan harga

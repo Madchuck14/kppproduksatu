@@ -11,7 +11,7 @@ import type { AccountSession } from '#shared/types/account'
 import type { BookInput } from '#shared/schemas/editor'
 import type { EditorDatabase } from '#shared/types/editor-database'
 import { getCatalogClient } from '../utils/catalog-client'
-import { assertBookScope } from '../utils/require-editor'
+import { assertSuperEditor } from '../utils/require-editor'
 
 export async function listClassifications(event: H3Event) {
   const source = useRuntimeConfig(event).catalogSource
@@ -46,9 +46,7 @@ export async function addClassification(
   account: AccountSession,
   input: ClassificationInput,
 ) {
-  if (input.kind === 'subject') assertBookScope(account, input.educationLevel)
-  if (!account.isSuper && !account.educationLevels.length)
-    throw createError({ statusCode: 403, statusMessage: 'Anda belum memiliki jenjang akses.' })
+  assertSuperEditor(account)
   const code =
     input.kind === 'division'
       ? input.name
@@ -108,9 +106,7 @@ export async function deleteClassification(
   account: AccountSession,
   input: ClassificationDelete,
 ) {
-  if (input.kind === 'subject') assertBookScope(account, input.educationLevel)
-  if (!account.isSuper && !account.educationLevels.length)
-    throw createError({ statusCode: 403, statusMessage: 'Anda belum memiliki jenjang akses.' })
+  assertSuperEditor(account)
   const client = await serverSupabaseClient<EditorDatabase>(event)
   const { data, error } = await client.rpc('delete_book_classification', {
     option_kind: input.kind,

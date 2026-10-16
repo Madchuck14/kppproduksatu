@@ -124,6 +124,13 @@ try {
     /classification_forbidden/,
   )
   await db.exec("set request.jwt.claim.sub = '11111111-1111-4111-8111-111111111111'")
+  await assert.rejects(
+    db.query("select public.delete_book_classification('division', 'sd-1-mipa', '')"),
+    /classification_forbidden/,
+  )
+  await db.exec(
+    "reset role; update public.account_memberships set is_super = true where role = 'editor'; set role authenticated",
+  )
   assert.equal(
     (
       await db.query(
@@ -136,13 +143,11 @@ try {
     db.query("select public.delete_book_classification('division', 'smk', '')"),
     /classification_in_use/,
   )
-  await assert.rejects(
-    db.exec(
-      "insert into public.book_classifications (kind, code, name, education_level) values ('subject', 'Test', 'Test', 'SMP')",
-    ),
+  await db.exec(
+    "insert into public.book_classifications (kind, code, name, education_level) values ('subject', 'Test', 'Test', 'SMP')",
   )
   console.log(
-    'PASS: 29-section bundle equals sequential schema/RLS/grants/functions/triggers/data; existing-DB guard, atomic rollback, public/draft separation, popularity, duplicate titles, and final Editor classification rules (isolated PostgreSQL).',
+    'PASS: 31-section bundle equals sequential schema/RLS/grants/functions/triggers/data; existing-DB guard, atomic rollback, public/draft separation, popularity, duplicate titles, and final Editor classification rules (isolated PostgreSQL).',
   )
 } finally {
   await Promise.all([db.close(), sequential.close(), failed.close()])

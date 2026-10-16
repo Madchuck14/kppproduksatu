@@ -21,3 +21,18 @@ export function assertBookScope(account: AccountSession, level: string | null) {
     throw createError({ statusCode: 403, statusMessage: 'Buku berada di luar jenjang akses Anda' })
   }
 }
+
+export function assertSuperEditor(account: AccountSession) {
+  if (account.role !== 'editor' || !account.isSuper) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Hanya Editor super yang dapat mengelola klasifikasi buku.',
+    })
+  }
+}
+
+export async function requireSuperEditor(event: H3Event) {
+  const account = await requireEditor(event)
+  assertSuperEditor(account)
+  return account
+}

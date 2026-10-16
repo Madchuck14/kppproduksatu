@@ -1,3 +1,4 @@
+import { bookMaterialMaxBytes } from '#shared/schemas/editor'
 import { createError, getHeader, getRequestWebStream } from 'h3'
 import type { H3Event } from 'h3'
 
@@ -106,7 +107,7 @@ export function bookMaterialFormat(kind: MaterialKind, type: string) {
       statusMessage:
         kind === 'product-knowledge' ? 'Gunakan berkas PPT atau PPTX' : 'Gunakan berkas PDF',
     })
-  const maxSize = kind === 'product-knowledge' ? 50 * 1024 * 1024 : 20 * 1024 * 1024
+  const maxSize = bookMaterialMaxBytes[kind]
   return { type, extension, maxSize }
 }
 

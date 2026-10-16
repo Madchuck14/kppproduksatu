@@ -1,9 +1,23 @@
+## Dummy Buku publik (16 Oktober 2026)
+
+Terapkan migration incremental `202610160001_public_dummy_books.sql` setelah seluruh
+migration sebelumnya, sebelum deploy aplikasi terbaru. Dummy Buku published dapat
+dilihat dan diunduh tanpa login. Bucket `book-materials` tetap privat; RLS hanya
+membuka path materi yang direferensikan buku published. Draf, objek tanpa referensi,
+dan hak tulis Editor tetap mengikuti pembatasan sebelumnya. Tidak ada perubahan data
+buku atau objek Storage. Database baru memakai `supabase/setup.sql` yang sudah diperbarui.
+
+Rollback: pulihkan definisi `can_access_public_book_material` dari migration
+`202610140005_manual_product_knowledge_pdf.sql` dan aplikasi sebelumnya. Jangan jalankan
+ulang seluruh migration lama karena berisi perubahan lain. Signed URL yang sudah terbit
+tetap berlaku sampai kedaluwarsa. Migration ini belum diterapkan ke Supabase live oleh agent.
+
 # Setup Supabase untuk demo online
 
 ## Setup satu file untuk database baru
 
-[`supabase/setup.sql`](../supabase/setup.sql) menggabungkan seluruh 29 migrasi sampai
-`202610150006_delete_all_book_classifications.sql`. Setiap bagian memiliki judul,
+[`supabase/setup.sql`](../supabase/setup.sql) menggabungkan seluruh 31 migrasi sampai
+`202610160002_super_editor_classifications.sql`. Setiap bagian memiliki judul,
 komentar penjelasan singkat tepat di bawahnya, serta nama file sumber. Urutan SQL sama
 dengan migrasi berurutan; definisi historis yang diganti bagian berikutnya tetap diberi
 penjelasan agar hasil akhir sesuai aplikasi terbaru.
@@ -245,7 +259,7 @@ memeriksa status published, UUID buku, folder Flyer/PPT, dan path asli yang ters
 Dummy, draft, bucket lain, dan objek tanpa referensi tidak mendapat akses anonim. Writer
 tetap membutuhkan Editor dan scope jenjang; tidak ada perubahan UUID, metadata, atau file.
 
-Editor mengunggah PPT/PPTX maksimal 50 MB untuk unduhan dan PDF maksimal 20 MB untuk tampilan.
+Editor mengunggah PPT/PPTX maksimal 10 MB untuk unduhan dan PDF maksimal 10 MB untuk tampilan.
 Tidak ada iframe Microsoft, converter, atau layanan viewer pihak ketiga.
 
 Endpoint publik menggunakan client anonim dan query published. Dummy menggunakan
@@ -291,8 +305,8 @@ jalankan `supabase/migrations/202610140005_manual_product_knowledge_pdf.sql`. Mi
 `catalog_cleanup_archive`, lalu menghapus kolom status dan slide yang tidak lagi digunakan.
 
 Editor mendapat dua input independen. Folder `product-knowledge-preview` hanya menerima PDF
-maksimal 20 MB untuk tombol **Tampilkan**. Folder `product-knowledge` menerima PPT/PPTX maksimal
-50 MB untuk tombol **Unduh PowerPoint**. Keduanya dapat dibaca anonim hanya pada buku published;
+maksimal 10 MB untuk tombol **Tampilkan**. Folder `product-knowledge` menerima PPT/PPTX maksimal
+10 MB untuk tombol **Unduh PowerPoint**. Keduanya dapat dibaca anonim hanya pada buku published;
 Dummy Buku tetap membutuhkan login. Tidak diperlukan port 3001 atau environment converter.
 
 Rollback `supabase/rollback/202610140005_restore_presentation_converter_columns.sql` mengembalikan
@@ -405,6 +419,30 @@ kredensial. Endpoint `POST /api/auth/register` selalu mengembalikan 403. Pada Su
 nonaktifkan **Allow new users to sign up** agar public key tidak dapat dipakai signup langsung.
 Pertahankan **Confirm email**; provisioning administratif mengonfirmasi dua akun yang disetujui.
 
+## Provisioning Editor per jenjang
+
+Empat akun Editor biasa (SD, SMP, SMA, SMK) disiapkan melalui script lokal
+`scripts/provision-editor-accounts.mjs`. Setiap akun memiliki satu row `editor_scopes`,
+`is_super=false`, dan tidak diberi `admin_memberships`. Jenjang adalah batas akses;
+divisi buku tetap metadata katalog dan tidak menjadi scope akun.
+
+Simpan kredensial di `.env.editor-accounts` lokal memakai pasangan variabel
+`EDITOR_SD_EMAIL`/`EDITOR_SD_PASSWORD`, dengan pola sama untuk SMP, SMA, dan SMK.
+File ini diabaikan Git dan tidak dibaca runtime aplikasi. Konfigurasi Supabase dan key
+admin tetap berasal dari `.env`; jangan menyalin rahasia ke dokumentasi atau contoh env.
+
+Jalankan `node scripts/provision-editor-accounts.mjs --check` untuk preflight, kemudian
+`node scripts/provision-editor-accounts.mjs` untuk membuat/memperbarui akun target.
+Email target mengikuti `editor<jenjang-huruf-kecil>@erlangga.com`. Script mengonfirmasi
+email secara administratif tanpa mengirim undangan. Akun target dengan role lain, hak
+super, atau membership admin ditolak sebelum mutasi. Rerun memperbarui password akun
+Editor target dan membatasi ulang scope ke satu jenjang; akun lain tidak disentuh.
+
+Verifikasi script mencakup login Supabase, membership non-super, satu scope, RPC RLS
+`can_manage_book_level`, dan API dashboard pada seluruh pasangan jenjang melalui
+server lokal port 3000. Jenjang sendiri harus 200; tiga jenjang lain harus 403.
+Gunakan `EDITOR_TEST_BASE_URL` bila server berada pada alamat lain.
+
 ## Provisioning akun super
 
 1. Jalankan `supabase/migrations/202610050001_account_access.sql` satu kali setelah migration katalog.
@@ -464,8 +502,8 @@ privat `book-materials`, serta kebijakan upload Editor sesuai scope jenjang. Con
 dibuat `NOT VALID`: data lama berkode nonnumerik tetap terbaca, tetapi harus diperbaiki saat row
 tersebut diperbarui. Jangan jalankan aplikasi baru dalam mode Supabase sebelum migration diterapkan.
 
-Flyer dan Dummy Buku menerima PDF maksimal 20 MB. PPT Produk (Product Knowledge) menerima
-PPT/PPTX maksimal 50 MB dengan gambar slide hasil ekspor PNG/JPG untuk preview statis.
+Flyer menerima PDF maksimal 10 MB; Dummy Buku maksimal 15 MB. PPT Produk (Product Knowledge) menerima
+PPT/PPTX maksimal 10 MB dengan gambar slide hasil ekspor PNG/JPG untuk preview statis.
 Product Knowledge PDF lama tetap dapat dibuka. Bucket tidak memiliki URL publik permanen.
 Materi published hanya dapat dibuka setelah login lewat endpoint server yang membuat signed URL
 berumur 60 detik.
@@ -814,3 +852,23 @@ mobile, dan pencatatan detail di Chrome headless. Tentukan `PLAYWRIGHT_MODULE_PA
 `index.mjs` instalasi Playwright, serta `CATALOG_TEST_BASE_URL` jika server bukan port 3000.
 Data ranking UI merupakan fixture berlabel; seluruh POST statistik diintersep sehingga
 skrip tidak menulis statistik live. `CATALOG_SCREENSHOT_DIR` opsional menyimpan screenshot.
+
+## Pengelolaan klasifikasi hanya Editor super
+
+Terapkan migration `202610160002_super_editor_classifications.sql` setelah migration
+sebelumnya dan sebelum deploy aplikasi terbaru. Endpoint tambah/hapus klasifikasi
+memverifikasi sesi dan mensyaratkan `role=editor` serta `is_super=true` sebelum
+membaca input. Tombol **Edit Klasifikasi Buku** hanya tampil bagi Editor super.
+RLS insert dan RPC hapus memeriksa syarat yang sama, termasuk akses langsung Supabase.
+Editor super tidak harus memiliki row scope jenjang untuk mengelola mapel.
+
+Editor biasa tetap memilih opsi yang tersedia saat mengedit buku dalam jenjangnya.
+Pembacaan opsi publik, perlindungan klasifikasi yang sedang dipakai buku (termasuk
+draf), serta data buku/klasifikasi tidak diubah. Sales super tetap tidak boleh mengelola
+klasifikasi. Ketentuan historis yang membolehkan Editor biasa di bagian sebelumnya
+sudah digantikan. Migration belum diterapkan ke Supabase live oleh agent.
+
+Rollback aplikasi sebelumnya, lalu pulihkan policy `classifications_editor_insert`
+dari migration `202610150004` dan definisi RPC hapus dari `202610150006`; hapus policy
+`classifications_super_insert`. Salin hanya definisi tersebut, jangan jalankan ulang
+seluruh migration lama. Rollback ini membuka kembali pengelolaan untuk Editor biasa.

@@ -20,7 +20,7 @@ Referensi: https://vercel.com/docs/frameworks/full-stack/nuxt dan https://vercel
 Vercel Functions membatasi body request hingga 4,5 MB. Form editor mengunggah Flyer,
 Dummy Buku, dan PPT Produk langsung dari browser ke Supabase Storage menggunakan
 signed upload token; API aplikasi hanya menerima JSON kecil untuk persiapan dan
-penyelesaian. Batas aplikasi tetap 20 MB untuk PDF dan 50 MB untuk PowerPoint.
+penyelesaian. Batas unggahan: Dummy Buku PDF 15 MB; Flyer, PDF tampilan, dan PowerPoint masing-masing 10 MB.
 Sampul maksimal 2 MB tetap melalui API aplikasi.
 
 Kedua endpoint memeriksa sesi editor dan lingkup buku. Endpoint penyelesaian memeriksa

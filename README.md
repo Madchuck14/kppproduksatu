@@ -10,7 +10,7 @@ Fondasi katalog produk dengan Nuxt 4, Vue 3, TypeScript, Tailwind CSS, Nuxt UI, 
 ## Mulai di Windows
 
 Untuk menyiapkan database Supabase baru lewat satu file, gunakan
-[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 29 migrasi
+[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 31 migrasi
 dengan komentar section dan penjelasan singkat. Ikuti [panduan file gabungan](docs/supabase.md#setup-satu-file-untuk-database-baru).
 Database yang sudah terpasang tetap memakai migrasi incremental; jangan jalankan ulang file setup.
 
@@ -34,11 +34,12 @@ Docker, dan pemeriksaan interaksi browser belum diverifikasi untuk dashboard ini
 
 ## Yang tersedia
 
-Dashboard menyediakan modal **Edit Klasifikasi Buku** untuk menambah kurikulum, divisi,
+Hanya Editor super yang dapat memakai modal **Edit Klasifikasi Buku** untuk menambah kurikulum, divisi,
 dan mata pelajaran per jenjang, serta menghapus opsi tambahan yang belum dipakai buku melalui
 konfirmasi. Seluruh opsi termasuk divisi dan mapel awal dapat dihapus bila tidak dipakai buku.
 Terapkan `202610150004_book_classifications.sql`, `202610150005_delete_book_classifications.sql`,
-dan `202610150006_delete_all_book_classifications.sql` sebelum deploy. Beranda menampilkan
+`202610150006_delete_all_book_classifications.sql`, dan
+`202610160002_super_editor_classifications.sql` sebelum deploy. Beranda menampilkan
 hanya divisi awal yang belum dihapus; `/divisi` menampilkan seluruh divisi
 terdaftar, termasuk yang belum memiliki buku. Lihat [rollout klasifikasi](docs/supabase.md#klasifikasi-buku-dinamis).
 
@@ -78,7 +79,8 @@ Editor mengunggah dua berkas untuk PPT Produk: PDF untuk tombol **Tampilkan** da
 untuk tombol **Unduh PowerPoint**. Keduanya disimpan langsung di Supabase tanpa converter atau
 server tambahan. Flyer dan Dummy Buku tetap PDF.
 Setelah migration `202610140002_public_promotional_materials.sql`, Flyer dan PPT Produk buku
-published dapat dibuka tanpa login; hanya Dummy Buku yang memerlukan login. Bucket `book-materials`
+published dapat dibuka tanpa login. Migration `202610160001_public_dummy_books.sql` juga
+membuka Dummy Buku published tanpa login; terapkan sebelum menjalankan aplikasi terbaru. Bucket `book-materials`
 tetap privat dan RLS melindungi draft serta akses Editor per jenjang. Terapkan migration sebelumnya
 terlebih dahulu, lalu migration `202610140005_manual_product_knowledge_pdf.sql` dan
 [rollout PDF tampilan](docs/supabase.md#pdf-tampilan-dan-powerpoint-unduhan).

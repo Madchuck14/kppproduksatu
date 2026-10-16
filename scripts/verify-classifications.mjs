@@ -243,6 +243,107 @@ try {
     ).rows.length,
     1,
   )
+  const accessSql = await readFile(
+    'supabase/migrations/202610160002_super_editor_classifications.sql',
+    'utf8',
+  )
+  const optionsBefore = (
+    await db.query('select * from public.book_classifications order by kind, code, education_level')
+  ).rows
+  const productsBefore = (await db.query('select * from public.products order by id')).rows
+  await db.exec(accessSql)
+  await db.exec(accessSql)
+  assert.deepEqual(
+    (
+      await db.query(
+        'select * from public.book_classifications order by kind, code, education_level',
+      )
+    ).rows,
+    optionsBefore,
+  )
+  assert.deepEqual(
+    (await db.query('select * from public.products order by id')).rows,
+    productsBefore,
+  )
+  await db.exec('set role anon')
+  assert.equal(
+    (await db.query('select * from public.book_classifications')).rows.length,
+    optionsBefore.length,
+  )
+  await assert.rejects(remove('division', 'smk'), /permission denied/)
+  await db.exec('reset role')
+  await db.exec(`
+    insert into auth.users values ('33333333-3333-4333-8333-333333333333');
+    insert into public.account_memberships (user_id, role, is_super)
+      values ('33333333-3333-4333-8333-333333333333', 'editor', true);
+  `)
+  for (const userId of [
+    '11111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222222',
+  ]) {
+    await db.query("select set_config('request.jwt.claim.sub', $1, false)", [userId])
+    await db.exec('set role authenticated')
+    for (const [kind, code, level] of [
+      ['division', 'forbidden', ''],
+      ['curriculum', 'Forbidden', ''],
+      ['subject', 'Forbidden', 'SD'],
+    ]) {
+      await assert.rejects(
+        db.query(
+          'insert into public.book_classifications (kind, code, name, education_level) values ($1, $2, $2, $3)',
+          [kind, code, level],
+        ),
+        /row-level security/,
+      )
+      await assert.rejects(remove(kind, code, level), /classification_forbidden/)
+    }
+    await db.exec('reset role')
+  }
+  // A Sales super flag alone must not grant classification management.
+  await db.exec("update public.account_memberships set is_super = true where role = 'sales'")
+  await db.exec(
+    "set role authenticated; set request.jwt.claim.sub = '22222222-2222-4222-8222-222222222222'",
+  )
+  await assert.rejects(
+    db.exec(
+      "insert into public.book_classifications (kind, code, name) values ('division', 'forbidden', 'Forbidden')",
+    ),
+    /row-level security/,
+  )
+  await assert.rejects(remove('division', 'smk'), /classification_forbidden/)
+  await db.exec(
+    "reset role; set role authenticated; set request.jwt.claim.sub = '33333333-3333-4333-8333-333333333333'",
+  )
+  for (const [kind, code, level] of [
+    ['division', 'super-test', ''],
+    ['curriculum', 'Super Test', ''],
+    ['subject', 'Super Mapel', 'SMK'],
+  ]) {
+    await db.query(
+      'insert into public.book_classifications (kind, code, name, education_level) values ($1, $2, $2, $3)',
+      [kind, code, level],
+    )
+    assert.equal((await remove(kind, code, level)).rows[0].deleted, true)
+  }
+  await assert.rejects(db.exec('delete from public.book_classifications'), /permission denied/)
+  await db.exec('reset role')
+  await db.exec("update public.products set division_code = 'smk', published = false")
+  await db.exec(
+    "set role authenticated; set request.jwt.claim.sub = '33333333-3333-4333-8333-333333333333'",
+  )
+  await assert.rejects(remove('division', 'smk'), /classification_in_use/)
+  await db.exec('reset role')
+  assert.deepEqual(
+    (
+      await db.query(
+        'select * from public.book_classifications order by kind, code, education_level',
+      )
+    ).rows,
+    optionsBefore,
+  )
+  console.log(
+    'PASS: super-only insert/delete; super without scopes; ordinary Editor/Sales/Sales super/anon denied; public reads; draft reference protection; migration retries preserve books/options.',
+  )
   console.log(
     'PASS: all options deletable, actual row removal, deleted rows remain absent after migration retry, product preservation, auth/scope and in-use checks retained.',
   )

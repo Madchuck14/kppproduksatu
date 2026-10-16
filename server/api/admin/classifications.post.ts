@@ -1,9 +1,9 @@
 import { classificationInputSchema } from '#shared/schemas/classifications'
-import { requireEditor } from '../../utils/require-editor'
+import { requireSuperEditor } from '../../utils/require-editor'
 import { addClassification } from '../../repositories/classifications'
 
 export default defineEventHandler(async (event) => {
-  const account = await requireEditor(event)
+  const account = await requireSuperEditor(event)
   const input = classificationInputSchema.safeParse(await readBody(event))
   if (!input.success)
     throw createError({

@@ -69,13 +69,6 @@ const resources: Array<{
   },
 ]
 async function openPdfResource(resource: (typeof resources)[number]) {
-  if (resource.id === 'dummy' && !user.value) {
-    await navigateTo({
-      path: '/login',
-      query: { returnTo: `${getProductPath(product.value!)}#${resource.id}` },
-    })
-    return
-  }
   const request = ++pdfRequest
   pdfViewerKind.value = resource.id
   pdfViewerTitle.value = resource.title
@@ -213,9 +206,7 @@ useSeoMeta({
 
     <section class="detail-resources" aria-labelledby="resources-title">
       <h2 id="resources-title">Materi Promosi</h2>
-      <p class="resources-intro">
-        Flyer dan PPT Produk dapat dibuka tanpa login. Dummy Buku memerlukan login.
-      </p>
+      <p class="resources-intro">Flyer, PPT Produk, dan Dummy Buku dapat dibuka tanpa login.</p>
       <p v-if="resourceError" role="alert" class="resources-error">
         Status materi belum dapat dimuat. Muat ulang halaman.
       </p>
@@ -273,13 +264,6 @@ useSeoMeta({
             >
               Berkas belum tersedia
             </p>
-            <div v-else-if="resource.id === 'dummy' && !user" class="resource-actions">
-              <NuxtLink
-                :to="{ path: '/login', query: { returnTo: `${getProductPath(product)}#dummy` } }"
-                class="resource-view"
-                >Login untuk membuka Dummy Buku</NuxtLink
-              >
-            </div>
             <div v-else class="resource-actions">
               <a
                 v-if="resource.id !== 'product-knowledge' || resourceStatus.productKnowledge"

@@ -1,3 +1,11 @@
+## Akses Dummy Buku publik
+
+Setelah migration `202610160001_public_dummy_books.sql`, seluruh materi buku published
+(Flyer, PPT Produk, dan Dummy Buku) dapat dilihat dan diunduh tanpa login melalui endpoint
+yang sama. Repository memakai client anonim dengan filter published dan RLS Storage.
+Bucket tetap privat; draf dan objek yang tidak direferensikan buku published tetap terlindungi.
+Ketentuan Dummy login pada catatan historis di bawah sudah digantikan.
+
 # Arsitektur
 
 ## Cleanup kolom produk lama
@@ -44,7 +52,10 @@ Kartu divisi tambahan memakai 12 pilihan ikon Lucide dan delapan palet pastel da
 divisi, terpisah satu sama lain, sehingga tetap konsisten pada SSR, hydration, dan refresh.
 Kombinasi dapat berulang; enam divisi awal mempertahankan tampilan semula.
 Form tambah/edit, filter mapel publik/Editor, nama divisi detail, dan `/divisi` memakai
-registry ini. Kurikulum tetap menerima teks lama dan menyediakan saran dari registry.
+registry ini. Form kurikulum memakai dropdown dengan gaya yang sama seperti Jenjang, Kelas,
+Mapel, dan Divisi. Pilihan berasal dari registry; nilai kurikulum lama yang tersimpan tetap
+tersedia saat edit agar metadata tidak hilang. Kurikulum opsional dapat dikosongkan. Input
+harga dan tahun mempertahankan validasi angka, tanpa tombol naik/turun bawaan browser.
 Landing memakai irisan enam kode awal dan registry saat ini sehingga divisi yang dihapus
 tidak tampil lagi; divisi baru tetap hanya ada di halaman Divisi. RPC ranking membaca semua divisi
 dari registry, termasuk kelompok kosong. Validasi mapel per jenjang dan divisi terdaftar
@@ -248,8 +259,8 @@ Object baru memakai `books/{product UUID}/{random UUID}.{extension}`; RLS Storag
 ke buku tersebut. Tidak ada overwrite object. File lama tidak otomatis dihapus saat sampul diganti
 atau buku dihapus; pembersihan aset tak terpakai dilakukan terpisah oleh pengelola.
 
-PPT Produk memakai dua upload independen: PPT/PPTX maksimal 50 MB untuk unduhan dan PDF maksimal
-20 MB untuk tampilan. Flyer dan Dummy Buku juga dibatasi PDF 20 MB. Dummy Buku memakai PDF.js dan
+PPT Produk memakai dua upload independen: PPT/PPTX maksimal 10 MB untuk unduhan dan PDF maksimal
+10 MB untuk tampilan. Flyer dibatasi PDF 10 MB; Dummy Buku PDF 15 MB. Dummy Buku memakai PDF.js dan
 StPageFlip (`page-flip`) dalam popup flipbook: dua halaman pada layar lebar, satu halaman pada layar
 sempit, dengan sampul, swipe/drag, tombol navigasi, dan panah keyboard. PDF diambil sekali sebelum
 halaman disiapkan agar navigasi tidak bergantung pada masa berlaku signed URL. Penampil hanya
@@ -479,3 +490,13 @@ Storage, termasuk berkas 10,6 MiB dan kegagalan yang mempertahankan materi lama.
 `node scripts/verify-material-upload-browser.mjs`; uji browser memakai port 3000
 (default) atau `MATERIAL_TEST_BASE_URL`, dan mengintersep semua mutasi admin serta
 unggahan Storage. Kedua uji tidak membuktikan unggahan atau RLS Supabase live.
+
+## Otorisasi klasifikasi buku
+
+Setelah migration `202610160002_super_editor_classifications.sql`, pengelolaan opsi
+klasifikasi hanya tersedia bagi Editor super (`role=editor`, `is_super=true`).
+UI menyembunyikan tombol bagi Editor biasa; guard server, repository, RLS insert,
+dan RPC hapus menegakkan syarat yang sama. Sales, termasuk Sales super, tidak mendapat
+akses tulis. Opsi tetap dapat dibaca publik dan dipilih Editor pada formulir buku.
+Scope pengelolaan buku per jenjang dan larangan hapus opsi yang dipakai tetap berlaku.
+Ketentuan historis sebelumnya tentang pengelolaan oleh Editor biasa sudah digantikan.

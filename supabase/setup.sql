@@ -1,5 +1,5 @@
 -- KPP PRODUK SATU - SETUP SUPABASE LENGKAP
--- Gabungan 29 migrasi berurutan, sampai versi 202610150006.
+-- Gabungan 31 migrasi berurutan, sampai versi 202610160002.
 -- Untuk database Supabase BARU yang belum memiliki tabel aplikasi ini.
 -- Jalankan seluruh file sebagai database owner melalui SQL Editor.
 -- Jangan jalankan pada database existing atau hanya memilih section tertentu.
@@ -1769,6 +1769,76 @@ begin
         select 1 from public.editor_scopes s where s.user_id = m.user_id
       ))
   ) or (option_kind = 'subject' and not public.has_editor_scope(option_level)) then
+    raise exception 'classification_forbidden' using errcode = '42501';
+  end if;
+  lock table public.products in share row exclusive mode;
+  select * into target from public.book_classifications
+    where kind = option_kind and code = option_code and education_level = option_level for update;
+  if not found then return false; end if;
+  if exists (
+    select 1 from public.products p where
+      (target.kind = 'division' and p.division_code = target.code)
+      or (target.kind = 'subject' and p.subject = target.name and p.education_level = target.education_level)
+      or (target.kind = 'curriculum' and lower(btrim(p.curriculum)) = lower(target.name))
+  ) then raise exception 'classification_in_use' using errcode = 'P0001'; end if;
+  delete from public.book_classifications
+    where kind = target.kind and code = target.code and education_level = target.education_level;
+  return true;
+end;
+$$;
+revoke all on function public.delete_book_classification(text, text, text) from public, anon, authenticated;
+grant execute on function public.delete_book_classification(text, text, text) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- BAGIAN 30: DUMMY BUKU PUBLIK
+-- Penjelasan: Mengizinkan baca Dummy Buku published tanpa login; bucket dan materi draf tetap privat.
+-- Sumber: migrations/202610160001_public_dummy_books.sql
+-- ============================================================================
+
+-- Published materials are public through RLS; the bucket and drafts remain private.
+create or replace function public.can_access_public_book_material(object_name text)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.products p
+    where p.published and p.id::text = split_part(object_name, '/', 2)
+      and object_name in (
+        p.flyer_path,
+        p.dummy_book_path,
+        p.product_knowledge_path,
+        p.product_knowledge_preview_path
+      )
+  );
+$$;
+revoke all on function public.can_access_public_book_material(text) from public, anon, authenticated;
+grant execute on function public.can_access_public_book_material(text) to anon, authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- BAGIAN 31: KLASIFIKASI HANYA EDITOR SUPER
+-- Penjelasan: Membatasi tambah dan hapus klasifikasi ke Editor super melalui RLS dan RPC; pembacaan opsi tetap publik.
+-- Sumber: migrations/202610160002_super_editor_classifications.sql
+-- ============================================================================
+
+-- Classification management belongs exclusively to super Editors.
+-- Public option reads and scoped book editing remain available.
+drop policy if exists classifications_editor_insert on public.book_classifications;
+drop policy if exists classifications_super_insert on public.book_classifications;
+create policy classifications_super_insert on public.book_classifications for insert to authenticated
+with check (
+  exists (select 1 from public.account_memberships m
+    where m.user_id = (select auth.uid()) and m.role = 'editor' and m.is_super)
+);
+create or replace function public.delete_book_classification(option_kind text, option_code text, option_level text)
+returns boolean language plpgsql security definer set search_path = '' as $$
+declare target public.book_classifications%rowtype;
+begin
+  if not exists (
+    select 1 from public.account_memberships m where m.user_id = (select auth.uid())
+      and m.role = 'editor' and m.is_super
+  ) then
     raise exception 'classification_forbidden' using errcode = '42501';
   end if;
   lock table public.products in share row exclusive mode;

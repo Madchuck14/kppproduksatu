@@ -196,7 +196,7 @@ const fieldClass =
         </p>
       </div>
       <div class="dashboard-header-actions">
-        <ClassificationManager :levels="levels" />
+        <ClassificationManager v-if="data?.account.isSuper" :levels="levels" />
         <UButton
           type="button"
           class="featured-manager-button"

@@ -22,10 +22,8 @@ for (const route of [
 await get('/api/products?q=matematika')
 await get('/products/definitely-missing-presentation-smoke', 404)
 await get('/api/products/definitely-missing-presentation-smoke', 404)
-await get(`/api/products/${slug}/resources/dummy?preview=1`, 401)
-await get(`/api/products/${slug}/resources/dummy?download=1`, 401)
 if (catalog.source === 'demo') {
-  for (const kind of ['flyer', 'product-knowledge']) {
+  for (const kind of ['flyer', 'product-knowledge', 'dummy']) {
     await get(`/api/products/${slug}/resources/${kind}?preview=1`, 404)
     await get(`/api/products/${slug}/resources/${kind}?download=1`, 404)
   }
@@ -34,15 +32,14 @@ await get(`/api/products/${slug}/resources/invalid?preview=1`, 400)
 await get('/api/auth/session', 401)
 await get('/api/admin/books', 401)
 const page = await (await get(`/products/${slug}`)).text()
-assert.ok(page.includes('Dummy Buku memerlukan login'))
-assert.ok(page.includes('Flyer dan PPT Produk dapat dibuka tanpa login'))
+assert.ok(page.includes('Flyer, PPT Produk, dan Dummy Buku dapat dibuka tanpa login.'))
 assert.equal(
   page.includes('/storage/v1/object/sign/book-materials'),
   false,
   'Anonymous SSR contains no material signed URLs',
 )
 console.log(
-  'PASS: landing, catalog/search, detail API/SSR, missing-book 404, healthz, login, anonymous Dummy/admin/session denial, public material demo isolation, access labels, and no private signed URLs in anonymous SSR.',
+  'PASS: landing, catalog/search, detail API/SSR, missing-book 404, healthz, login, anonymous admin/session denial, public material demo isolation, access labels, and no private signed URLs in anonymous SSR.',
 )
 console.log(
   'Anonymous smoke only; authenticated upload, Storage/RLS, and browser interactions need a migrated Supabase test project.',

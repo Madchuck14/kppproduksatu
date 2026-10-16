@@ -96,7 +96,7 @@ const server = createServer(toNodeListener(app))
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
 const base = `http://127.0.0.1:${server.address().port}`
 const type = 'application/vnd.ms-powerpoint'
-const size = Math.round(10.6 * 1024 * 1024)
+const size = 10 * 1024 * 1024
 async function post(route, body, status) {
   const response = await fetch(`${base}/${route}`, {
     method: 'POST',
@@ -116,7 +116,7 @@ try {
   level = 'SMP'
   await post('prepare', { type, size }, 403)
   level = 'SD'
-  await post('prepare', { type, size: 51 * 1024 * 1024 }, 413)
+  await post('prepare', { type, size: 10 * 1024 * 1024 + 1 }, 413)
   await post('prepare', { type: 'application/zip', size }, 400)
   assert.equal(signed, 0)
   const upload = await post('prepare', { type, size }, 200)
@@ -136,7 +136,7 @@ try {
     { ...body, path: upload.path.replace('/product-knowledge/', '/dummy/') },
     400,
   )
-  infoSize = 51 * 1024 * 1024
+  infoSize = 10 * 1024 * 1024 + 1
   await post('complete', body, 413)
   infoSize = size - 1
   await post('complete', body, 400)
@@ -176,8 +176,28 @@ try {
     200,
   )
   assert.match(pointer, new RegExp(`^books/${id}/product-knowledge-preview/.+\\.pdf$`))
+  for (const kind of ['dummy', 'flyer', 'product-knowledge', 'product-knowledge-preview']) {
+    requestedKind = kind
+    const maxSize = (kind === 'dummy' ? 15 : 10) * 1024 * 1024
+    const mime = kind === 'product-knowledge' ? type : 'application/pdf'
+    await post('prepare', { type: mime, size: maxSize + 1 }, 413)
+    const boundary = await post('prepare', { type: mime, size: maxSize }, 200)
+    infoType = mime
+    infoSize = maxSize + 1
+    await post('complete', { path: boundary.path, type: mime, size: maxSize }, 413)
+    stored = Buffer.alloc(maxSize)
+    if (kind === 'product-knowledge') {
+      Buffer.from([208, 207, 17, 224, 161, 177, 26, 225]).copy(stored)
+      Buffer.from('PowerPoint Document', 'utf16le').copy(stored, 8)
+    } else Buffer.from('%PDF-1.7').copy(stored)
+    infoSize = maxSize
+    await post('complete', { path: boundary.path, type: mime, size: maxSize }, 200)
+  }
   console.log(
-    'PASS: 10.6 MiB PPT and PDF preview validation; small JSON API bodies; auth/scope recheck; path/type/size/signature rejection; previous material retained on failure.',
+    'PASS: Dummy 15 MB; all other materials 10 MB; exact limits accepted; one byte over rejected at prepare and completion.',
+  )
+  console.log(
+    'PASS: 10 MiB PPT and PDF preview validation; small JSON API bodies; auth/scope recheck; path/type/size/signature rejection; previous material retained on failure.',
   )
 } finally {
   server.closeAllConnections()

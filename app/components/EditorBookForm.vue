@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { bookInputSchema } from '#shared/schemas/editor'
+import { bookInputSchema, bookMaterialMaxBytes } from '#shared/schemas/editor'
 import type { BookSubject } from '#shared/utils/book-subjects'
 import type { DivisionCode } from '#shared/utils/book-divisions'
 import { educationLevelSchema } from '#shared/schemas/auth'
@@ -14,21 +14,21 @@ const props = defineProps<{
 const storageClient = useSupabaseClient()
 const savedId = ref(props.book?.id)
 const materials = [
-  { kind: 'dummy', label: 'Dummy Buku', help: 'Format file dalam bentuk PDF, maksimal 20 MB' },
+  { kind: 'dummy', label: 'Dummy Buku', help: 'Format file dalam bentuk PDF, maksimal 15 MB' },
   {
     kind: 'product-knowledge',
     label: 'PPT Produk untuk diunduh',
-    help: 'Format file dalam bentuk PPT/PPTX, maksimal 50 MB. Pengunjung mengunduh file ini.',
+    help: 'Format file dalam bentuk PPT/PPTX, maksimal 10 MB. Pengunjung mengunduh file ini.',
   },
   {
     kind: 'product-knowledge-preview',
     label: 'PPT Produk untuk pratinjau',
-    help: 'Format file dalam bentuk PDF, maksimal 20 MB. File ini dibuka oleh tombol "Tampilkan".',
+    help: 'Format file dalam bentuk PDF, maksimal 10 MB. File ini dibuka oleh tombol "Tampilkan".',
   },
   {
     kind: 'flyer',
     label: 'Flyer',
-    help: 'Format file dalam bentuk PDF, maksimal 20 MB',
+    help: 'Format file dalam bentuk PDF, maksimal 10 MB',
   },
 ] as const
 const form = reactive({
@@ -62,6 +62,11 @@ const subjectOptions = computed(() =>
   form.educationLevel ? subjectsForLevel(form.educationLevel) : [],
 )
 const gradeOptions = computed(() => getGradesForLevel(form.educationLevel))
+const curriculumOptions = computed(() =>
+  [...new Set([props.book?.curriculum, ...curricula.value])].filter((item): item is string =>
+    Boolean(item),
+  ),
+)
 watch(
   () => form.educationLevel,
   () => {
@@ -124,12 +129,12 @@ function selectMaterial(kind: keyof typeof materialFiles, event: Event) {
     kind === 'product-knowledge'
       ? /\.(ppt|pptx)$/i.test(selected.name)
       : selected.type === 'application/pdf'
-  const maxSize = kind === 'product-knowledge' ? 50 * 1024 * 1024 : 20 * 1024 * 1024
+  const maxSize = bookMaterialMaxBytes[kind]
   if (!validFormat || !selected.size || selected.size > maxSize) {
     message.value =
       kind === 'product-knowledge'
-        ? 'Pilih PPT Produk PPT/PPTX maksimal 50 MB.'
-        : 'Pilih berkas PDF maksimal 20 MB.'
+        ? 'Pilih PPT Produk PPT/PPTX maksimal 10 MB.'
+        : `Pilih berkas PDF maksimal ${maxSize / 1024 / 1024} MB.`
     input.value = ''
     return
   }
@@ -299,6 +304,7 @@ async function save() {
                 id="new-book-price"
                 v-model.number="form.price"
                 type="number"
+                inputmode="numeric"
                 required
                 min="0"
                 max="2147483647"
@@ -313,6 +319,7 @@ async function save() {
                 id="new-book-year"
                 v-model.number="form.publicationYear"
                 type="number"
+                inputmode="numeric"
                 required
                 min="1000"
                 max="9999"
@@ -386,19 +393,17 @@ async function save() {
             </div>
             <div class="form-field">
               <label for="new-book-curriculum">Kurikulum</label>
-              <input
+              <select
                 id="new-book-curriculum"
                 v-model="form.curriculum"
-                type="text"
-                maxlength="200"
-                list="book-curricula"
-                placeholder="Contoh: Kurikulum Merdeka"
                 :aria-invalid="!!errors.curriculum"
-              />
+              >
+                <option value="">Pilih kurikulum</option>
+                <option v-for="item in curriculumOptions" :key="item" :value="item">
+                  {{ item }}
+                </option>
+              </select>
               <p v-if="errors.curriculum" class="field-error">{{ errors.curriculum }}</p>
-              <datalist id="book-curricula">
-                <option v-for="item in curricula" :key="item" :value="item" />
-              </datalist>
               <p v-if="classificationError" role="alert" class="field-error">
                 Klasifikasi gagal dimuat.
                 <button type="button" @click="refreshClassifications()">Coba lagi</button>
@@ -653,9 +658,6 @@ async function save() {
 .materials-card {
   min-height: 572px;
 }
-.publication-card {
-  min-height: 244px;
-}
 .form-field {
   display: flex;
   flex-direction: column;
@@ -702,7 +704,17 @@ async function save() {
 .form-field textarea::placeholder {
   color: #757575;
 }
+.form-field input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.form-field input[type='number']::-webkit-inner-spin-button,
+.form-field input[type='number']::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
 .form-field select {
+  text-overflow: ellipsis;
   appearance: none;
   padding-right: 38px;
   background-image: url('/images/editor/chevron.svg');
@@ -860,7 +872,6 @@ async function save() {
 .publication-card {
   display: grid;
   gap: 14px;
-  padding-bottom: 40px;
 }
 .publication-option {
   display: flex;

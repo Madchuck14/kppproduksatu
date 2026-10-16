@@ -356,6 +356,35 @@ try {
   console.log(
     'PASS: converter metadata is archived then removed; manual PDF preview path, RLS, constraints, and migration retry are verified.',
   )
+  const dummySql = await readFile('supabase/migrations/202610160001_public_dummy_books.sql', 'utf8')
+  const beforeDummy = (await db.query('select * from public.products order by id')).rows
+  await db.exec(dummySql)
+  await db.exec(dummySql)
+  assert.deepEqual((await db.query('select * from public.products order by id')).rows, beforeDummy)
+  await db.exec('set role anon')
+  assert.deepEqual(
+    await visible(),
+    [
+      materialPath(publicId, 'dummy'),
+      materialPath(publicId, 'flyer'),
+      materialPath(publicId, 'product-knowledge'),
+      previewPath,
+    ].sort(),
+    'Anonymous reads only referenced published materials, including Dummy',
+  )
+  await db.exec('reset role')
+  await db.query('update public.products set published = false where id = $1', [publicId])
+  await db.exec('set role anon')
+  assert.deepEqual(await visible(), [], 'Unpublishing revokes Dummy and other material reads')
+  await db.exec('reset role')
+  assert.equal(
+    (await db.query("select public from storage.buckets where id = 'book-materials'")).rows[0]
+      .public,
+    false,
+  )
+  console.log(
+    'PASS: public Dummy migration, anonymous reads, draft/unreferenced/bucket denial, unpublish, retries and data preservation.',
+  )
   console.log('Isolated PostgreSQL with simulated Auth/Storage; live Supabase remains unverified.')
 } finally {
   await db.close()
