@@ -1,5 +1,5 @@
 -- KPP PRODUK SATU - SETUP SUPABASE LENGKAP
--- Gabungan 32 migrasi berurutan, sampai versi 202610160003.
+-- Gabungan 34 migrasi berurutan, sampai versi 202610160005.
 -- Untuk database Supabase BARU yang belum memiliki tabel aplikasi ini.
 -- Jalankan seluruh file sebagai database owner melalui SQL Editor.
 -- Jangan jalankan pada database existing atau hanya memilih section tertentu.
@@ -1903,6 +1903,156 @@ create policy "Editors remove their favorites" on public.product_favorites
       where m.user_id = (select auth.uid()) and m.role = 'editor'
     )
   );
+
+notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- BAGIAN 33: TEKS HERO LANDING
+-- Penjelasan: Menyimpan heading dan isi publik, dengan penyimpanan atomik bersama pilihan buku oleh Editor.
+-- Sumber: migrations/202610160004_landing_hero.sql
+-- ============================================================================
+
+create table if not exists public.landing_hero (
+  id boolean primary key default true check (id),
+  heading text not null check (heading ~ '[^[:space:]]' and char_length(btrim(heading)) between 1 and 100),
+  body text not null check (body ~ '[^[:space:]]' and char_length(btrim(body)) between 1 and 400)
+);
+
+insert into public.landing_hero (heading, body) values (
+  'Temukan Buku Pilihanmu',
+  'Jelajahi berbagai koleksi buku pelajaran untuk menemani rasa ingin tahu dan setiap langkah perjalananmu.'
+) on conflict (id) do nothing;
+
+alter table public.landing_hero enable row level security;
+revoke all on public.landing_hero from public, anon, authenticated;
+grant select on public.landing_hero to anon, authenticated;
+drop policy if exists landing_hero_public_read on public.landing_hero;
+create policy landing_hero_public_read on public.landing_hero
+  for select to anon, authenticated using (true);
+
+-- Save global copy and scoped featured books in one transaction. No direct client writes.
+create or replace function public.set_featured_books_with_hero(
+  selected_book_ids uuid[], hero_heading text, hero_body text
+)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  selected_count integer;
+begin
+  -- Existing RPC verifies Editor membership, level scope, uniqueness, and the eight-book limit.
+  selected_count := public.set_featured_books(selected_book_ids);
+  if hero_heading is null or hero_heading !~ '[^[:space:]]'
+    or char_length(btrim(hero_heading)) not between 1 and 100
+    or hero_body is null or hero_body !~ '[^[:space:]]'
+    or char_length(btrim(hero_body)) not between 1 and 400 then
+    raise exception using errcode = '22023', message = 'invalid_landing_hero';
+  end if;
+  update public.landing_hero
+    set heading = btrim(hero_heading), body = btrim(hero_body)
+    where id = true;
+  if not found then
+    raise exception using errcode = 'P0001', message = 'landing_hero_missing';
+  end if;
+  return selected_count;
+end;
+$$;
+
+revoke all on function public.set_featured_books_with_hero(uuid[], text, text) from public, anon;
+grant execute on function public.set_featured_books_with_hero(uuid[], text, text) to authenticated;
+
+-- ============================================================================
+-- BAGIAN 34: BUKU PILIHAN HANYA EDITOR SUPER
+-- Penjelasan: Membatasi RPC buku pilihan dan perubahan langsung featured ke Editor super tanpa mengganti pilihan tersimpan.
+-- Sumber: migrations/202610160005_super_editor_featured_books.sql
+-- ============================================================================
+
+-- Preserve existing selections and copy; restrict both legacy and hero RPC callers.
+create or replace function public.featured_products_count()
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (
+    select 1 from public.account_memberships
+    where user_id = (select auth.uid()) and role = 'editor' and is_super
+  ) then
+    raise exception using errcode = '42501', message = 'super_editor_required';
+  end if;
+
+  return (select count(*)::integer from public.products where featured);
+end;
+$$;
+
+create or replace function public.set_featured_books(selected_book_ids uuid[])
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  selected_ids uuid[] := coalesce(selected_book_ids, '{}'::uuid[]);
+begin
+  if not exists (
+    select 1 from public.account_memberships
+    where user_id = (select auth.uid()) and role = 'editor' and is_super
+  ) then
+    raise exception using errcode = '42501', message = 'super_editor_required';
+  end if;
+
+  if cardinality(selected_ids) > 8
+    or cardinality(selected_ids) <> (select count(distinct id) from unnest(selected_ids) as ids(id))
+  then
+    raise exception using errcode = '22023', message = 'invalid_featured_books';
+  end if;
+
+  perform pg_advisory_xact_lock(742015, 8);
+
+  if exists (
+    select 1
+    from unnest(selected_ids) as ids(id)
+    left join public.products as product on product.id = ids.id
+    where product.id is null
+      or not public.can_manage_book_level(product.education_level)
+  ) then
+    raise exception using errcode = '42501', message = 'featured_book_out_of_scope';
+  end if;
+
+  update public.products as product
+  set featured = product.id = any(selected_ids)
+  where public.can_manage_book_level(product.education_level)
+    and product.featured is distinct from (product.id = any(selected_ids));
+
+  return (select count(*)::integer from public.products where featured);
+end;
+$$;
+
+create or replace function public.enforce_featured_super_editor()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if (tg_op = 'INSERT' and new.featured)
+    or (tg_op = 'UPDATE' and new.featured is distinct from old.featured) then
+    -- Trusted database maintenance without a user JWT remains possible.
+    if (select auth.uid()) is not null and not exists (
+      select 1 from public.account_memberships
+      where user_id = (select auth.uid()) and role = 'editor' and is_super
+    ) then
+      raise exception using errcode = '42501', message = 'super_editor_required';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.enforce_featured_super_editor() from public, anon, authenticated;
+drop trigger if exists products_featured_super_editor on public.products;
+create trigger products_featured_super_editor
+  before insert or update of featured on public.products
+  for each row execute function public.enforce_featured_super_editor();
 
 notify pgrst, 'reload schema';
 

@@ -22,6 +22,7 @@ import { divisionCodeSchema } from '#shared/utils/book-divisions'
 import { assertBookScope } from '../utils/require-editor'
 import { validateBookClassifications } from './classifications'
 import { getProductImageUrl } from '../utils/storage'
+import type { LandingHero } from '#shared/schemas/landing-hero'
 
 const columns =
   'id,book_code,education_level,division_code,grade,subject,title,slug,author,curriculum,isbn,synopsis,target_market,highlights,price,publication_year,featured,published,image_path,flyer_path,dummy_book_path,product_knowledge_path,product_knowledge_preview_path,updated_at'
@@ -89,7 +90,7 @@ export async function listFeaturedBooks(
   event: H3Event,
   account: AccountSession,
   options: FeaturedBooksQuery,
-): Promise<FeaturedBooksPage> {
+): Promise<Omit<FeaturedBooksPage, 'hero'>> {
   const client = await serverSupabaseClient<EditorDatabase>(event)
   const pageSize = 12
   const search = options.q.replace(/[^\p{L}\p{N}\s._-]/gu, '').trim()
@@ -151,11 +152,15 @@ export async function listFeaturedBooks(
   }
 }
 
-export async function saveFeaturedBooks(event: H3Event, bookIds: string[]) {
+export async function saveFeaturedBooks(event: H3Event, bookIds: string[], hero?: LandingHero) {
   const client = await serverSupabaseClient<EditorDatabase>(event)
-  const { data, error } = await client.rpc('set_featured_books', {
-    selected_book_ids: bookIds,
-  })
+  const { data, error } = hero
+    ? await client.rpc('set_featured_books_with_hero', {
+        selected_book_ids: bookIds,
+        hero_heading: hero.heading,
+        hero_body: hero.body,
+      })
+    : await client.rpc('set_featured_books', { selected_book_ids: bookIds })
   if (error?.code === 'PGRST202')
     throw createError({
       statusCode: 503,

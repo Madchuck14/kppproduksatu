@@ -4,6 +4,7 @@ import type { BookSubject } from '#shared/utils/book-subjects'
 import { getProductPath } from '#shared/utils/product-path'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import type { EditorBook, FeaturedBookOption, FeaturedBooksPage } from '#shared/types/editor'
+import { defaultLandingHero, landingHeroSchema } from '#shared/schemas/landing-hero'
 
 definePageMeta({ middleware: 'admin' })
 useSeoMeta({ title: 'Dashboard Editor', robots: 'noindex, nofollow' })
@@ -67,12 +68,17 @@ const featuredPage = ref(1)
 const featuredLoading = ref(false)
 const featuredSaving = ref(false)
 const featuredError = ref('')
+const featuredReady = ref(false)
+const hero = reactive({ ...defaultLandingHero })
+const originalHero = ref({ ...defaultLandingHero })
 const featuredPageCount = computed(() => Math.max(1, Math.ceil(featuredTotal.value / 12)))
 const featuredCountOutsideScope = computed(() =>
   Math.max(0, featuredCount.value - originalFeaturedBookIds.value.length),
 )
 const hasFeaturedChanges = computed(
   () =>
+    hero.heading !== originalHero.value.heading ||
+    hero.body !== originalHero.value.body ||
     featuredBookIds.value.length !== originalFeaturedBookIds.value.length ||
     featuredBookIds.value.some((id) => !originalFeaturedBookIds.value.includes(id)),
 )
@@ -80,7 +86,7 @@ function featuredRequestError(error: unknown, fallback: string) {
   const response = error as { data?: { statusMessage?: string }; statusMessage?: string }
   return response.data?.statusMessage ?? response.statusMessage ?? fallback
 }
-async function loadFeaturedBooks(page = 1, initialize = false) {
+async function loadFeaturedBooks(page = 1, initialize = !featuredReady.value) {
   featuredLoading.value = true
   featuredError.value = ''
   try {
@@ -91,6 +97,9 @@ async function loadFeaturedBooks(page = 1, initialize = false) {
     featuredTotal.value = result.total
     featuredPage.value = result.page
     if (initialize) {
+      Object.assign(hero, result.hero)
+      originalHero.value = { ...result.hero }
+      featuredReady.value = true
       featuredBookIds.value = [...result.selectedIds]
       originalFeaturedBookIds.value = [...result.selectedIds]
       featuredCount.value = result.selectedCount
@@ -105,6 +114,8 @@ async function loadFeaturedBooks(page = 1, initialize = false) {
   }
 }
 function openFeaturedBooksDialog() {
+  if (!data.value?.account.isSuper) return
+  featuredReady.value = false
   featuredSearch.value = ''
   featuredBookIds.value = []
   originalFeaturedBookIds.value = []
@@ -130,13 +141,19 @@ function toggleFeaturedBook(book: FeaturedBookOption, event: Event) {
   }
 }
 async function saveFeaturedSelection() {
-  if (featuredSaving.value || !hasFeaturedChanges.value) return
+  if (!data.value?.account.isSuper) return
+  if (featuredSaving.value || !featuredReady.value || !hasFeaturedChanges.value) return
+  const parsedHero = landingHeroSchema.safeParse(hero)
+  if (!parsedHero.success) {
+    featuredError.value = parsedHero.error.issues[0]?.message ?? 'Teks hero tidak valid.'
+    return
+  }
   featuredSaving.value = true
   featuredError.value = ''
   try {
     await $fetch('/api/admin/featured-books', {
       method: 'PUT',
-      body: { bookIds: featuredBookIds.value },
+      body: { bookIds: featuredBookIds.value, hero: parsedHero.data },
     })
   } catch (error) {
     featuredError.value = featuredRequestError(
@@ -147,7 +164,7 @@ async function saveFeaturedSelection() {
     return
   }
   featuredDialog.value?.close()
-  message.value = 'Buku pilihan berhasil diperbarui.'
+  message.value = 'Buku pilihan dan teks hero berhasil diperbarui.'
   featuredSaving.value = false
   try {
     await refresh()
@@ -198,9 +215,9 @@ const fieldClass =
       <div class="dashboard-header-actions">
         <ClassificationManager v-if="data?.account.isSuper" :levels="levels" />
         <UButton
+          v-if="data?.account.isSuper"
           type="button"
           class="featured-manager-button"
-          :disabled="!levels.length"
           @click="openFeaturedBooksDialog"
           >Atur Buku Pilihan</UButton
         >
@@ -439,6 +456,18 @@ const fieldClass =
       <p v-if="featuredCountOutsideScope" class="featured-scope-note" role="status">
         {{ featuredCountOutsideScope }} buku pilihan berada di jenjang di luar akses Anda.
       </p>
+      <fieldset
+        class="hero-settings"
+        :disabled="!featuredReady || featuredLoading || featuredSaving"
+      >
+        <legend>Teks hero landing</legend>
+        <label for="hero-heading">Heading</label>
+        <input id="hero-heading" v-model="hero.heading" type="text" maxlength="100" required />
+        <p class="field-help">Maksimal 100 karakter.</p>
+        <label for="hero-body">Isi</label>
+        <textarea id="hero-body" v-model="hero.body" rows="3" maxlength="400" required />
+        <p class="field-help">Maksimal 400 karakter. Perubahan tampil untuk semua pengunjung.</p>
+      </fieldset>
       <form class="featured-search" @submit.prevent="loadFeaturedBooks(1)">
         <label for="featured-search">Cari buku</label>
         <input
@@ -528,7 +557,7 @@ const fieldClass =
         <UButton
           class="dashboard-primary"
           :loading="featuredSaving"
-          :disabled="!hasFeaturedChanges || featuredLoading"
+          :disabled="!featuredReady || !hasFeaturedChanges || featuredLoading"
           @click="saveFeaturedSelection"
           >Simpan pilihan</UButton
         >
@@ -644,6 +673,37 @@ const fieldClass =
 }
 .featured-dialog {
   max-height: 90dvh;
+  overflow-y: auto;
+}
+.hero-settings {
+  display: grid;
+  gap: 6px;
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #dce8e0;
+  border-radius: 12px;
+}
+.hero-settings legend,
+.hero-settings label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.hero-settings input,
+.hero-settings textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid #d6d3d1;
+  border-radius: 10px;
+  background: white;
+  font-size: 14px;
+}
+.hero-settings textarea {
+  resize: vertical;
+}
+.hero-settings .field-help {
+  color: #6b6f6b;
+  font-size: 12px;
 }
 .featured-dialog-heading,
 .featured-dialog-footer,

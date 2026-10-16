@@ -38,10 +38,12 @@ const [
   { data, error, status, refresh },
   { data: levelCounts },
   { data: featuredData, error: featuredLoadError },
+  { data: hero, error: heroError },
 ] = await Promise.all([
   useFetch('/api/products'),
   useFetch('/api/catalog/level-counts'),
   useFetch('/api/products', { query: { featured: 'true', pageSize: 60 } }),
+  useFetch('/api/catalog/hero'),
 ])
 const latestBooks = computed(() => data.value?.products.slice(0, 4) ?? [])
 const featuredBooks = computed(() => featuredData.value?.products ?? [])
@@ -187,10 +189,12 @@ async function searchCatalog() {
   <div class="landing-page">
     <section class="landing-hero" aria-labelledby="landing-title">
       <div class="hero-content">
-        <h1 id="landing-title">Temukan Buku<br />Pilihanmu</h1>
-        <p>
-          Jelajahi berbagai koleksi buku pelajaran untuk menemani rasa ingin tahu dan setiap langkah
-          perjalananmu.
+        <template v-if="hero">
+          <h1 id="landing-title">{{ hero.heading }}</h1>
+          <p>{{ hero.body }}</p>
+        </template>
+        <p v-else-if="heroError" role="alert">
+          Teks beranda belum dapat dimuat. Silakan muat ulang.
         </p>
         <NuxtLink to="/products" class="hero-link"
           >Jelajahi Buku <span aria-hidden="true">→</span></NuxtLink
@@ -389,7 +393,7 @@ async function searchCatalog() {
   color: #242b26;
 }
 .landing-hero {
-  height: 420px;
+  min-height: 420px;
   display: grid;
   grid-template-columns: 550px 500px;
   align-items: start;
@@ -401,10 +405,10 @@ async function searchCatalog() {
 }
 .hero-content {
   display: grid;
-  grid-template-rows: 100px 97px 28px;
+  grid-template-rows: auto auto auto;
   gap: 20px;
   max-width: 550px;
-  height: 280px;
+  min-height: 280px;
   margin-top: 29px;
   padding: 9px 14px 3px;
   border: 1px solid #dce8e0;
@@ -413,11 +417,14 @@ async function searchCatalog() {
   font-family: var(--font-landing-serif);
 }
 .hero-content h1 {
+  overflow-wrap: anywhere;
   font-size: 48px;
   font-weight: 700;
   line-height: 50px;
 }
 .hero-content p {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
   margin: 0;
   font-size: 20px;
   line-height: 28px;
@@ -853,7 +860,7 @@ async function searchCatalog() {
     font-size: 40px;
   }
   .hero-content {
-    grid-template-rows: 100px 97px 28px;
+    grid-template-rows: auto auto auto;
     font-size: 18px;
   }
   .hero-content p {

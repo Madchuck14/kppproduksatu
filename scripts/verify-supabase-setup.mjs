@@ -147,7 +147,7 @@ try {
     "insert into public.book_classifications (kind, code, name, education_level) values ('subject', 'Test', 'Test', 'SMP')",
   )
   console.log(
-    'PASS: 32-section bundle equals sequential schema/RLS/grants/functions/triggers/data; existing-DB guard, atomic rollback, public/draft separation, popularity, duplicate titles, and final Editor classification rules (isolated PostgreSQL).',
+    'PASS: 34-section bundle equals sequential schema/RLS/grants/functions/triggers/data; existing-DB guard, atomic rollback, public/draft separation, popularity, duplicate titles, and final Editor classification rules (isolated PostgreSQL).',
   )
 } finally {
   await Promise.all([db.close(), sequential.close(), failed.close()])

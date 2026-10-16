@@ -22,17 +22,20 @@ export function assertBookScope(account: AccountSession, level: string | null) {
   }
 }
 
-export function assertSuperEditor(account: AccountSession) {
+export function assertSuperEditor(
+  account: AccountSession,
+  statusMessage = 'Hanya Editor super yang dapat mengelola klasifikasi buku.',
+) {
   if (account.role !== 'editor' || !account.isSuper) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Hanya Editor super yang dapat mengelola klasifikasi buku.',
+      statusMessage,
     })
   }
 }
 
-export async function requireSuperEditor(event: H3Event) {
+export async function requireSuperEditor(event: H3Event, statusMessage?: string) {
   const account = await requireEditor(event)
-  assertSuperEditor(account)
+  assertSuperEditor(account, statusMessage)
   return account
 }

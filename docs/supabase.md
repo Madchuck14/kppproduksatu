@@ -14,10 +14,43 @@ tetap berlaku sampai kedaluwarsa. Migration ini belum diterapkan ke Supabase liv
 
 # Setup Supabase untuk demo online
 
+## Teks hero landing
+
+Terapkan migration incremental `202610160004_landing_hero.sql` setelah migration sebelumnya,
+sebelum deploy aplikasi. Migration membuat singleton `landing_hero`, mengisi teks hero awal,
+dan menambahkan RPC `set_featured_books_with_hero`. Heading wajib 1–100 karakter dan isi
+wajib 1–400 karakter setelah trim; teks whitespace ditolak. RLS membuka pembacaan publik.
+Penulisan langsung ditolak; RPC memverifikasi Editor melalui RPC buku pilihan yang sudah ada,
+mempertahankan scope jenjang serta batas delapan buku, dan menyimpan kedua perubahan atomik.
+Setelah migration `202610160005_super_editor_featured_books.sql`, hanya Editor super yang
+dapat membuka modal serta mengubah buku pilihan dan teks global, termasuk lewat API/RPC.
+
+Database baru memakai `supabase/setup.sql`. Migration dapat diulang tanpa mengganti teks
+yang sudah disimpan. Rollback aplikasi ke versi sebelumnya dan biarkan tabel/RPC/data tetap
+ada; RPC lama `set_featured_books` tidak mengubah teks hero. Tidak ada data buku yang dihapus.
+Uji terisolasi: `node scripts/verify-landing-hero.mjs` dengan `PGLITE_MODULE_PATH`.
+Migration ini belum diterapkan atau diverifikasi pada Supabase live oleh agent.
+
+## Buku pilihan hanya Editor super
+
+Terapkan `202610160005_super_editor_featured_books.sql` setelah migration teks hero dan
+sebelum deploy. Migration memperketat `featured_products_count` serta `set_featured_books`;
+RPC gabungan hero otomatis memakai pemeriksaan yang sama. Trigger menolak perubahan
+langsung kolom `products.featured` dan insert buku featured oleh akun non-super, sambil
+mempertahankan CRUD metadata biasa sesuai scope. Maintenance database terpercaya tanpa JWT
+tetap tersedia. Pilihan buku, teks hero, dan data akun tidak diubah.
+
+Rollback aplikasi lalu pulihkan hanya definisi `featured_products_count` dan
+`set_featured_books` dari migration `202610150001_featured_books_limit.sql` menggunakan
+`CREATE OR REPLACE FUNCTION`; hapus trigger `products_featured_super_editor` dan fungsi
+`enforce_featured_super_editor`. Jangan menjalankan ulang seluruh migration lama atau
+menghapus data pilihan/hero. Uji lokal: `scripts/verify-landing-hero.mjs`.
+Migration ini belum diterapkan atau diverifikasi di Supabase live oleh agent.
+
 ## Setup satu file untuk database baru
 
-[`supabase/setup.sql`](../supabase/setup.sql) menggabungkan seluruh 32 migrasi sampai
-`202610160003_editor_only_favorites.sql`. Setiap bagian memiliki judul,
+[`supabase/setup.sql`](../supabase/setup.sql) menggabungkan seluruh 34 migrasi sampai
+`202610160005_super_editor_featured_books.sql`. Setiap bagian memiliki judul,
 komentar penjelasan singkat tepat di bawahnya, serta nama file sumber. Urutan SQL sama
 dengan migrasi berurutan; definisi historis yang diganti bagian berikutnya tetap diberi
 penjelasan agar hasil akhir sesuai aplikasi terbaru.
@@ -78,16 +111,16 @@ Sebelum deploy pengelolaan buku pilihan, terapkan migration
 `supabase/migrations/202610150001_featured_books_limit.sql` setelah migration katalog dan Editor.
 Migration mempertahankan flag `products.featured` yang sudah ada, menambahkan batas global
 delapan buku melalui trigger database, serta fungsi RPC untuk membaca jumlah dan menyimpan
-perubahan pilihan secara atomik. Perubahan massal Editor hanya menyentuh buku dalam jenjang
-yang boleh dikelolanya; role Editor diperiksa ulang di fungsi database. Sales tidak dapat
-memanggil fungsi tersebut.
+perubahan pilihan secara atomik. Terapkan juga migration
+`202610160005_super_editor_featured_books.sql`: fungsi memeriksa role Editor dan `is_super=true`.
+Editor biasa maupun Sales, termasuk Sales super, tidak dapat memanggil fungsi pengelolaan.
 
 Carousel beranda mengambil buku `featured` melalui API katalog publik, yang tetap membatasi
 hasil ke `published=true`. Buku draf dapat ditandai dari modal, tetapi baru muncul setelah
-dipublikasikan. Modal dashboard menjadi satu-satunya tempat Editor memilih buku dari halaman
+dipublikasikan. Modal dashboard menjadi satu-satunya tempat Editor super memilih buku dari halaman
 katalog berpaginasi dan mencari judul,
 kode, atau penulis. Jumlah terpilih di jenjang lain tetap dihitung terhadap batas global;
-Editor tidak dapat mengubah pilihan di luar scope-nya. Editor super dapat mengelola semua jenjang.
+Editor super dapat mengelola pilihan dari semua jenjang.
 
 Rollout: periksa jumlah pilihan yang sudah ada dengan
 `select count(*) from public.products where featured;`. Deploy migration lebih dulu, lalu
@@ -259,7 +292,7 @@ memeriksa status published, UUID buku, folder Flyer/PPT, dan path asli yang ters
 Dummy, draft, bucket lain, dan objek tanpa referensi tidak mendapat akses anonim. Writer
 tetap membutuhkan Editor dan scope jenjang; tidak ada perubahan UUID, metadata, atau file.
 
-Editor mengunggah PPT/PPTX maksimal 10 MB untuk unduhan dan PDF maksimal 10 MB untuk tampilan.
+Editor mengunggah PPT/PPTX maksimal 50 MB untuk unduhan dan PDF maksimal 50 MB untuk tampilan.
 Tidak ada iframe Microsoft, converter, atau layanan viewer pihak ketiga.
 
 Endpoint publik menggunakan client anonim dan query published. Dummy menggunakan
@@ -305,8 +338,8 @@ jalankan `supabase/migrations/202610140005_manual_product_knowledge_pdf.sql`. Mi
 `catalog_cleanup_archive`, lalu menghapus kolom status dan slide yang tidak lagi digunakan.
 
 Editor mendapat dua input independen. Folder `product-knowledge-preview` hanya menerima PDF
-maksimal 10 MB untuk tombol **Tampilkan**. Folder `product-knowledge` menerima PPT/PPTX maksimal
-10 MB untuk tombol **Unduh PowerPoint**. Keduanya dapat dibaca anonim hanya pada buku published;
+maksimal 50 MB untuk tombol **Tampilkan**. Folder `product-knowledge` menerima PPT/PPTX maksimal
+50 MB untuk tombol **Unduh PowerPoint**. Keduanya dapat dibaca anonim hanya pada buku published;
 Dummy Buku tetap membutuhkan login. Tidak diperlukan port 3001 atau environment converter.
 
 Rollback `supabase/rollback/202610140005_restore_presentation_converter_columns.sql` mengembalikan
@@ -489,8 +522,13 @@ privat `book-materials`, serta kebijakan upload Editor sesuai scope jenjang. Con
 dibuat `NOT VALID`: data lama berkode nonnumerik tetap terbaca, tetapi harus diperbaiki saat row
 tersebut diperbarui. Jangan jalankan aplikasi baru dalam mode Supabase sebelum migration diterapkan.
 
-Flyer menerima PDF maksimal 10 MB; Dummy Buku maksimal 15 MB. PPT Produk (Product Knowledge) menerima
-PPT/PPTX maksimal 10 MB dengan gambar slide hasil ekspor PNG/JPG untuk preview statis.
+Flyer menerima PDF maksimal 10 MB; Dummy Buku maksimal 50 MB. PPT Produk (Product Knowledge) menerima
+PPT/PPTX maksimal 50 MB dan PDF tampilan maksimal 50 MB.
+Ukuran dihitung sebagai kelipatan 1024 × 1024 byte (50 MB = 52.428.800 byte).
+Form menolak file yang melebihi batas saat dipilih, mengosongkan pilihan, dan menampilkan notifikasi.
+Server memeriksa ukuran kembali sebelum upload dan saat penyelesaian; kelebihan ukuran menghasilkan
+HTTP 413. Bucket `book-materials` sudah memiliki batas 52.428.800 byte pada migration awal,
+sehingga perubahan batas aplikasi ini tidak memerlukan migration tambahan.
 Product Knowledge PDF lama tetap dapat dibuka. Bucket tidak memiliki URL publik permanen.
 Materi published hanya dapat dibuka setelah login lewat endpoint server yang membuat signed URL
 berumur 60 detik.

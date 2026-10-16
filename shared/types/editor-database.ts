@@ -48,6 +48,10 @@ export type EditorDatabase = {
     }
     Views: Record<never, never>
     Functions: {
+      set_featured_books_with_hero: {
+        Args: { selected_book_ids: string[]; hero_heading: string; hero_body: string }
+        Returns: number
+      }
       delete_book_classification: {
         Args: { option_kind: string; option_code: string; option_level: string }
         Returns: boolean

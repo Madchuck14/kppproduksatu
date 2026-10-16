@@ -51,6 +51,16 @@ Katalog sekarang khusus buku sesuai PRD awal, namun penamaan entitas `products` 
 
 ## Beranda dan pencarian katalog
 
+Modal **Atur Buku Pilihan** juga mengelola heading (maksimal 100 karakter) dan isi hero
+(maksimal 400 karakter). Teks tersimpan pada singleton `landing_hero` dan dibaca publik
+melalui `GET /api/catalog/hero` saat SSR. Hanya Editor super dapat menyimpan teks global bersama
+pilihan buku dalam satu RPC atomik; scope jenjang tetap berlaku pada pilihan bukunya.
+Input berupa teks biasa, dirender melalui interpolasi Vue. Mode demo membaca teks awal
+dan tidak menyimpan perubahan. Terapkan migration `202610160004_landing_hero.sql` dan
+`202610160005_super_editor_featured_books.sql` sebelum deploy. Tombol dan endpoint pengaturan
+hanya tersedia bagi Editor super; trigger database juga menolak perubahan langsung `featured`
+oleh akun biasa. Buku pilihan dan teks yang sudah tersimpan tetap dipertahankan.
+
 Setelah migration `202610150004_book_classifications.sql`, opsi kurikulum, divisi,
 dan mapel disimpan di `book_classifications`. Modal **Edit Klasifikasi Buku** pada
 dashboard menambah opsi melalui `POST /api/admin/classifications`; server memverifikasi
@@ -81,7 +91,7 @@ pencarian, maksimal empat buku terbaru dari API publik, dan empat kartu jenjang 
 Carousel menampilkan buku `featured` yang sudah dipublikasikan, berganti setiap lima detik,
 berulang tanpa henti, dan dapat digeser dengan mouse atau sentuhan; tombol panah keyboard juga
 tersedia. Jika tidak ada pilihan publik, hero menampilkan keadaan kosong. Maksimal delapan buku
-dapat ditandai sebagai pilihan; Editor mengelola pilihan hanya melalui modal dashboard.
+dapat ditandai sebagai pilihan; hanya Editor super mengelola pilihan melalui modal dashboard.
 Kartu jenjang dan enam divisi menuju halaman `/jenjang?level=...` dan
 `/divisi?division=...`. Navigasi Jenjang/Divisi membuka halaman masing-masing tanpa pilihan.
 Kedua halaman menampilkan kartu jumlah buku published dan maksimal empat buku paling sering
@@ -246,8 +256,9 @@ Daftar Editor tidak mencakup buku di luar scope meskipun buku published dapat di
 Dashboard `/admin` menyediakan ringkasan, daftar berpaginasi 12 buku, pencarian judul/kode/penulis,
 filter jenjang/status, tambah/edit buku, publikasi, pengaturan massal buku pilihan lewat modal
 dengan pencarian, serta konfirmasi hapus dengan mengetik judul. Buku pilihan dibatasi delapan
-secara global; Editor hanya dapat mengubah buku dalam jenjang aksesnya. Trigger PostgreSQL
-menegakkan batas ini untuk perubahan dari form edit maupun endpoint pengelolaan massal.
+secara global dan hanya Editor super dapat mengubah pilihan. Editor biasa tetap mengubah
+metadata buku dalam jenjang aksesnya. Trigger PostgreSQL menegakkan batas dan hak pengaturan
+pilihan, termasuk perubahan langsung ke database.
 Tampilan dashboard mengikuti ekspor `figmatocode/dashboard`, memakai header/footer dan font
 Plus Jakarta Sans yang sama dengan katalog. Panel akses hijau muda, empat kartu statistik, serta
 form filter memakai data dan scope akun nyata. Tabel HTML dengan tujuh kolom tetap menyelaraskan
@@ -273,8 +284,8 @@ Object baru memakai `books/{product UUID}/{random UUID}.{extension}`; RLS Storag
 ke buku tersebut. Tidak ada overwrite object. File lama tidak otomatis dihapus saat sampul diganti
 atau buku dihapus; pembersihan aset tak terpakai dilakukan terpisah oleh pengelola.
 
-PPT Produk memakai dua upload independen: PPT/PPTX maksimal 10 MB untuk unduhan dan PDF maksimal
-10 MB untuk tampilan. Flyer dibatasi PDF 10 MB; Dummy Buku PDF 15 MB. Dummy Buku memakai PDF.js dan
+PPT Produk memakai dua upload independen: PPT/PPTX maksimal 50 MB untuk unduhan dan PDF maksimal
+50 MB untuk tampilan. Flyer dibatasi PDF 10 MB; Dummy Buku PDF 50 MB. Dummy Buku memakai PDF.js dan
 StPageFlip (`page-flip`) dalam popup flipbook: dua halaman pada layar lebar, satu halaman pada layar
 sempit, dengan sampul, swipe/drag, tombol navigasi, dan panah keyboard. PDF diambil sekali sebelum
 halaman disiapkan agar navigasi tidak bergantung pada masa berlaku signed URL. Penampil hanya
@@ -489,9 +500,27 @@ mempengaruhi SSR dan hasil pengukuran lokal bukan jaminan performa deployment pr
 
 ### Transport unggahan materi
 
+Form Tambah/Edit Buku membuka pengelolaan Dummy Buku, PPT unduhan, PDF pratinjau, dan Flyer
+melalui tombol **Kelola kelengkapan produk**. Modal besar mengikuti gaya katalog, menampilkan
+status tiap file dan progres unggahan, serta mempertahankan hasil saat dibuka ulang. Modal
+menampilkan peringatan format, ukuran, dan kegagalan upload tepat di bawah pemilih file
+masing-masing; pesan tidak saling menimpa atau muncul lagi sebagai banner/toast peringatan global.
+Keberhasilan ditampilkan pada bagian file tanpa popup/toast. Modal
+tetap terbuka setelah upload selesai atau gagal; pengguna menutupnya lewat tombol X atau
+**Selesai**. Escape dan klik backdrop tidak menutup modal. Upload dapat tetap berjalan bila
+modal ditutup manual; ringkasan status tetap tersedia di form.
+
 Form editor memakai `POST /api/admin/books/:id/materials/:kind/upload-url` untuk
-meminta path unik dan signed upload token, kemudian `uploadToSignedUrl` untuk
-mengirim berkas langsung ke Supabase Storage. Setelah unggah berhasil,
+meminta path unik, signed upload token, dan signed URL, kemudian `XMLHttpRequest` untuk
+mengirim berkas langsung ke Supabase Storage. Setiap file, termasuk sampul, memiliki progress bar
+dan langsung diunggah saat pengguna mengonfirmasi pilihan pada dialog file. Untuk buku yang sudah
+ada, upload tidak menyimpan perubahan metadata form. Untuk buku baru, seluruh data wajib harus valid;
+aplikasi membuat satu draf `published=false` sebelum upload pertama. Tombol Simpan hanya menyimpan
+metadata dan status publikasi, tanpa mengunggah ulang file. Upload gagal dapat diulang lewat Coba lagi.
+Progress bar bergerak
+berdasarkan byte yang terkirim; progres dibatasi 99% sampai server mengonfirmasi keberhasilan.
+Setelah verifikasi berhasil, bar mencapai 100% dan status berhasil tampil pada bagian file. Kegagalan
+menandai bar merah serta mempertahankan pilihan file untuk dicoba ulang. Setelah unggah berhasil,
 `POST /api/admin/books/:id/materials/:kind/complete` memeriksa ulang akses editor,
 lingkup buku, path, metadata Storage, serta signature berkas sebelum menyimpan
 referensi materi. API hanya menerima JSON kecil sehingga unggahan materi tidak

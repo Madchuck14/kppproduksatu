@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { educationLevelSchema } from './auth'
 import { getGradesForLevel } from '../utils/book-grades'
 import { divisionCodeSchema } from '../utils/book-divisions'
+import { landingHeroSchema } from './landing-hero'
 
 export const bookSubjectSchema = z.string().trim().min(1).max(200)
 
@@ -14,10 +15,10 @@ export const editorQuerySchema = z.object({
 })
 
 export const bookMaterialMaxBytes = {
-  dummy: 15 * 1024 * 1024,
+  dummy: 50 * 1024 * 1024,
   flyer: 10 * 1024 * 1024,
-  'product-knowledge': 10 * 1024 * 1024,
-  'product-knowledge-preview': 10 * 1024 * 1024,
+  'product-knowledge': 50 * 1024 * 1024,
+  'product-knowledge-preview': 50 * 1024 * 1024,
 } as const
 
 export const maxFeaturedBooks = 8
@@ -26,6 +27,7 @@ export const featuredBooksQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(100000).default(1),
 })
 export const setFeaturedBooksSchema = z.object({
+  hero: landingHeroSchema.optional(),
   bookIds: z
     .array(z.string().uuid())
     .max(maxFeaturedBooks, `Maksimal ${maxFeaturedBooks} buku pilihan.`)

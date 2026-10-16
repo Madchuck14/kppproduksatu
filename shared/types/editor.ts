@@ -1,6 +1,7 @@
 import type { BookInput } from '../schemas/editor'
 import type { AccountSession } from './account'
 import type { DivisionCode } from '../utils/book-divisions'
+import type { LandingHero } from '../schemas/landing-hero'
 
 export interface EditorBook extends Omit<BookInput, 'bookCode' | 'educationLevel' | 'highlights'> {
   highlights: string[]
@@ -46,6 +47,7 @@ export interface FeaturedBookOption {
 }
 
 export interface FeaturedBooksPage {
+  hero: LandingHero
   books: FeaturedBookOption[]
   selectedIds: string[]
   selectedCount: number

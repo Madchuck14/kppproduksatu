@@ -21,7 +21,14 @@ let signed = 0
 const bucket = {
   createSignedUploadUrl: async (objectPath) => {
     signed += 1
-    return { data: { token: 'test-token', path: objectPath }, error: null }
+    return {
+      data: {
+        token: 'test-token',
+        path: objectPath,
+        signedUrl: `https://storage.example.test/storage/v1/object/upload/sign/book-materials/${objectPath}?token=test-token`,
+      },
+      error: null,
+    }
   },
   info: async () => ({ data: { size: infoSize, contentType: infoType }, error: null }),
   download: async () => ({ data: new Blob([stored]), error: null }),
@@ -97,6 +104,69 @@ await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
 const base = `http://127.0.0.1:${server.address().port}`
 const type = 'application/vnd.ms-powerpoint'
 const size = 10 * 1024 * 1024
+// Exercise the form's actual file-selection handler without Auth or live Storage writes.
+const formSource = fs.readFileSync('app/components/EditorBookForm.vue', 'utf8')
+const selectionSource = formSource.slice(
+  formSource.indexOf('function selectMaterial('),
+  formSource.indexOf('\nfunction parseBookForm()'),
+)
+const limits = load('shared/schemas/editor.ts').bookMaterialMaxBytes
+const selectedFiles = {}
+const message = { value: '' }
+const notices = []
+const uploadWarnings = {}
+const selectMaterial = new Function(
+  'bookMaterialMaxBytes',
+  'materialFiles',
+  'message',
+  'materials',
+  'toast',
+  'uploads',
+  'uploadSelected',
+  'uploadWarnings',
+  `${ts.transpileModule(selectionSource, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText}\nreturn selectMaterial`,
+)(
+  limits,
+  selectedFiles,
+  message,
+  Object.keys(limits).map((kind) => ({ kind, label: kind })),
+  { add: (notice) => notices.push(notice) },
+  {},
+  () => {},
+  uploadWarnings,
+)
+for (const [kind, name, mime] of [
+  ['dummy', 'dummy.pdf', 'application/pdf'],
+  ['product-knowledge-preview', 'preview.pdf', 'application/pdf'],
+  ['product-knowledge', 'slides.ppt', type],
+  [
+    'product-knowledge',
+    'slides.pptx',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  ],
+  ['flyer', 'flyer.pdf', 'application/pdf'],
+]) {
+  const maxSize = (kind === 'flyer' ? 10 : 50) * 1024 * 1024
+  const file = { name, type: mime, size: maxSize }
+  const input = { files: [file], value: name }
+  const previousNotices = notices.length
+  selectMaterial(kind, { target: input })
+  assert.equal(selectedFiles[kind], file)
+  assert.equal(message.value, '')
+  assert.equal(uploadWarnings[kind], '')
+  assert.equal(notices.length, previousNotices)
+  file.size += 1
+  selectMaterial(kind, { target: input })
+  assert.equal(selectedFiles[kind], null)
+  assert.equal(input.value, '')
+  assert.match(uploadWarnings[kind], /ditolak karena terlalu besar/)
+  assert.ok(uploadWarnings[kind].includes(`maksimal ${maxSize / 1024 / 1024} MB`))
+  assert.equal(message.value, '')
+  assert.equal(notices.length, previousNotices)
+}
+console.log(
+  'PASS: Form accepts exact PDF/PPT/PPTX limits; oversized selection cleared with warning on its own file section, no global alert or error toast.',
+)
 async function post(route, body, status) {
   const response = await fetch(`${base}/${route}`, {
     method: 'POST',
@@ -116,7 +186,7 @@ try {
   level = 'SMP'
   await post('prepare', { type, size }, 403)
   level = 'SD'
-  await post('prepare', { type, size: 10 * 1024 * 1024 + 1 }, 413)
+  await post('prepare', { type, size: 50 * 1024 * 1024 + 1 }, 413)
   await post('prepare', { type: 'application/zip', size }, 400)
   assert.equal(signed, 0)
   const upload = await post('prepare', { type, size }, 200)
@@ -136,7 +206,7 @@ try {
     { ...body, path: upload.path.replace('/product-knowledge/', '/dummy/') },
     400,
   )
-  infoSize = 10 * 1024 * 1024 + 1
+  infoSize = 50 * 1024 * 1024 + 1
   await post('complete', body, 413)
   infoSize = size - 1
   await post('complete', body, 400)
@@ -178,9 +248,10 @@ try {
   assert.match(pointer, new RegExp(`^books/${id}/product-knowledge-preview/.+\\.pdf$`))
   for (const kind of ['dummy', 'flyer', 'product-knowledge', 'product-knowledge-preview']) {
     requestedKind = kind
-    const maxSize = (kind === 'dummy' ? 15 : 10) * 1024 * 1024
+    const maxSize = (kind === 'flyer' ? 10 : 50) * 1024 * 1024
     const mime = kind === 'product-knowledge' ? type : 'application/pdf'
-    await post('prepare', { type: mime, size: maxSize + 1 }, 413)
+    const rejection = await post('prepare', { type: mime, size: maxSize + 1 }, 413)
+    assert.equal(rejection.statusMessage, `Ukuran berkas maksimal ${maxSize / 1024 / 1024} MB`)
     const boundary = await post('prepare', { type: mime, size: maxSize }, 200)
     infoType = mime
     infoSize = maxSize + 1
@@ -194,7 +265,7 @@ try {
     await post('complete', { path: boundary.path, type: mime, size: maxSize }, 200)
   }
   console.log(
-    'PASS: Dummy 15 MB; all other materials 10 MB; exact limits accepted; one byte over rejected at prepare and completion.',
+    'PASS: Dummy and both PPT materials 50 MB; Flyer 10 MB; exact limits accepted; one byte over rejected at prepare and completion with size notification.',
   )
   console.log(
     'PASS: 10 MiB PPT and PDF preview validation; small JSON API bodies; auth/scope recheck; path/type/size/signature rejection; previous material retained on failure.',

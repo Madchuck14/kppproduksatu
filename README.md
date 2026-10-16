@@ -10,7 +10,7 @@ Fondasi katalog produk dengan Nuxt 4, Vue 3, TypeScript, Tailwind CSS, Nuxt UI, 
 ## Mulai di Windows
 
 Untuk menyiapkan database Supabase baru lewat satu file, gunakan
-[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 32 migrasi
+[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 34 migrasi
 dengan komentar section dan penjelasan singkat. Ikuti [panduan file gabungan](docs/supabase.md#setup-satu-file-untuk-database-baru).
 Database yang sudah terpasang tetap memakai migrasi incremental; jangan jalankan ulang file setup.
 
@@ -52,7 +52,7 @@ tanpa spasi/tanda hubung agar nol di depan tidak hilang. Ikuti [rollout metadata
 - URL detail memakai kode buku yang unik; URL slug lama tetap didukung untuk kompatibilitas.
   Judul boleh sama untuk edisi atau tahun terbit berbeda. Terapkan migration
   `202610150002_allow_duplicate_book_titles.sql` sebelum deploy.
-- Carousel sampul buku pilihan di hero beranda, berganti setiap 5 detik; Editor mengelolanya
+- Carousel sampul buku pilihan di hero beranda, berganti setiap 5 detik; hanya Editor super mengelolanya
   hanya lewat modal dashboard, maksimal 8 buku, dan dapat digeser pada carousel. Terapkan migration
   `202610150001_featured_books_limit.sql` sebelum mengelola pilihan buku di Supabase.
 - API `GET /api/products` dan `GET /api/products/:identifier`, dengan validasi Zod.

@@ -21,5 +21,5 @@ export default defineEventHandler(async (event) => {
       statusCode: 503,
       statusMessage: 'Unggahan belum dapat dimulai. Coba lagi.',
     })
-  return { path, token: data.token }
+  return { path, token: data.token, signedUrl: data.signedUrl }
 })
