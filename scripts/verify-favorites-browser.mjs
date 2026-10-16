@@ -32,22 +32,18 @@ async function screenshot(page, name) {
 try {
   const guest = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
   observe(guest)
-  const response = await guest.goto(`${base}/favorites?q=matematika&level=SD`, {
-    waitUntil: 'domcontentloaded',
-  })
-  assert.equal(response.status(), 200)
+  await guest.goto(base + '/', { waitUntil: 'domcontentloaded' })
   await hydrated(guest)
-  await guest.getByRole('heading', { name: 'Belum ada buku favorit', exact: true }).waitFor()
-  assert.equal(await guest.locator('.favorites-login-banner').isVisible(), true)
-  assert.equal(await guest.locator('.favorites-grid').count(), 0)
-  const loginLink = guest.locator('.favorites-login-banner a')
-  assert.equal(
-    new URL(await loginLink.getAttribute('href'), base).searchParams.get('returnTo'),
-    '/favorites?q=matematika&level=SD',
+  assert.equal(await guest.locator('a[href="/favorites"]').count(), 0)
+  assert.equal(await guest.locator('.favorite-icon-button').count(), 0)
+  await guest.goto(base + '/favorites?q=matematika&level=SD', { waitUntil: 'domcontentloaded' })
+  await guest.waitForURL(
+    (url) => url.pathname === '/login' && url.searchParams.get('returnTo') === '/favorites',
   )
-  await screenshot(guest, 'favoritesempty-guest-desktop')
+  assert.equal(await guest.locator('.favorites-grid').count(), 0)
+  await screenshot(guest, 'editor-login-guest-desktop')
   await guest.setViewportSize({ width: 390, height: 844 })
-  await screenshot(guest, 'favoritesempty-guest-mobile')
+  await screenshot(guest, 'editor-login-guest-mobile')
   await guest.close()
 
   const jar = new Map()
@@ -111,6 +107,11 @@ try {
   })
   await page.goto(`${base}/contact`, { waitUntil: 'domcontentloaded' })
   await hydrated(page)
+  await page.evaluate(() =>
+    document
+      .querySelector('#__nuxt')
+      .__vue_app__.config.globalProperties.$nuxt.callHook('app:data:refresh', ['favorite-ids']),
+  )
   await page.getByRole('link', { name: /^Favorit/i }).click()
   await page.locator('.favorites-grid article').nth(3).waitFor()
   assert.equal(await page.locator('.favorites-login-banner').count(), 0)
@@ -161,7 +162,7 @@ try {
   await page.getByRole('heading', { name: 'Belum ada buku favorit', exact: true }).waitFor()
   assert.deepEqual(errors, [])
   console.log(
-    'PASS port 3000: guest SSR/login destination, four-column favorites, mobile, search/filter/history, removal to empty, error/retry, no hydration errors. Favorite API mutations intercepted; no database writes.',
+    'PASS port 3000: public controls absent and guest redirected to Editor login, four-column favorites, mobile, search/filter/history, removal to empty, error/retry, no hydration errors. Favorite API mutations intercepted; no database writes.',
   )
 } finally {
   await browser.close()

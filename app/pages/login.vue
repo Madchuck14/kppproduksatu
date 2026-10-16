@@ -9,12 +9,8 @@ const route = useRoute()
 const account = ref<AccountSession | null>(null)
 const returnTo = computed(() => {
   const result = loginReturnToSchema.safeParse(route.query.returnTo)
-  return result.success ? result.data : '/'
+  return result.success ? result.data : '/admin'
 })
-const registerDestination = computed(() => ({
-  path: '/register',
-  query: returnTo.value !== '/' ? { returnTo: returnTo.value } : {},
-}))
 const client = useSupabaseClient()
 const user = useSupabaseUser()
 const email = ref('')
@@ -24,18 +20,14 @@ const message = ref('')
 const showPassword = ref(false)
 const requestFetch = useRequestFetch()
 async function loadAccount() {
-  try {
-    account.value = await requestFetch<AccountSession>('/api/auth/session')
-  } catch (error) {
-    if ((error as { statusCode?: number }).statusCode !== 403) throw error
-    account.value = null
-  }
+  account.value = await requestFetch<AccountSession>('/api/auth/session')
 }
 if (user.value) {
   try {
     await loadAccount()
   } catch {
-    message.value = 'Hak akses belum dapat dimuat. Silakan coba lagi.'
+    account.value = null
+    message.value = 'Login hanya tersedia untuk Editor. Keluar untuk memakai akun Editor.'
   }
 }
 const configured = computed(
@@ -62,8 +54,13 @@ async function login() {
     }
     await loadAccount()
     await navigateTo(returnTo.value)
-  } catch {
-    message.value = 'Login belum dapat diproses. Coba lagi nanti.'
+  } catch (error) {
+    await client.auth.signOut({ scope: 'local' })
+    account.value = null
+    message.value =
+      (error as { statusCode?: number }).statusCode === 403
+        ? 'Login hanya tersedia untuk akun Editor.'
+        : 'Login belum dapat diproses. Coba lagi nanti.'
   } finally {
     loading.value = false
   }
@@ -98,12 +95,14 @@ async function logout() {
       </div>
       <div>
         <h2>Selamat datang kembali</h2>
-        <p>Masuk dengan akun terdaftar untuk melanjutkan aktivitas Anda di katalog.</p>
+        <p>
+          Katalog dan materi buku terbuka untuk umum. Masuk sebagai Editor untuk mengelola buku.
+        </p>
       </div>
     </div>
     <div class="login-panel">
-      <h1 id="login-title">Masuk</h1>
-      <p class="login-intro">Gunakan email dan kata sandi akunmu.</p>
+      <h1 id="login-title">Masuk Editor</h1>
+      <p class="login-intro">Gunakan email dan kata sandi akun Editor Anda.</p>
       <p v-if="returnTo !== '/' && returnTo !== '/products'" class="login-notice">
         Setelah login, Anda akan kembali ke konten yang dipilih. Akses mengikuti hak akun dan
         ketersediaan berkas.
@@ -115,7 +114,9 @@ async function logout() {
       <p v-if="message" id="login-message" role="alert" class="login-alert">{{ message }}</p>
       <div v-if="user" class="login-account">
         <p>Anda sudah masuk. Lanjutkan ke tujuan Anda atau keluar untuk memakai akun lain.</p>
-        <UButton :to="returnTo" class="login-primary" :disabled="loading">Lanjutkan</UButton>
+        <UButton v-if="account" :to="returnTo" class="login-primary" :disabled="loading"
+          >Lanjutkan</UButton
+        >
         <UButton variant="outline" class="login-secondary" :loading="loading" @click="logout"
           >Keluar dari akun</UButton
         >
@@ -173,15 +174,10 @@ async function logout() {
           >{{ loading ? 'Memproses login...' : 'Masuk' }}</UButton
         >
       </form>
-      <div class="login-register">
-        <p>Belum memiliki akun?</p>
-        <UButton :to="registerDestination" variant="outline" class="login-secondary"
-          >Daftar</UButton
-        >
-        <p class="registration-note">
-          Pendaftaran mandiri dinonaktifkan. Hubungi pengelola untuk mendapatkan akun.
-        </p>
-      </div>
+      <p class="registration-note">
+        Akun Editor disediakan pengelola. <NuxtLink to="/contact">Hubungi pengelola</NuxtLink>
+        jika memerlukan akses.
+      </p>
     </div>
   </section>
 </template>

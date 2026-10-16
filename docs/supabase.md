@@ -16,8 +16,8 @@ tetap berlaku sampai kedaluwarsa. Migration ini belum diterapkan ke Supabase liv
 
 ## Setup satu file untuk database baru
 
-[`supabase/setup.sql`](../supabase/setup.sql) menggabungkan seluruh 31 migrasi sampai
-`202610160002_super_editor_classifications.sql`. Setiap bagian memiliki judul,
+[`supabase/setup.sql`](../supabase/setup.sql) menggabungkan seluruh 32 migrasi sampai
+`202610160003_editor_only_favorites.sql`. Setiap bagian memiliki judul,
 komentar penjelasan singkat tepat di bawahnya, serta nama file sumber. Urutan SQL sama
 dengan migrasi berurutan; definisi historis yang diganti bagian berikutnya tetap diberi
 penjelasan agar hasil akhir sesuai aplikasi terbaru.
@@ -417,7 +417,7 @@ Pendaftaran mandiri ditutup. Tombol Daftar tetap membuka `/register` dengan desa
 pilihan Sales/Editor dan dropdown jenjang, tetapi tombol submit dinonaktifkan dan tidak mengirim
 kredensial. Endpoint `POST /api/auth/register` selalu mengembalikan 403. Pada Supabase Auth,
 nonaktifkan **Allow new users to sign up** agar public key tidak dapat dipakai signup langsung.
-Pertahankan **Confirm email**; provisioning administratif mengonfirmasi dua akun yang disetujui.
+Pertahankan **Confirm email**; provisioning administratif mengonfirmasi akun Editor yang disetujui.
 
 ## Provisioning Editor per jenjang
 
@@ -443,28 +443,15 @@ Verifikasi script mencakup login Supabase, membership non-super, satu scope, RPC
 server lokal port 3000. Jenjang sendiri harus 200; tiga jenjang lain harus 403.
 Gunakan `EDITOR_TEST_BASE_URL` bila server berada pada alamat lain.
 
-## Provisioning akun super
+## Provisioning Editor super
 
-1. Jalankan `supabase/migrations/202610050001_account_access.sql` satu kali setelah migration katalog.
-2. Isi `.env` lokal dengan `SUPABASE_SECRET_KEY` (Secret API key), empat variabel
-   `SUPER_ACCOUNT_EDITOR_EMAIL`, `SUPER_ACCOUNT_EDITOR_PASSWORD`, `SUPER_ACCOUNT_SALES_EMAIL`, dan
-   `SUPER_ACCOUNT_SALES_PASSWORD`. Tidak ada prefix `PUBLIC` untuk nilai administratif ini.
-   Public URL dan public key tetap dibutuhkan. Email kedua akun harus berbeda dan password
-   8–128 karakter. Jangan memasukkan kredensial nyata ke contoh env atau commit.
-3. Jalankan `npm.cmd run provision:super-accounts -- --check` untuk validasi tanpa mutasi.
-4. Jalankan `npm.cmd run provision:super-accounts` untuk membuat akun atau memperbarui akun
-   pada dua email tersebut, termasuk password dan konfirmasi email. Tidak ada email undangan dikirim.
-5. Script menetapkan `account_memberships.role` dan `is_super=true`. Editor mendapat empat row
-   `editor_scopes` serta `admin_memberships` untuk katalog lama. Sales tidak mendapat scope Editor
-   atau akses admin. Script menghapus membership admin/scope Editor milik email Sales yang ditentukan.
-6. Script menguji login dan pembacaan role/scope memakai public key serta session setiap akun.
-   Tidak ada email, password, key, atau token dicetak.
-
-Hanya pengelola tepercaya melalui database owner atau key admin yang dapat memberikan role dan
-scope. Metadata `requested_role` dari registrasi lama bukan sumber otorisasi. Untuk mencabut akun
-super, cabut membership admin (Editor), membership akun, dan session Auth sesuai kebutuhan.
-`GET /api/auth/session` memverifikasi session pada server. Login default Sales dan Editor menuju
-landing page `/`; tujuan buku tervalidasi tetap didahulukan. Navigasi akun Editor menyediakan tautan Dashboard Editor.
+Isi `SUPER_ACCOUNT_EDITOR_EMAIL`, `SUPER_ACCOUNT_EDITOR_PASSWORD`, URL/public key, dan
+`SUPABASE_SECRET_KEY` di `.env` lokal. Jalankan
+`npm.cmd run provision:super-accounts -- --check` untuk preflight, lalu
+`npm.cmd run provision:super-accounts` untuk membuat/memperbarui Editor super.
+Script hanya membuat Editor; kredensial akun umum lama tidak dibaca. Tidak ada email
+undangan dikirim. Editor super mendapat empat jenjang dan membership admin kompatibilitas.
+Gunakan provisioning Editor per jenjang di atas untuk akun non-super.
 
 ## Dashboard Editor dan migration katalog
 
@@ -872,3 +859,34 @@ Rollback aplikasi sebelumnya, lalu pulihkan policy `classifications_editor_inser
 dari migration `202610150004` dan definisi RPC hapus dari `202610150006`; hapus policy
 `classifications_super_insert`. Salin hanya definisi tersebut, jangan jalankan ulang
 seluruh migration lama. Rollback ini membuka kembali pengelolaan untuk Editor biasa.
+
+## Transisi akun hanya Editor (16 Oktober 2026)
+
+Katalog dan materi published terbuka untuk publik tanpa akun. Hanya Editor yang dikenali
+oleh session aplikasi, dashboard, dan Favorit. Login akun non-Editor ditolak dan sesi login
+baru yang ditolak dibersihkan. Tidak ada pendaftaran mandiri atau pilihan role publik;
+`/register` lama mengalihkan ke login Editor sambil mempertahankan tujuan yang tervalidasi.
+
+Urutan rollout: cadangkan database, terapkan seluruh migration sampai
+`202610160003_editor_only_favorites.sql`, lalu deploy aplikasi dari branch
+`feat/editor-only-access`. Migration mengganti policy pembacaan membership agar hanya
+Editor yang dikenali, serta policy select/insert/delete Favorit agar mensyaratkan pemilik
+sekaligus role Editor. Editor biasa dan super tetap dapat menyimpan buku published dari
+semua jenjang; scope CRUD katalog tidak berubah. Favorit draf dan pemalsuan pemilik ditolak.
+
+Baris Auth, membership legacy, dan favorit lama tetap disimpan; tidak ada konversi Sales
+menjadi Editor atau penghapusan data. Auth Supabase lama secara teknis masih dapat menerbitkan
+session kepada akun legacy, tetapi session itu tidak memberi akses akun/Favorit pada aplikasi
+atau RLS terbaru. Nonaktifkan signup langsung pada pengaturan Supabase Auth seperti sebelumnya.
+Tidak ada mutasi Auth/pengaturan atau migration live yang dijalankan agent pada transisi ini.
+
+Rollback: deploy aplikasi sebelumnya dan jalankan
+`supabase/rollback/202610160003_all_account_favorites.sql`. Policy lama akan kembali
+mengizinkan akun authenticated mengelola favoritnya; data tidak perlu dipulihkan.
+Jangan hapus tabel atau row akun sebagai bagian rollback.
+
+Verifikasi terisolasi: `node scripts/verify-editor-only.mjs` dengan `PGLITE_MODULE_PATH`.
+Verifikasi browser fixture: `node scripts/verify-favorites-browser.mjs` dengan
+`PLAYWRIGHT_MODULE_PATH`. Test integrasi mutasi `scripts/verify-favorites.mjs` hanya
+untuk project pengujian yang sudah dimigrasi; jangan dipakai sebagai bukti database live
+sebelum migration diterapkan. Catatan historis tentang akun umum di atas digantikan bagian ini.

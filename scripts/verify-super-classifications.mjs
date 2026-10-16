@@ -64,6 +64,12 @@ try {
       const sessionResponse = await fetch(`${base}/api/auth/session`, {
         headers: { Cookie: cookie },
       })
+      if (account.role !== 'editor') {
+        assert.equal(sessionResponse.status, 403)
+        for (const method of ['POST', 'DELETE']) await api(cookie, method, 403)
+        console.log('PASS: legacy non-Editor session and classification access denied.')
+        continue
+      }
       assert.equal(sessionResponse.status, 200)
       const session = await sessionResponse.json()
       assert.equal(session.role, account.role)

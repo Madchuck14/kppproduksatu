@@ -187,7 +187,7 @@ async function searchCatalog() {
   <div class="landing-page">
     <section class="landing-hero" aria-labelledby="landing-title">
       <div class="hero-content">
-        <h1 id="landing-title">Temukan Buku<br />Favoritmu</h1>
+        <h1 id="landing-title">Temukan Buku<br />Pilihanmu</h1>
         <p>
           Jelajahi berbagai koleksi buku pelajaran untuk menemani rasa ingin tahu dan setiap langkah
           perjalananmu.

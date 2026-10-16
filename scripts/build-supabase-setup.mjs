@@ -157,6 +157,11 @@ const sections = [
     'Klasifikasi hanya Editor super',
     'Membatasi tambah dan hapus klasifikasi ke Editor super melalui RLS dan RPC; pembacaan opsi tetap publik.',
   ],
+  [
+    '202610160003_editor_only_favorites.sql',
+    'Akun dan Favorit hanya Editor',
+    'Membatasi membership aplikasi dan Favorit ke Editor; data akun lama dipertahankan untuk rollback.',
+  ],
 ]
 const directory = new URL('../supabase/migrations/', import.meta.url)
 const output = new URL('../supabase/setup.sql', import.meta.url)
@@ -168,7 +173,7 @@ if (JSON.stringify(filenames) !== JSON.stringify(sections.map(([name]) => name))
 }
 const parts = [
   '-- KPP PRODUK SATU - SETUP SUPABASE LENGKAP',
-  '-- Gabungan 31 migrasi berurutan, sampai versi 202610160002.',
+  '-- Gabungan 32 migrasi berurutan, sampai versi 202610160003.',
   '-- Untuk database Supabase BARU yang belum memiliki tabel aplikasi ini.',
   '-- Jalankan seluruh file sebagai database owner melalui SQL Editor.',
   '-- Jangan jalankan pada database existing atau hanya memilih section tertentu.',
@@ -228,7 +233,7 @@ if (process.argv.includes('--check')) {
     throw new Error(
       'setup.sql tidak sesuai sumber. Jalankan node scripts/build-supabase-setup.mjs.',
     )
-  console.log('PASS: setup.sql sesuai dengan seluruh 31 migrasi dan komentar section.')
+  console.log('PASS: setup.sql sesuai dengan seluruh 32 migrasi dan komentar section.')
 } else {
   await writeFile(output, bundle, 'utf8')
   console.log(`supabase/setup.sql: ${sections.length} bagian, ${Buffer.byteLength(bundle)} bytes.`)

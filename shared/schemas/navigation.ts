@@ -10,4 +10,5 @@ export const loginReturnToSchema = z.union([
   bookReturnToSchema,
   z.literal('/products'),
   z.literal('/favorites'),
+  z.literal('/admin'),
 ])

@@ -8,7 +8,7 @@ class ProvisioningError extends Error {}
 const accountSchema = z.object({
   email: z.string().trim().email(),
   password: z.string().min(8).max(128),
-  role: z.enum(['sales', 'editor']),
+  role: z.literal('editor'),
 })
 
 function fail(stage, error) {
@@ -28,19 +28,11 @@ async function main() {
       email: process.env.SUPER_ACCOUNT_EDITOR_EMAIL,
       password: process.env.SUPER_ACCOUNT_EDITOR_PASSWORD,
     },
-    {
-      role: 'sales',
-      email: process.env.SUPER_ACCOUNT_SALES_EMAIL,
-      password: process.env.SUPER_ACCOUNT_SALES_PASSWORD,
-    },
   ].map((value) => {
     const parsed = accountSchema.safeParse(value)
     if (!parsed.success) throw new ProvisioningError(`Kredensial akun ${value.role} tidak valid.`)
     return parsed.data
   })
-  if (accounts[0].email.toLowerCase() === accounts[1].email.toLowerCase()) {
-    throw new ProvisioningError('Email Sales dan Editor harus berbeda.')
-  }
   const client = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: {
@@ -63,7 +55,7 @@ async function main() {
         accounts.some((account) => account.email.toLowerCase() === user.email?.toLowerCase()),
       ),
     )
-    if (data.users.length < 100 || existingUsers.length === 2) break
+    if (data.users.length < 100 || existingUsers.length === accounts.length) break
   }
   if (process.argv.includes('--check')) {
     console.log('Konfigurasi, akses admin, kredensial, dan tabel siap. Belum ada akun diubah.')
@@ -93,17 +85,6 @@ async function main() {
         .from('admin_memberships')
         .upsert({ user_id: userId }, { onConflict: 'user_id' })
       if (adminError) fail('Penetapan admin Editor super', adminError)
-    } else {
-      const { error: adminError } = await client
-        .from('admin_memberships')
-        .delete()
-        .eq('user_id', userId)
-      if (adminError) fail('Pemisahan akses Sales dari admin', adminError)
-      const { error: scopeError } = await client
-        .from('editor_scopes')
-        .delete()
-        .eq('user_id', userId)
-      if (scopeError) fail('Pemisahan scope Editor dari Sales', scopeError)
     }
     const verification = createClient(url, process.env.NUXT_PUBLIC_SUPABASE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -127,15 +108,14 @@ async function main() {
     if (
       scopesError ||
       (account.role === 'editor' &&
-        levels.some((level) => !scopes.some((scope) => scope.education_level === level))) ||
-      (account.role === 'sales' && scopes.length)
+        levels.some((level) => !scopes.some((scope) => scope.education_level === level)))
     )
       fail(`Verifikasi scope ${account.role}`, scopesError)
     const { data: admin, error: adminReadError } = await verification
       .from('admin_memberships')
       .select('user_id')
       .eq('user_id', userId)
-    if (adminReadError || (account.role === 'editor' ? admin.length !== 1 : admin.length !== 0))
+    if (adminReadError || admin.length !== 1)
       fail(`Verifikasi batas admin ${account.role}`, adminReadError)
     console.log(
       `Akun super ${account.role} siap; login, role, scope, dan batas admin terverifikasi.`,

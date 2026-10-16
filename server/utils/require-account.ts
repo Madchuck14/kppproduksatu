@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import type { AccountSession } from '#shared/types/account'
 
-const membershipSchema = z.object({ role: z.enum(['sales', 'editor']), is_super: z.boolean() })
+const membershipSchema = z.object({ role: z.literal('editor'), is_super: z.boolean() })
 const scopesSchema = z.array(z.object({ education_level: educationLevelSchema }))
 
 export async function requireAccount(event: H3Event): Promise<AccountSession> {
@@ -21,7 +21,9 @@ export async function requireAccount(event: H3Event): Promise<AccountSession> {
     .maybeSingle()
   if (membershipError)
     throw createError({ statusCode: 503, statusMessage: 'Hak akses belum dapat diperiksa' })
-  if (!data) throw createError({ statusCode: 403, statusMessage: 'Akun belum memiliki hak akses' })
+  const role = z.object({ role: z.string() }).safeParse(data)
+  if (!role.success || role.data.role !== 'editor')
+    throw createError({ statusCode: 403, statusMessage: 'Login hanya tersedia untuk akun Editor.' })
   const membership = membershipSchema.safeParse(data)
   if (!membership.success)
     throw createError({ statusCode: 503, statusMessage: 'Data hak akses tidak valid' })

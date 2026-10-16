@@ -564,8 +564,7 @@ async function save() {
             </div>
           </div>
           <p class="privacy-note">
-            PDF tampilan dan PPT/PPTX unduhan dapat dibuka publik setelah buku dipublikasikan. Dummy
-            Buku memerlukan login.
+            Flyer, PPT Produk, dan Dummy Buku dapat dibuka publik setelah buku dipublikasikan.
           </p>
         </section>
         <section class="form-card publication-card" aria-labelledby="publication-heading">
@@ -573,7 +572,7 @@ async function save() {
           <label class="publication-option"
             ><input v-model="form.published" type="checkbox" /><span
               ><strong>Publikasikan buku</strong
-              ><span>Tampil di katalog dan dapat dibuka oleh Sales.</span></span
+              ><span>Tampil di katalog dan dapat dibuka oleh semua pengunjung.</span></span
             ></label
           >
         </section>

@@ -1,10 +1,10 @@
 import type { FavoriteIds } from '#shared/types/favorite'
 
 export function useFavorites() {
-  const user = useSupabaseUser()
+  const editorAccount = useEditorAccount()
   const { data } = useNuxtData<FavoriteIds>('favorite-ids')
   const pending = useState<string[]>('favorite-pending', () => [])
-  const ownerId = computed(() => user.value?.sub ?? null)
+  const ownerId = computed(() => editorAccount.value?.id ?? null)
   const ready = computed(() =>
     Boolean(ownerId.value && data.value?.ownerId === ownerId.value && !data.value.unavailable),
   )
@@ -12,7 +12,7 @@ export function useFavorites() {
 
   async function toggle(productId: string) {
     const owner = ownerId.value
-    if (!owner) throw new Error('Silakan login untuk menyimpan favorit.')
+    if (!owner) throw new Error('Favorit hanya tersedia untuk Editor.')
     const key = `${owner}:${productId}`
     if (pending.value.includes(key)) return
     pending.value = [...pending.value, key]
@@ -40,6 +40,7 @@ export function useFavorites() {
     }
   }
   return {
+    canUse: computed(() => Boolean(editorAccount.value)),
     ids,
     ready,
     ownerId,

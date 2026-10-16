@@ -2,6 +2,7 @@
 import { educationLevelSchema } from '#shared/schemas/auth'
 import type { FavoriteList } from '#shared/types/favorite'
 
+definePageMeta({ middleware: 'admin' })
 const config = useRuntimeConfig()
 useSeoMeta({ title: `Favorit | ${config.public.siteName}`, robots: 'noindex, nofollow' })
 const user = useSupabaseUser()
@@ -83,12 +84,6 @@ watch([visible, status], async () => {
       <span aria-current="page">Favorit</span>
     </nav>
     <h1>Buku Favorit</h1>
-    <div v-if="!user" class="favorites-login-banner">
-      <p>Masuk untuk menyimpan favorit di semua perangkat.</p>
-      <NuxtLink :to="loginDestination">
-        Masuk <UIcon name="i-lucide-arrow-right" aria-hidden="true" />
-      </NuxtLink>
-    </div>
     <template v-if="user">
       <form
         v-if="visible?.total || appliedSearch || appliedLevel"

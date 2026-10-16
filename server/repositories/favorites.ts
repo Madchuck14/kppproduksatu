@@ -5,18 +5,11 @@ import type { FavoriteQuery } from '#shared/schemas/favorites'
 import type { FavoriteIds, FavoriteList } from '#shared/types/favorite'
 import type { FavoriteDatabase } from '#shared/types/favorite-database'
 import { mapProductRow, productColumns } from './products'
+import { requireEditor } from '../utils/require-editor'
 
-// Favorites are available to every authenticated user, independent of Editor privileges.
 async function favoriteSession(event: H3Event) {
+  const user = await requireEditor(event)
   const client = await serverSupabaseClient<FavoriteDatabase>(event)
-  const {
-    data: { user },
-    error,
-  } = await client.auth.getUser()
-  if (error || !user) throw createError({ statusCode: 401, statusMessage: 'Silakan login' })
-  if (useRuntimeConfig(event).catalogSource !== 'supabase') {
-    throw createError({ statusCode: 503, statusMessage: 'Favorit memerlukan katalog Supabase' })
-  }
   return { client, user }
 }
 

@@ -32,21 +32,7 @@ const isShowcase = computed(
 const user = useSupabaseUser()
 const client = useSupabaseClient()
 const requestFetch = useRequestFetch()
-const favorites = useFavorites()
-const favoritesRequest = useAsyncData<FavoriteIds>(
-  'favorite-ids',
-  async () => {
-    const ownerId = user.value?.sub ?? null
-    if (!ownerId) return { ownerId: null, ids: [] }
-    try {
-      return await requestFetch<FavoriteIds>('/api/favorites/ids')
-    } catch {
-      return { ownerId, ids: [], unavailable: true }
-    }
-  },
-  { server: false, watch: [() => user.value?.sub], default: () => ({ ownerId: null, ids: [] }) },
-)
-const accountRequest = useAsyncData(
+const { data: navigationAccount } = await useAsyncData(
   'navigation-account',
   async () => {
     if (!user.value) return null
@@ -56,9 +42,23 @@ const accountRequest = useAsyncData(
       return null
     }
   },
-  { server: false, watch: [() => user.value?.sub] },
+  { watch: [() => user.value?.sub], default: () => null },
 )
-const [, { data: navigationAccount }] = await Promise.all([favoritesRequest, accountRequest])
+const editorAccount = useEditorAccount()
+const favorites = useFavorites()
+await useAsyncData<FavoriteIds>(
+  'favorite-ids',
+  async () => {
+    const ownerId = editorAccount.value?.id ?? null
+    if (!ownerId) return { ownerId: null, ids: [] }
+    try {
+      return await requestFetch<FavoriteIds>('/api/favorites/ids')
+    } catch {
+      return { ownerId, ids: [], unavailable: true }
+    }
+  },
+  { watch: [() => editorAccount.value?.id], default: () => ({ ownerId: null, ids: [] }) },
+)
 const loggingOut = ref(false)
 const logoutMessage = ref('')
 
@@ -195,7 +195,13 @@ async function logout() {
               <path d="m16 17 5-5-5-5M21 12H9" />
             </svg>
           </button>
-          <NuxtLink v-else to="/login" class="header-icon-button" aria-label="Login" title="Login">
+          <NuxtLink
+            v-else
+            to="/login"
+            class="header-icon-button"
+            aria-label="Login Editor"
+            title="Login Editor"
+          >
             <svg
               viewBox="0 0 24 24"
               width="20"
@@ -212,7 +218,7 @@ async function logout() {
             </svg>
           </NuxtLink>
           <NuxtLink
-            v-if="isShowcase"
+            v-if="isShowcase && editorAccount"
             to="/favorites"
             class="header-icon-button favorites-link"
             :aria-label="
@@ -336,7 +342,7 @@ async function logout() {
                 <h2>Jelajahi</h2>
                 <NuxtLink to="/products">Katalog Buku</NuxtLink>
                 <NuxtLink to="/#kategori">Jenjang Sekolah</NuxtLink>
-                <NuxtLink to="/login">Akun</NuxtLink>
+                <NuxtLink to="/login">Login Editor</NuxtLink>
               </template>
             </div>
           </div>

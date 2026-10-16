@@ -1,3 +1,17 @@
+# Model akses saat ini: publik dan Editor
+
+Katalog dan seluruh materi buku published terbuka tanpa akun. Satu-satunya role aplikasi
+adalah Editor; Editor biasa dibatasi jenjang untuk CRUD dan Editor super memiliki akses
+penuh. Favorit hanya untuk Editor, dengan tombol/navigasi yang tidak dirender bagi publik,
+guard route, validasi session server, dan RLS pemilik + membership Editor. Tidak ada
+pendaftaran akun umum. URL `/register` lama mengalihkan ke login Editor; login default
+menuju `/admin`, tujuan buku/Favorit yang tervalidasi tetap dihormati.
+
+Migration `202610160003_editor_only_favorites.sql` mempertahankan baris akun legacy dan
+favorit untuk rollback, tetapi mencabut akses aplikasinya. Provisioning hanya membuat
+Editor. Ketentuan historis tentang Sales, registrasi, atau favorit akun umum di bawah
+sudah digantikan. Ikuti urutan rollout/rollback di [panduan Supabase](supabase.md#transisi-akun-hanya-editor-16-oktober-2026).
+
 ## Akses Dummy Buku publik
 
 Setelah migration `202610160001_public_dummy_books.sql`, seluruh materi buku published

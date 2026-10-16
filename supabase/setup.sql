@@ -1,5 +1,5 @@
 -- KPP PRODUK SATU - SETUP SUPABASE LENGKAP
--- Gabungan 31 migrasi berurutan, sampai versi 202610160002.
+-- Gabungan 32 migrasi berurutan, sampai versi 202610160003.
 -- Untuk database Supabase BARU yang belum memiliki tabel aplikasi ini.
 -- Jalankan seluruh file sebagai database owner melalui SQL Editor.
 -- Jangan jalankan pada database existing atau hanya memilih section tertentu.
@@ -1858,6 +1858,51 @@ end;
 $$;
 revoke all on function public.delete_book_classification(text, text, text) from public, anon, authenticated;
 grant execute on function public.delete_book_classification(text, text, text) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- BAGIAN 32: AKUN DAN FAVORIT HANYA EDITOR
+-- Penjelasan: Membatasi membership aplikasi dan Favorit ke Editor; data akun lama dipertahankan untuk rollback.
+-- Sumber: migrations/202610160003_editor_only_favorites.sql
+-- ============================================================================
+
+-- Compatibility transition: retain legacy memberships/Auth users/favorites for rollback.
+-- Only Editor memberships are recognized by the application or exposed to their owner.
+drop policy if exists "Accounts read their membership" on public.account_memberships;
+create policy "Accounts read their membership" on public.account_memberships
+  for select to authenticated using (user_id = (select auth.uid()) and role = 'editor');
+
+drop policy if exists "Users read their favorites" on public.product_favorites;
+drop policy if exists "Users favorite published books" on public.product_favorites;
+drop policy if exists "Users remove their favorites" on public.product_favorites;
+drop policy if exists "Editors read their favorites" on public.product_favorites;
+drop policy if exists "Editors favorite published books" on public.product_favorites;
+drop policy if exists "Editors remove their favorites" on public.product_favorites;
+
+create policy "Editors read their favorites" on public.product_favorites
+  for select to authenticated using (
+    user_id = (select auth.uid()) and exists (
+      select 1 from public.account_memberships m
+      where m.user_id = (select auth.uid()) and m.role = 'editor'
+    )
+  );
+create policy "Editors favorite published books" on public.product_favorites
+  for insert to authenticated with check (
+    user_id = (select auth.uid()) and exists (
+      select 1 from public.account_memberships m
+      where m.user_id = (select auth.uid()) and m.role = 'editor'
+    ) and exists (
+      select 1 from public.products p where p.id = product_id and p.published = true
+    )
+  );
+create policy "Editors remove their favorites" on public.product_favorites
+  for delete to authenticated using (
+    user_id = (select auth.uid()) and exists (
+      select 1 from public.account_memberships m
+      where m.user_id = (select auth.uid()) and m.role = 'editor'
+    )
+  );
 
 notify pgrst, 'reload schema';
 

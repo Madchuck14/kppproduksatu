@@ -72,9 +72,10 @@ async function main() {
   const catalog = await api(null, '/api/products')
   check(catalog.source === 'supabase', 'Server uji harus memakai katalog Supabase')
   const sales = await account('sales')
+  const firstEditor = await account('editor')
   const editor = await account('editor')
   const ordinary = await account()
-  check((await api(sales, '/api/auth/session')).role === 'sales', 'Session Sales gagal')
+  await api(sales, '/api/auth/session', 'GET', 403)
   check((await api(editor, '/api/auth/session')).role === 'editor', 'Session Editor gagal')
   await api(ordinary, '/api/auth/session', 'GET', 403)
   await api(sales, '/api/admin/books', 'GET', 403)
@@ -105,6 +106,16 @@ async function main() {
     books.push(result.data)
   }
   const [sd, sma, draft] = books
+  for (const denied of [sales, ordinary]) {
+    await api(denied, '/api/favorites', 'GET', 403)
+    await api(denied, '/api/favorites/ids', 'GET', 403)
+    await api(denied, `/api/favorites/${sd.id}`, 'PUT', 403)
+    await api(denied, `/api/favorites/${sd.id}`, 'DELETE', 403)
+    const raw = await denied.client
+      .from('product_favorites')
+      .insert({ user_id: denied.id, product_id: sd.id })
+    check(raw.error?.code === '42501', 'RLS non-Editor tidak ditolak')
+  }
   for (const path of [
     '/',
     '/products',
@@ -118,40 +129,44 @@ async function main() {
   for (const method of ['GET', 'PUT', 'DELETE'])
     await api(null, method === 'GET' ? '/api/favorites' : `/api/favorites/${sd.id}`, method, 401)
   await api(null, '/api/favorites/ids', 'GET', 401)
-  await api(sales, '/api/favorites/not-a-uuid', 'PUT', 400)
-  await api(sales, '/api/favorites?page=0', 'GET', 400)
-  for (const session of [sales, editor, ordinary]) {
+  await api(firstEditor, '/api/favorites/not-a-uuid', 'PUT', 400)
+  await api(firstEditor, '/api/favorites?page=0', 'GET', 400)
+  for (const session of [firstEditor, editor]) {
     await api(session, `/api/favorites/${sd.id}`, 'PUT')
     await api(session, `/api/favorites/${sd.id}`, 'PUT')
     check((await api(session, '/api/favorites')).total === 1, 'Favorit duplikat atau role ditolak')
     await api(session, `/api/favorites/${draft.id}`, 'PUT', 404)
   }
-  await api(sales, `/api/favorites/${sma.id}`, 'PUT')
+  await api(firstEditor, `/api/favorites/${sma.id}`, 'PUT')
   check(
-    (await api(sales, `/api/favorites?q=${sma.book_code}&level=SMA`)).products[0]?.id === sma.id,
+    (await api(firstEditor, `/api/favorites?q=${sma.book_code}&level=SMA`)).products[0]?.id ===
+      sma.id,
     'Pencarian kode/filter gagal',
   )
-  check((await api(sales, '/api/favorites?level=SD')).total === 1, 'Filter jenjang gagal')
-  check((await api(sales, '/api/favorites?page=2')).products.length === 0, 'Pagination gagal')
+  check((await api(firstEditor, '/api/favorites?level=SD')).total === 1, 'Filter jenjang gagal')
+  check((await api(firstEditor, '/api/favorites?page=2')).products.length === 0, 'Pagination gagal')
   check((await api(editor, '/api/favorites')).total === 1, 'Favorit akun lain bocor')
   const foreign = await editor.client
     .from('product_favorites')
     .select('product_id')
-    .eq('user_id', sales.id)
+    .eq('user_id', firstEditor.id)
   check(!foreign.error && foreign.data.length === 0, 'RLS baca lintas akun bocor')
   const forged = await editor.client
     .from('product_favorites')
-    .insert({ user_id: sales.id, product_id: draft.id })
+    .insert({ user_id: firstEditor.id, product_id: draft.id })
   check(forged.error?.code === '42501', 'RLS pemalsuan pemilik tidak ditolak')
   const rawDraft = await editor.client
     .from('product_favorites')
     .insert({ user_id: editor.id, product_id: draft.id })
   check(rawDraft.error?.code === '42501', 'RLS favorit draft tidak ditolak')
   check(
-    !(await editor.client.from('product_favorites').delete().eq('user_id', sales.id)).error,
+    !(await editor.client.from('product_favorites').delete().eq('user_id', firstEditor.id)).error,
     'RLS delete gagal',
   )
-  check((await api(sales, '/api/favorites')).total === 2, 'RLS mengizinkan hapus favorit akun lain')
+  check(
+    (await api(firstEditor, '/api/favorites')).total === 2,
+    'RLS mengizinkan hapus favorit akun lain',
+  )
   check(
     !(await admin.from('products').update({ published: false }).eq('id', sd.id)).error,
     'Unpublish uji gagal',
@@ -164,13 +179,10 @@ async function main() {
     !(await admin.from('products').update({ published: true }).eq('id', sd.id)).error,
     'Republish uji gagal',
   )
-  const favoritePage = await api(sales, '/favorites')
+  const favoritePage = await api(firstEditor, '/favorites')
   check(favoritePage.includes(sd.slug), 'SSR favorit gagal')
   check(favoritePage.includes('aria-pressed="true"'), 'Status tombol favorit pada SSR gagal')
-  check(
-    (await api(null, '/favorites')).includes('Login untuk membuka favorit'),
-    'State anonim gagal',
-  )
+  await api(null, '/favorites', 'GET', 302)
   check(!(await admin.from('products').delete().eq('id', sma.id)).error, 'Hapus buku uji gagal')
   const remaining = await admin
     .from('product_favorites')
@@ -178,7 +190,7 @@ async function main() {
     .eq('product_id', sma.id)
   check(!remaining.error && remaining.data.length === 0, 'Cascade hapus buku gagal')
   console.log(
-    'PASS favorit Sales/Editor/akun biasa, idempotensi, pencarian/filter/pagination, SSR, published-only, RLS lintas akun, cascade',
+    'PASS favorit hanya Editor; Sales/akun biasa ditolak, idempotensi, pencarian/filter/pagination, SSR, published-only, RLS lintas akun, cascade',
   )
 }
 try {

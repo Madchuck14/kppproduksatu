@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { Product } from '#shared/types/product'
-import { getProductPath } from '#shared/utils/product-path'
 
 const props = defineProps<{
   product: Product
@@ -22,17 +21,7 @@ watch(
 
 async function toggle() {
   message.value = ''
-  if (!user.value) {
-    if (props.iconOnly) {
-      await navigateTo({
-        path: '/login',
-        query: { returnTo: getProductPath(props.product) },
-      })
-      return
-    }
-    message.value = 'Login untuk menyimpan buku ke favorit.'
-    return
-  }
+  if (!favorites.canUse.value) return
   try {
     await favorites.toggle(props.product.id)
   } catch (error) {
@@ -47,6 +36,7 @@ async function toggle() {
 
 <template>
   <div
+    v-if="favorites.canUse.value"
     :class="{
       'favorite-control--icon': iconOnly,
       'favorite-control--catalog': catalog,
@@ -100,13 +90,6 @@ async function toggle() {
     </button>
     <div v-if="message" :class="{ 'sr-only': iconOnly }">
       <p role="status" class="mt-2 text-sm text-stone-600">{{ message }}</p>
-      <NuxtLink
-        v-if="message && !user"
-        :to="{ path: '/login', query: { returnTo: getProductPath(product) } }"
-        class="mt-2 inline-block text-sm font-semibold text-emerald-800 underline"
-      >
-        Login dan kembali ke buku
-      </NuxtLink>
     </div>
   </div>
 </template>

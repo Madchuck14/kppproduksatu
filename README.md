@@ -10,7 +10,7 @@ Fondasi katalog produk dengan Nuxt 4, Vue 3, TypeScript, Tailwind CSS, Nuxt UI, 
 ## Mulai di Windows
 
 Untuk menyiapkan database Supabase baru lewat satu file, gunakan
-[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 31 migrasi
+[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 32 migrasi
 dengan komentar section dan penjelasan singkat. Ikuti [panduan file gabungan](docs/supabase.md#setup-satu-file-untuk-database-baru).
 Database yang sudah terpasang tetap memakai migrasi incremental; jangan jalankan ulang file setup.
 
@@ -60,18 +60,18 @@ tanpa spasi/tanda hubung agar nol di depan tidak hilang. Ikuti [rollout metadata
 - Login email/password dan dashboard Editor `/admin`: ringkasan, pencarian, filter jenjang/status,
   tambah/edit/hapus buku, publikasi, unggah sampul, dan pengelolaan buku pilihan. Akses dibatasi
   di server dan RLS.
-- Tampilan registrasi Sales/Editor tetap tersedia; pengiriman registrasi mandiri dinonaktifkan.
-- Provisioning akun Sales/Editor super melalui script lokal dan membership RLS; Editor super
-  memiliki SD/SMP/SMA/SMK serta akses admin, Sales tidak memiliki akses admin.
+- Login khusus Editor; tidak ada pendaftaran akun umum. `/register` lama diarahkan ke login Editor.
+- Provisioning Editor super dan Editor per jenjang melalui script lokal; akun umum tidak dibuat.
 - Migration produk/admin membership, RLS, bucket gambar, dan seed demo. Tabel kategori lama tidak
   lagi dipakai aplikasi.
 - Endpoint `/healthz` untuk liveness aplikasi (bukan pemeriksaan database).
 - Konfigurasi Cloudflare Workers, Dockerfile, dan Compose untuk aplikasi Node.
 
-Favorit pribadi tersedia untuk semua akun yang sudah login, termasuk Sales dan Editor: tombol
-di kartu/detail buku serta halaman `/favorites` dengan pencarian, filter jenjang, dan pagination.
-Terapkan migration `202610070001_product_favorites.sql` sebelum memakai favorit dengan Supabase.
-Pengunjung anonim diarahkan login; mode demo tidak menyimpan favorit.
+Katalog dan seluruh materi buku published terbuka tanpa akun. Favorit pribadi hanya tersedia
+untuk Editor: tombol di kartu/detail dan navigasi disembunyikan bagi publik. `/favorites`
+dilindungi guard Editor; API dan RLS menolak akun lama non-Editor. Terapkan migration
+`202610160003_editor_only_favorites.sql` sebelum menjalankan versi ini. Data Auth, membership,
+dan favorit lama dipertahankan untuk rollback; tidak ada penghapusan akun live oleh aplikasi.
 
 Pagination tersedia pada dashboard Editor dan katalog publik. Cart, checkout, Midtrans, blog,
 banner CMS, sitemap, dan structured data belum diimplementasikan.

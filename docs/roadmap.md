@@ -1,5 +1,8 @@
 # Roadmap
 
+Model akses saat ini: katalog/materi published publik tanpa akun; hanya Editor yang login
+dan menggunakan Favorit/dashboard. Akun umum dan registrasi mandiri tidak tersedia.
+
 1. **Fondasi (folder ini):** Nuxt, UI, API katalog, fixture, schema Supabase, login/guard admin, konfigurasi dua target deploy. Instalasi dari cache dan halaman katalog pada development server sudah diverifikasi; build produksi dan integrasi Supabase masih perlu diuji.
 2. **Showcase:** branding asli, layout mengacu theme referensi, produk/gambar klien, filter jenjang/pagination, kontak, banner, dan staging online.
 3. **Editor:** Dashboard, CRUD buku, filter/pagination, upload sampul, form Zod, konfirmasi delete,

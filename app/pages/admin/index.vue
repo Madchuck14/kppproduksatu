@@ -192,7 +192,7 @@ const fieldClass =
         <p class="dashboard-eyebrow">Ruang Kerja Editorial</p>
         <h1>Dashboard Editor</h1>
         <p class="dashboard-description">
-          Rawat informasi buku agar tim Sales selalu membawa katalog yang tepat.
+          Kelola informasi buku agar pengunjung mendapatkan katalog yang tepat.
         </p>
       </div>
       <div class="dashboard-header-actions">
