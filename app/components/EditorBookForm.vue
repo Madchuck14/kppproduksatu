@@ -6,6 +6,7 @@ import { educationLevelSchema } from '#shared/schemas/auth'
 import { getGradesForLevel } from '#shared/utils/book-grades'
 import type { EditorBook } from '#shared/types/editor'
 import type { AccountSession } from '#shared/types/account'
+import type { StorageUsage } from '#shared/types/storage-usage'
 import { uploadFile } from '~/utils/upload-file'
 
 const props = defineProps<{
@@ -13,6 +14,29 @@ const props = defineProps<{
   account: AccountSession
 }>()
 const savedId = ref(props.book?.id)
+let nextAuthorId = 0
+const authors = ref(
+  (props.book?.author.split(';') ?? ['']).map((name) => ({
+    id: nextAuthorId++,
+    name: name.trim(),
+  })),
+)
+function authorInputId(id: number) {
+  return id === 0 ? 'new-book-author' : `new-book-author-${id}`
+}
+async function addAuthor() {
+  const id = nextAuthorId++
+  authors.value.push({ id, name: '' })
+  await nextTick()
+  document.getElementById(authorInputId(id))?.focus()
+}
+async function removeAuthor(index: number) {
+  if (index < 1) return
+  authors.value.splice(index, 1)
+  await nextTick()
+  const previous = authors.value[index - 1]
+  if (previous) document.getElementById(authorInputId(previous.id))?.focus()
+}
 const materials = [
   { kind: 'dummy', label: 'Dummy Buku', help: 'Format file dalam bentuk PDF, maksimal 50 MB' },
   {
@@ -38,7 +62,6 @@ const form = reactive({
   grade: props.book?.grade ?? null,
   subject: (props.book?.subject ?? '') as BookSubject | '',
   title: props.book?.title ?? '',
-  author: props.book?.author ?? '',
   curriculum: props.book?.curriculum ?? '',
   isbn: props.book?.isbn ?? '',
   synopsis: props.book?.synopsis ?? '',
@@ -101,6 +124,21 @@ const materialFiles = reactive<
   'product-knowledge-preview': null,
 })
 const materialsDialog = useTemplateRef<HTMLDialogElement>('materialsDialog')
+const {
+  data: storageUsage,
+  status: storageUsageStatus,
+  error: storageUsageError,
+  refresh: refreshStorageUsage,
+} = await useFetch<StorageUsage>('/api/admin/storage-usage', { server: false, immediate: false })
+function openMaterials() {
+  materialsDialog.value?.showModal()
+  void refreshStorageUsage()
+}
+function formatStorageBytes(bytes: number) {
+  const unit = bytes >= 1024 ** 3 ? 'GB' : 'MB'
+  const value = bytes / (unit === 'GB' ? 1024 ** 3 : 1024 ** 2)
+  return `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(value)} ${unit}`
+}
 function materialAvailable(kind: keyof typeof materialFiles) {
   const key =
     kind === 'product-knowledge'
@@ -188,6 +226,10 @@ function selectMaterial(kind: keyof typeof materialFiles, event: Event) {
 function parseBookForm() {
   return bookInputSchema.safeParse({
     ...form,
+    author: authors.value
+      .map((author) => author.name.trim())
+      .filter(Boolean)
+      .join('; '),
     curriculum: form.curriculum.trim() || null,
     isbn: form.isbn.trim() || null,
     highlights: form.highlights.map((item) => item.trim()).filter(Boolean),
@@ -201,6 +243,11 @@ function parseBookForm() {
 function checkBookForm() {
   const parsed = parseBookForm()
   errors.value = {}
+  if (!authors.value[0]?.name.trim()) {
+    errors.value.author = 'Penulis pertama wajib diisi.'
+    message.value = 'Lengkapi kolom wajib yang ditandai sebelum mengunggah atau menyimpan buku.'
+    return null
+  }
   if (!parsed.success) {
     for (const issue of parsed.error.issues) errors.value[String(issue.path[0])] ??= issue.message
     message.value = 'Lengkapi kolom wajib yang ditandai sebelum mengunggah atau menyimpan buku.'
@@ -274,6 +321,7 @@ async function uploadSelected(kind: UploadKind) {
   } finally {
     busy.value = false
     progress.value = ''
+    void refreshStorageUsage()
   }
 }
 async function save() {
@@ -281,7 +329,7 @@ async function save() {
   message.value = ''
   if (Object.values(uploads).some((upload) => upload?.status === 'error')) {
     if (materials.some((item) => uploads[item.kind]?.status === 'error')) {
-      materialsDialog.value?.showModal()
+      openMaterials()
     }
     return
   }
@@ -336,7 +384,35 @@ async function save() {
           </div>
           <div class="form-field">
             <label for="new-book-author">Penulis <span class="required">*</span></label>
-            <input id="new-book-author" v-model="form.author" required maxlength="200" />
+            <div v-for="(author, index) in authors" :key="author.id" class="highlight-row">
+              <label v-if="index > 0" :for="authorInputId(author.id)" class="sr-only">
+                Penulis {{ index + 1 }}
+              </label>
+              <input
+                :id="authorInputId(author.id)"
+                v-model="author.name"
+                :required="index === 0"
+                maxlength="200"
+                :aria-invalid="!!errors.author"
+                aria-describedby="new-book-author-help new-book-author-error"
+              />
+              <button
+                v-if="index > 0"
+                type="button"
+                class="remove-highlight"
+                :aria-label="`Hapus penulis ${index + 1}`"
+                @click="removeAuthor(index)"
+              >
+                <UIcon name="i-lucide-x" aria-hidden="true" />
+              </button>
+            </div>
+            <button type="button" class="add-highlight" @click="addAuthor">+ Tambah penulis</button>
+            <p id="new-book-author-help" class="field-help">
+              Satu penulis per kolom. Total maksimal 200 karakter, termasuk pemisah antarpenulis.
+            </p>
+            <p v-if="errors.author" id="new-book-author-error" class="field-error">
+              {{ errors.author }}
+            </p>
           </div>
           <div class="field-row">
             <div class="form-field">
@@ -652,7 +728,7 @@ async function save() {
               }}</span>
             </li>
           </ul>
-          <button type="button" class="manage-materials" @click="materialsDialog?.showModal()">
+          <button type="button" class="manage-materials" @click="openMaterials">
             <UIcon name="i-lucide-folder-open" aria-hidden="true" />
             Kelola kelengkapan produk
           </button>
@@ -795,10 +871,27 @@ async function save() {
         </p>
       </div>
       <footer class="materials-dialog-footer">
-        <p>
-          <UIcon name="i-lucide-info" aria-hidden="true" />Materi dapat dibuka publik setelah buku
-          dipublikasikan.
-        </p>
+        <div class="materials-footer-info">
+          <p>
+            <UIcon name="i-lucide-info" aria-hidden="true" />Materi dapat dibuka publik setelah buku
+            dipublikasikan.
+          </p>
+          <p class="storage-usage" role="status" aria-live="polite">
+            <template v-if="storageUsageStatus === 'pending'">
+              Memuat penggunaan penyimpanan...
+            </template>
+            <template v-else-if="storageUsageError">
+              Penggunaan penyimpanan belum dapat dimuat.
+              <button type="button" class="storage-retry" @click="refreshStorageUsage()">
+                Coba lagi
+              </button>
+            </template>
+            <template v-else-if="storageUsage">
+              {{ formatStorageBytes(storageUsage.usedBytes) }} dari
+              {{ formatStorageBytes(storageUsage.quotaBytes) }} penyimpanan telah dipakai.
+            </template>
+          </p>
+        </div>
         <button
           type="button"
           class="manage-materials materials-done"
@@ -1344,6 +1437,19 @@ async function save() {
   gap: 8px;
   color: #6b6f6b;
   font-size: 12px;
+}
+.materials-footer-info {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.materials-dialog-footer .storage-usage {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.storage-retry {
+  color: #1f5c3f;
+  text-decoration: underline;
 }
 .materials-done {
   min-width: 132px;

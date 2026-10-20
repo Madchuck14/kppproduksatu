@@ -47,10 +47,30 @@ Rollback aplikasi lalu pulihkan hanya definisi `featured_products_count` dan
 menghapus data pilihan/hero. Uji lokal: `scripts/verify-landing-hero.mjs`.
 Migration ini belum diterapkan atau diverifikasi di Supabase live oleh agent.
 
+## Indikator penggunaan penyimpanan file
+
+Untuk database existing, terapkan `202610200001_storage_usage.sql` sebelum deploy aplikasi.
+RPC `editor_storage_usage_bytes()` menjumlahkan `storage.objects.metadata.size` di seluruh
+bucket sebagai bigint. Fungsi `SECURITY DEFINER` memakai search path kosong dan memeriksa
+membership Editor sebelum membaca total. Anon tidak mendapat EXECUTE; akun non-Editor ditolak.
+Editor per jenjang hanya menerima satu angka agregat, tanpa nama/path/metadata file jenjang lain.
+Tidak ada policy, file, metadata Storage, atau data buku yang diubah. Service-role key tidak diperlukan.
+
+Footer kelengkapan produk memakai pembanding paket Free 1 GB; jika paket berubah, sesuaikan
+`quotaBytes` di `server/repositories/storage-usage.ts`. Nilai menunjukkan ukuran file saat ini di
+proyek yang terhubung, bukan ukuran database PostgreSQL, pemakaian proyek lain, atau rata-rata
+billing organisasi. [Dokumentasi Storage Supabase](https://supabase.com/docs/guides/platform/manage-your-usage/storage-size)
+menjelaskan agregasi metadata dan perbedaan ukuran saat ini dengan perhitungan billing.
+Migration belum diterapkan atau diverifikasi pada Supabase live oleh agent.
+
+Rollback: kembalikan aplikasi terlebih dahulu, lalu bila diperlukan jalankan
+`drop function public.editor_storage_usage_bytes();`. Migration dapat diulang dan tidak mengubah
+objek Storage. Uji terisolasi: `node scripts/verify-storage-usage.mjs` dengan `PGLITE_MODULE_PATH`.
+
 ## Setup satu file untuk database baru
 
-[`supabase/setup.sql`](../supabase/setup.sql) menggabungkan seluruh 34 migrasi sampai
-`202610160005_super_editor_featured_books.sql`. Setiap bagian memiliki judul,
+[`supabase/setup.sql`](../supabase/setup.sql) menggabungkan seluruh 35 migrasi sampai
+`202610200001_storage_usage.sql`. Setiap bagian memiliki judul,
 komentar penjelasan singkat tepat di bawahnya, serta nama file sumber. Urutan SQL sama
 dengan migrasi berurutan; definisi historis yang diganti bagian berikutnya tetap diberi
 penjelasan agar hasil akhir sesuai aplikasi terbaru.

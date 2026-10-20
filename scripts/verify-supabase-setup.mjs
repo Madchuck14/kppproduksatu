@@ -20,7 +20,7 @@ async function prepare(connection) {
     grant usage on schema auth to anon, authenticated;
     create schema storage;
     create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
-    create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text);
+    create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, metadata jsonb);
     alter table storage.objects enable row level security;
     grant usage on schema storage to anon, authenticated;
     grant select on storage.objects to anon, authenticated;
@@ -147,7 +147,7 @@ try {
     "insert into public.book_classifications (kind, code, name, education_level) values ('subject', 'Test', 'Test', 'SMP')",
   )
   console.log(
-    'PASS: 34-section bundle equals sequential schema/RLS/grants/functions/triggers/data; existing-DB guard, atomic rollback, public/draft separation, popularity, duplicate titles, and final Editor classification rules (isolated PostgreSQL).',
+    'PASS: 35-section bundle equals sequential schema/RLS/grants/functions/triggers/data; existing-DB guard, atomic rollback, public/draft separation, popularity, duplicate titles, and final Editor classification rules (isolated PostgreSQL).',
   )
 } finally {
   await Promise.all([db.close(), sequential.close(), failed.close()])

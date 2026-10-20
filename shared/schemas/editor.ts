@@ -67,7 +67,10 @@ export const bookInputSchema = z
     grade: z.number().int().min(1).max(12).nullable().optional(),
     subject: bookSubjectSchema.nullable().default(null),
     title: z.string().trim().min(1, 'Judul wajib diisi.').max(200),
-    author: z.string().trim().max(200),
+    author: z
+      .string()
+      .trim()
+      .max(200, 'Total nama penulis maksimal 200 karakter, termasuk pemisah.'),
     curriculum: bookCurriculumSchema.nullable().optional(),
     isbn: bookIsbnSchema.nullable().optional(),
     synopsis: z

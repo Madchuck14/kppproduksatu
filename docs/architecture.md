@@ -393,6 +393,12 @@ sebagai nilai kosong. Buku lama yang belum lengkap perlu diisi sebelum disimpan 
 Kontrak API tetap kompatibel dengan metadata lama yang nullable. Guard Editor dan scope
 jenjang tetap berlaku; migration `202610140003_book_curriculum_isbn.sql` menambah metadata opsional.
 
+Form tambah/edit menyediakan tombol **Tambah penulis** dan tombol hapus mulai kolom kedua.
+Penulis pertama wajib diisi; kolom tambahan kosong diabaikan. Nama disimpan berurutan pada
+kolom `author` yang sudah ada, dipisahkan `; `, dengan batas gabungan 200 karakter termasuk
+pemisah. Saat edit, titik koma memisahkan input penulis; koma dalam nama atau gelar tetap utuh.
+Data lama tanpa titik koma tetap dimuat sebagai satu input. Tidak ada perubahan schema database.
+
 Sinopsis, keunggulan, target pasar, dan divisi dikirim melalui kontrak katalog yang tersedia.
 ISBN dan kurikulum disimpan pada kolom `text` nullable. Kurikulum memakai input teks bebas
 maksimal 200 karakter. ISBN menerima format 10/13 karakter dan dinormalisasi tanpa spasi/tanda
@@ -499,6 +505,17 @@ untuk mengurangi overhead development; Vite/HMR tetap tersedia. Latensi Supabase
 mempengaruhi SSR dan hasil pengukuran lokal bukan jaminan performa deployment produksi.
 
 ### Transport unggahan materi
+
+Footer modal kelengkapan menampilkan pemakaian Storage proyek melalui
+`GET /api/admin/storage-usage`. Endpoint memverifikasi Editor dengan `auth.getUser()` dan
+memanggil RPC `editor_storage_usage_bytes`; hanya total byte dikirim ke browser, tanpa metadata
+file lintas jenjang. Total mencakup seluruh bucket, termasuk sampul, materi draf, dan file lama
+yang masih tersimpan. Angka dimuat saat modal dibuka dan diperbarui setelah setiap percobaan
+unggahan, termasuk kegagalan yang mungkin sudah meninggalkan objek Storage.
+Kegagalan pembacaan menampilkan pesan dan tombol coba lagi, tanpa angka nol buatan.
+Pembanding 1 GB (`1024 ** 3` byte) mengikuti paket Free saat ini, bukan deteksi paket billing.
+Ini ukuran file saat ini, bukan pemakaian database PostgreSQL atau rata-rata billing bulanan.
+Terapkan migration `202610200001_storage_usage.sql` sebelum deploy; lihat panduan Supabase.
 
 Form Tambah/Edit Buku membuka pengelolaan Dummy Buku, PPT unduhan, PDF pratinjau, dan Flyer
 melalui tombol **Kelola kelengkapan produk**. Modal besar mengikuti gaya katalog, menampilkan

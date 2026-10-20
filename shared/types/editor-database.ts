@@ -48,6 +48,10 @@ export type EditorDatabase = {
     }
     Views: Record<never, never>
     Functions: {
+      editor_storage_usage_bytes: {
+        Args: Record<never, never>
+        Returns: number
+      }
       set_featured_books_with_hero: {
         Args: { selected_book_ids: string[]; hero_heading: string; hero_body: string }
         Returns: number

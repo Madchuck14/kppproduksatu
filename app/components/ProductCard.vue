@@ -94,6 +94,7 @@ withDefaults(defineProps<{ product: Product; variant?: 'default' | 'landing' | '
 }
 .book-details {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 7px;
   margin-top: 16px;
 }

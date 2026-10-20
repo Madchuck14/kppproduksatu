@@ -172,6 +172,11 @@ const sections = [
     'Buku pilihan hanya Editor super',
     'Membatasi RPC buku pilihan dan perubahan langsung featured ke Editor super tanpa mengganti pilihan tersimpan.',
   ],
+  [
+    '202610200001_storage_usage.sql',
+    'Penggunaan penyimpanan file',
+    'Mengizinkan Editor membaca total ukuran seluruh objek Storage tanpa membuka metadata file lintas jenjang.',
+  ],
 ]
 const directory = new URL('../supabase/migrations/', import.meta.url)
 const output = new URL('../supabase/setup.sql', import.meta.url)
@@ -183,7 +188,7 @@ if (JSON.stringify(filenames) !== JSON.stringify(sections.map(([name]) => name))
 }
 const parts = [
   '-- KPP PRODUK SATU - SETUP SUPABASE LENGKAP',
-  '-- Gabungan 34 migrasi berurutan, sampai versi 202610160005.',
+  '-- Gabungan 35 migrasi berurutan, sampai versi 202610200001.',
   '-- Untuk database Supabase BARU yang belum memiliki tabel aplikasi ini.',
   '-- Jalankan seluruh file sebagai database owner melalui SQL Editor.',
   '-- Jangan jalankan pada database existing atau hanya memilih section tertentu.',

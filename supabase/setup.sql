@@ -1,5 +1,5 @@
 -- KPP PRODUK SATU - SETUP SUPABASE LENGKAP
--- Gabungan 34 migrasi berurutan, sampai versi 202610160005.
+-- Gabungan 35 migrasi berurutan, sampai versi 202610200001.
 -- Untuk database Supabase BARU yang belum memiliki tabel aplikasi ini.
 -- Jalankan seluruh file sebagai database owner melalui SQL Editor.
 -- Jangan jalankan pada database existing atau hanya memilih section tertentu.
@@ -2055,6 +2055,35 @@ create trigger products_featured_super_editor
   for each row execute function public.enforce_featured_super_editor();
 
 notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- BAGIAN 35: PENGGUNAAN PENYIMPANAN FILE
+-- Penjelasan: Mengizinkan Editor membaca total ukuran seluruh objek Storage tanpa membuka metadata file lintas jenjang.
+-- Sumber: migrations/202610200001_storage_usage.sql
+-- ============================================================================
+
+-- Aggregate only: Editors can see project usage without reading other levels' file metadata.
+create or replace function public.editor_storage_usage_bytes()
+returns bigint
+language plpgsql stable security definer
+set search_path = ''
+as $$
+begin
+  if not exists (
+    select 1 from public.account_memberships
+    where user_id = (select auth.uid()) and role = 'editor'
+  ) then
+    raise exception using errcode = '42501', message = 'storage_usage_forbidden';
+  end if;
+  return (
+    select coalesce(sum((metadata->>'size')::bigint), 0)::bigint
+    from storage.objects
+  );
+end;
+$$;
+
+revoke all on function public.editor_storage_usage_bytes() from public, anon;
+grant execute on function public.editor_storage_usage_bytes() to authenticated;
 
 -- SELESAI: simpan seluruh perubahan setup secara atomik.
 commit;
