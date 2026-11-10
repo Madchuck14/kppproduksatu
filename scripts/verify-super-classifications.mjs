@@ -65,9 +65,10 @@ try {
         headers: { Cookie: cookie },
       })
       if (account.role !== 'editor') {
-        assert.equal(sessionResponse.status, 403)
+        assert.equal(sessionResponse.status, 200)
+        assert.equal((await sessionResponse.json()).role, 'sales')
         for (const method of ['POST', 'DELETE']) await api(cookie, method, 403)
-        console.log('PASS: legacy non-Editor session and classification access denied.')
+        console.log('PASS: Sales session restored; classification access denied.')
         continue
       }
       assert.equal(sessionResponse.status, 200)

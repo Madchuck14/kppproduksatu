@@ -177,6 +177,51 @@ const sections = [
     'Penggunaan penyimpanan file',
     'Mengizinkan Editor membaca total ukuran seluruh objek Storage tanpa membuka metadata file lintas jenjang.',
   ],
+  [
+    '202611040001_restore_sales_registration.sql',
+    'Pemulihan akun Sales',
+    'Menetapkan akun baru sebagai Sales biasa dan membuka kembali akses Favorit pemilik Sales/Editor.',
+  ],
+  [
+    '202611040002_editor_registration_requests.sql',
+    'Pengajuan pendaftaran Editor',
+    'Mencatat jenjang yang diajukan dan membatasi persetujuan akses Editor biasa pada Editor super.',
+  ],
+  [
+    '202611040003_direct_editor_registration.sql',
+    'Pendaftaran Editor langsung per jenjang',
+    'Menetapkan Editor biasa dan satu scope jenjang langsung saat signup tanpa persetujuan; hak super tetap ditutup.',
+  ],
+  [
+    '202611060001_employee_nip_auth.sql',
+    'Pendaftaran dan login memakai NIP',
+    'Membuat registry pegawai kosong dan menetapkan akun serta scope dari NIP yang disiapkan pengelola.',
+  ],
+  [
+    '202611100001_retire_admin_memberships.sql',
+    'Satu sumber hak akses akun',
+    'Memusatkan role aktif pada account_memberships dan mengarsipkan membership admin lama secara privat untuk rollback.',
+  ],
+  [
+    '202611100002_contact_page.sql',
+    'Pengaturan halaman Kontak',
+    'Menyimpan konten Kontak publik dengan validasi dan izin ubah khusus Editor super melalui RLS.',
+  ],
+  [
+    '202611100003_contact_phones.sql',
+    'Nomor telepon berlabel',
+    'Menambahkan daftar nomor telepon dan tanda pengenal tanpa mengubah konten Kontak existing; izin Editor super tetap berlaku.',
+  ],
+  [
+    '202611100004_sales_areas.sql',
+    'Area Sales yang diisi pengguna',
+    'Menambahkan label area pada membership dan membatasi perubahan ke Sales pemilik tanpa mengubah role atau scope.',
+  ],
+  [
+    '202611100005_product_structure.sql',
+    'Struktur Produk per jenjang',
+    'Membuat hierarki aktif/arsip, referensi buku opsional, RLS Editor super, dan penguncian perubahan struktur serta posisi buku.',
+  ],
 ]
 const directory = new URL('../supabase/migrations/', import.meta.url)
 const output = new URL('../supabase/setup.sql', import.meta.url)
@@ -188,7 +233,7 @@ if (JSON.stringify(filenames) !== JSON.stringify(sections.map(([name]) => name))
 }
 const parts = [
   '-- KPP PRODUK SATU - SETUP SUPABASE LENGKAP',
-  '-- Gabungan 35 migrasi berurutan, sampai versi 202610200001.',
+  `-- Gabungan ${sections.length} migrasi berurutan, sampai versi 202611100005.`,
   '-- Untuk database Supabase BARU yang belum memiliki tabel aplikasi ini.',
   '-- Jalankan seluruh file sebagai database owner melalui SQL Editor.',
   '-- Jangan jalankan pada database existing atau hanya memilih section tertentu.',
@@ -248,7 +293,9 @@ if (process.argv.includes('--check')) {
     throw new Error(
       'setup.sql tidak sesuai sumber. Jalankan node scripts/build-supabase-setup.mjs.',
     )
-  console.log('PASS: setup.sql sesuai dengan seluruh 34 migrasi dan komentar section.')
+  console.log(
+    `PASS: setup.sql sesuai dengan seluruh ${sections.length} migrasi dan komentar section.`,
+  )
 } else {
   await writeFile(output, bundle, 'utf8')
   console.log(`supabase/setup.sql: ${sections.length} bagian, ${Buffer.byteLength(bundle)} bytes.`)

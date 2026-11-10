@@ -1,5 +1,6 @@
 import type { BookSubject } from '../utils/book-subjects'
 import type { DivisionCode } from '../utils/book-divisions'
+import type { StructureNode } from '../schemas/product-structure'
 
 export interface Product {
   id: string
@@ -19,6 +20,8 @@ export interface Product {
   featured: boolean
   bookCode?: string | null
   educationLevel?: 'SD' | 'SMP' | 'SMA' | 'SMK' | null
+  structureNodeId?: string | null
+  structurePath?: StructureNode[]
   subject?: BookSubject | null
   grade?: number | null
   publicationYear?: number | null

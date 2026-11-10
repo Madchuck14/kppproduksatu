@@ -1,3 +1,167 @@
+## Struktur Produk
+
+Terapkan `supabase/migrations/202611100005_product_structure.sql` setelah migration
+sebelumnya dan sebelum deploy. Migration menambahkan hierarki terpisah, foreign key
+nullable pada produk, RLS Editor super, dan guard transaksi privat. Buku, UUID, kode,
+referensi, dan izin lama dipertahankan; tidak ada data produksi contoh yang diisi.
+Database baru memakai bundle 44 migration. Ikuti [rollout, rollback, RLS, dan uji
+penyimpanan bersamaan](product-structure.md). Migration ini tidak diterapkan ke live oleh agent.
+
+## Area Sales yang diisi pengguna
+
+Terapkan `supabase/migrations/202611100004_sales_areas.sql` setelah migration sebelumnya
+dan sebelum deploy aplikasi baru. Database baru memakai bundle 44 migration. Kolom
+`account_memberships.sales_areas` berupa array teks, default kosong untuk akun lama.
+Migration tidak mengubah NIP, role, status super, scope Editor, password, atau Favorit.
+Seluruh pemeriksaan sesi kini membaca kolom ini, sehingga migration diperlukan sebelum
+memakai aplikasi baru, termasuk untuk akun Editor.
+
+Sesudah login NIP/password berhasil, Sales tetap berada di halaman login untuk mengisi
+minimal satu dan maksimal sepuluh area. Satu area per kolom, maksimal 100 karakter;
+spasi awal/akhir dihapus dan duplikat tanpa membedakan huruf besar/kecil ditolak. Tombol
+tambah/hapus memungkinkan beberapa area. Setelah **Simpan area dan lanjutkan**, pengguna
+kembali ke tujuan `returnTo` yang valid atau katalog. Editor melewati langkah ini.
+Area yang sudah tersimpan dimuat saat login berikutnya, tampil di ringkasan navigasi,
+dan dapat diubah melalui **Ubah area**. Jika simpan gagal, sesi serta isian tetap tersedia.
+
+`PUT /api/auth/sales-areas` memverifikasi Auth dan role Sales di server, menerima hanya
+`{ areas: string[] }`, lalu memperbarui user ID sesi. RLS membatasi UPDATE pada Sales
+pemilik; privilege kolom hanya diberikan untuk `sales_areas`. Role, `is_super`, user ID,
+scope, dan akun lain tidak dapat diubah. Area bukan syarat izin katalog/Favorit dan bukan
+scope Editor; pengguna tetap dapat membuka katalog publik tanpa mengisi area.
+
+Area sekarang merupakan label yang diisi pengguna, bukan penugasan resmi tim IT.
+Belum ada tabel daftar area, sinkronisasi, atau data perusahaan buatan. Saat tim IT
+menyediakan sumber resmi, tentukan pemetaan area ke user/NIP dan kepemilikan datanya,
+lalu ganti jalur baca/tulis ini serta cabut izin isi mandiri melalui migration terpisah.
+Jangan memakai label saat ini untuk keputusan otorisasi.
+
+Rollback aplikasi mempertahankan kolom dan isi area. Untuk menghentikan isi mandiri,
+database owner dapat mencabut `UPDATE (sales_areas)` dari `authenticated` dan menghapus
+policy `sales_update_own_areas`; terapkan ulang migration untuk memulihkan fitur. Jangan
+menghapus kolom/data saat rollback. Migration dapat diulang tanpa mengosongkan area.
+
+Verifikasi terisolasi: `PGLITE_MODULE_PATH` menunjuk `dist/index.js` PGlite, lalu jalankan
+`node scripts/verify-sales-areas.mjs` dan `node scripts/verify-supabase-setup.mjs`.
+Browser: `PLAYWRIGHT_MODULE_PATH` menunjuk `index.mjs` Playwright dan server lokal aktif,
+lalu jalankan `node scripts/verify-nip-browser.mjs`. Login serta penyimpanan area pada
+uji browser diintersep menjadi fixture; pengujian ini tidak mengubah akun/area live.
+
+## Pengaturan halaman Kontak
+
+Terapkan `supabase/migrations/202611100002_contact_page.sql` pada database existing
+setelah migration sebelumnya, sebelum deploy aplikasi baru. Jangan menjalankan ulang
+`setup.sql`. Database baru memakai bundle 44 migration. Migration membuat satu row
+`contact_page` dengan isi Kontak yang sebelumnya statis, tanpa mengubah akun atau katalog.
+Mengulang migration tidak menimpa konten yang sudah diedit.
+
+Editor super membuka dashboard `/admin` lalu **Atur Halaman Kontak**. Modal mengatur
+judul/deskripsi halaman, nama/alamat kantor, email, telepon, fax, hotline, WhatsApp,
+URL peta, serta dua kelompok hari/jam/keterangan layanan. URL peta harus berupa nilai
+`src` sematan Google Maps HTTPS, bukan HTML iframe. Nomor WhatsApp mendukung awalan 0
+(diubah menjadi 62 pada tautan) atau kode negara. Simpan langsung memperbarui konten publik.
+
+`GET /api/catalog/contact` dapat diakses publik. `GET/PUT /api/admin/contact` memerlukan
+Editor super yang diverifikasi server melalui Auth. RLS memberi SELECT publik dan UPDATE
+kolom konten hanya kepada Editor super; INSERT/DELETE tidak diberikan kepada pengguna.
+Zod dan CHECK database memvalidasi bentuk/panjang konten. Tidak ada key admin di browser.
+Jika migration belum tersedia, halaman/modal menampilkan kegagalan dengan tombol coba lagi.
+
+Rollback aplikasi dapat mempertahankan tabel beserta isinya; versi lama memakai konten
+statis. Jangan menghapus tabel untuk rollback. Cadangkan isi `contact_page` sebelum
+perubahan manual. Untuk menonaktifkan penulisan saat rollback, database owner dapat mencabut
+`UPDATE (content)` dari `authenticated`; terapkan ulang migration untuk memulihkannya.
+
+Verifikasi lokal: arahkan `PGLITE_MODULE_PATH` ke `dist/index.js` PGlite lalu jalankan
+`node scripts/verify-contact-page.mjs` dan `node scripts/verify-supabase-setup.mjs`.
+Browser: `PLAYWRIGHT_MODULE_PATH` menunjuk `index.mjs` Playwright, lalu jalankan
+`node scripts/verify-contact-page-browser.mjs` dengan server lokal aktif. Pengujian browser
+memakai login nyata dan memeriksa guard, tetapi seluruh mutasi Kontak diintersep sebagai
+fixture; ini tidak membuktikan penyimpanan Kontak pada Supabase live.
+
+### Beberapa nomor telepon berlabel
+
+Terapkan `supabase/migrations/202611100003_contact_phones.sql` setelah migration Kontak,
+sebelum deploy aplikasi baru. Migration menambahkan kolom nullable `contact_page.phones`
+tanpa mengubah JSON konten atau nomor lama. NULL dibaca sebagai satu nomor dengan label
+Telepon. Pengaturan menyediakan tanda pengenal (contoh: Kantor pusat/Customer service),
+nomor, tombol **+ Tambah nomor telepon**, dan Hapus. Minimal satu dan maksimal sepuluh
+nomor; setiap label wajib diisi, maksimal 60 karakter, dan nomor maksimal 40 karakter.
+
+Penyimpanan memperbarui kolom `phones` dan konten lama dalam satu UPDATE. `content.phone`
+tetap menyimpan nomor pertama untuk pembaca versi lama. RLS UPDATE yang sudah ada juga
+melindungi kolom baru: hanya Editor super yang boleh mengubahnya. Semua nomor ditampilkan
+di halaman Kontak dengan label dan tautan telepon masing-masing. Migration dapat diulang
+tanpa menghapus nomor tambahan.
+
+Rollback aplikasi mempertahankan kolom `phones` dan isinya; versi lama hanya menampilkan
+nomor pertama melalui `content.phone`. Jangan menghapus kolom untuk rollback. Hindari
+mengoperasikan penulis versi lama dan baru bersamaan agar perubahan nomor utama konsisten.
+Uji lokal: `node scripts/verify-contact-phones.mjs` dengan `PGLITE_MODULE_PATH` seperti di atas.
+
+## Satu sumber hak akses (10 November 2026)
+
+Role/status super aktif berada di `account_memberships`; jenjang Editor berada di
+`editor_scopes`. `employee_registry` menyimpan NIP, hubungan Auth, dan ketentuan akses
+awal saat pendaftaran. `admin_memberships` dipensiunkan melalui migration
+`202611100001_retire_admin_memberships.sql`, dengan arsip privat untuk rollback.
+Deploy aplikasi/provisioning baru dahulu, lalu terapkan migration setelah instance lama
+berhenti. Jangan menjalankan ulang setup pada database existing. Ikuti
+[rollout, pemeriksaan, dan rollback](nip-auth.md#sumber-hak-akses-aktif-10-november-2026).
+Database baru memakai bundle 44 migration. Bagian akun admin legacy di bawah adalah riwayat.
+
+## Autentikasi NIP (10 November 2026)
+
+Daftar/login sekarang memakai NIP + kata sandi tanpa email. Terapkan migration
+`202611060001_employee_nip_auth.sql`, isi registry kosong, dan petakan akun lama sebelum
+deploy. Database baru memakai bundle 44 migration. Ikuti [panduan NIP](nip-auth.md)
+untuk pengisian tabel, konfigurasi server, penutupan public signup, reset password, dan rollback.
+Ketentuan email dan pilihan hak Editor bebas pada catatan historis berikut sudah digantikan.
+
+## Pendaftaran Editor langsung per jenjang (4 November 2026, historis)
+
+Form `/register` menyediakan Sales dan Editor. Editor wajib memilih satu jenjang SD,
+SMP, SMA, atau SMK dan langsung mendapat akses Editor biasa pada jenjang itu saat signup.
+Tidak ada persetujuan Editor super dan tidak ada pilihan untuk mendaftar sebagai super.
+Konfirmasi email Supabase tetap berlaku sebelum login bila diaktifkan.
+
+Untuk database existing, cadangkan database lalu terapkan seluruh migration berurutan sampai
+`202611040003_direct_editor_registration.sql` sebelum deploy. Migration 001 membuka Sales,
+002 adalah tahap historis pengajuan, dan 003 menggantinya dengan pendaftaran langsung.
+Jangan menjalankan `setup.sql` pada database existing. Database baru memakai bundle 38 migration.
+Aktifkan email signup dan konfirmasi email setelah trigger terbaru terpasang. Periksa Site URL,
+redirect URL, dan konfigurasi email pada domain tujuan. Agent belum mengubah database/Auth live.
+
+`POST /api/auth/register` menerima email, password, role Sales/Editor, dan satu educationLevel
+untuk Editor; Sales tidak mengirim jenjang. Schema Zod menolak role/jenjang/field tambahan yang
+invalid. Trigger `assign_new_sales_account` memvalidasi ulang kebijakan pada insert Auth,
+menetapkan membership dengan `is_super=false`, dan menyimpan satu scope Editor secara atomik.
+Nama fungsi lama dipertahankan untuk kompatibilitas trigger. Signup langsung Supabase melalui
+public key tunduk pada validasi yang sama. Metadata super dan daftar scope tambahan diabaikan.
+Perubahan metadata setelah signup tidak mengubah membership atau scope; client tetap tidak
+memiliki hak insert/update membership atau scope. Editor hanya dapat CRUD pada jenjangnya.
+
+Tidak ada tombol atau endpoint setujui/tolak di aplikasi terbaru. RPC review lama dicabut untuk
+anon/authenticated. Tabel pengajuan lama disimpan sebagai riwayat dan tidak lagi dibaca aplikasi;
+002 tetap ada agar urutan migration yang mungkin sudah diterapkan tidak ditulis ulang.
+Membership, scope, dan pengajuan lama tidak dikonversi atau dihapus otomatis. Jika akun lama
+sudah terlanjur menunggu persetujuan, pengelola dapat menetapkan role/scope melalui provisioning
+yang sudah tersedia. Signup ulang dengan email yang sama tidak mengubah hak akun lama.
+
+Rollback ke versi persetujuan: jalankan
+`supabase/rollback/202611040003_editor_approval_registration.sql` lalu deploy versi sebelumnya.
+Rollback hanya mengubah kebijakan signup berikutnya dan mengaktifkan kembali RPC review;
+akun serta scope yang sudah diberikan tetap utuh. Pencabutan hak yang sudah diberikan merupakan
+keputusan pengelola terpisah. Migration dan rollback tidak menghapus akun atau materi.
+
+Uji database lokal: `node scripts/verify-direct-editor-registration.mjs` dengan
+`PGLITE_MODULE_PATH`. Uji browser: build Node lalu jalankan
+`node scripts/verify-sales-browser.mjs` dengan `PLAYWRIGHT_MODULE_PATH` ke Playwright sementara.
+Test mencakup keempat jenjang, role/scope super ditolak, signup gagal atomik, scope tidak berubah
+lewat metadata, login Editor langsung, penolakan CRUD lintas jenjang, dan rollback. Test memakai
+PostgreSQL/Auth/REST lokal; tidak mengirim email atau membuktikan perilaku Supabase live.
+Catatan historis pendaftaran khusus Sales/persetujuan di bawah sudah digantikan bagian ini.
+
 ## Dummy Buku publik (16 Oktober 2026)
 
 Terapkan migration incremental `202610160001_public_dummy_books.sql` setelah seluruh
@@ -69,8 +233,8 @@ objek Storage. Uji terisolasi: `node scripts/verify-storage-usage.mjs` dengan `P
 
 ## Setup satu file untuk database baru
 
-[`supabase/setup.sql`](../supabase/setup.sql) menggabungkan seluruh 35 migrasi sampai
-`202610200001_storage_usage.sql`. Setiap bagian memiliki judul,
+[`supabase/setup.sql`](../supabase/setup.sql) menggabungkan seluruh 38 migrasi sampai
+`202611040003_direct_editor_registration.sql`. Setiap bagian memiliki judul,
 komentar penjelasan singkat tepat di bawahnya, serta nama file sumber. Urutan SQL sama
 dengan migrasi berurutan; definisi historis yang diganti bagian berikutnya tetap diberi
 penjelasan agar hasil akhir sesuai aplikasi terbaru.
@@ -445,7 +609,7 @@ Migration membuat public bucket `product-images`. Upload JPG/PNG/WebP/AVIF maksi
 
 Public bucket membuat file dapat dibaca siapa pun yang memiliki URL, termasuk gambar produk draft. Hanya upload aset yang memang boleh dipublikasikan.
 
-## Akun admin
+## Akun admin (historis, sebelum pensiun tabel admin)
 
 1. Di Authentication dashboard, buat user email/password dan konfirmasi emailnya.
 2. Ambil UUID user tersebut.
@@ -476,7 +640,7 @@ Pertahankan **Confirm email**; provisioning administratif mengonfirmasi akun Edi
 
 Empat akun Editor biasa (SD, SMP, SMA, SMK) disiapkan melalui script lokal
 `scripts/provision-editor-accounts.mjs`. Setiap akun memiliki satu row `editor_scopes`,
-`is_super=false`, dan tidak diberi `admin_memberships`. Jenjang adalah batas akses;
+`is_super=false`, dan hubungan NIP pada `employee_registry`. Jenjang adalah batas akses;
 divisi buku tetap metadata katalog dan tidak menjadi scope akun.
 
 Simpan kredensial di `.env.editor-accounts` lokal memakai pasangan variabel
@@ -488,13 +652,18 @@ Jalankan `node scripts/provision-editor-accounts.mjs --check` untuk preflight, k
 `node scripts/provision-editor-accounts.mjs` untuk membuat/memperbarui akun target.
 Email target mengikuti `editor<jenjang-huruf-kecil>@erlangga.com`. Script mengonfirmasi
 email secara administratif tanpa mengirim undangan. Akun target dengan role lain, hak
-super, atau membership admin ditolak sebelum mutasi. Rerun memperbarui password akun
+super ditolak sebelum mutasi. Rerun memperbarui password akun
 Editor target dan membatasi ulang scope ke satu jenjang; akun lain tidak disentuh.
 
 Verifikasi script mencakup login Supabase, membership non-super, satu scope, RPC RLS
 `can_manage_book_level`, dan API dashboard pada seluruh pasangan jenjang melalui
 server lokal port 3000. Jenjang sendiri harus 200; tiga jenjang lain harus 403.
 Gunakan `EDITOR_TEST_BASE_URL` bila server berada pada alamat lain.
+
+Login memakai NIP: SD `000000002`, SMP `000000003`, SMA `000000004`, SMK `000000005`.
+NIP existing yang valid dipertahankan dan benturan ditolak. Untuk mengaitkan akun lama
+tanpa mengganti password/izin, gunakan `node scripts/convert-editor-nips.mjs`, lalu
+`node scripts/convert-editor-nips.mjs --apply`. Ikuti [pemetaan dan rollback Editor](nip-auth.md#editor-per-jenjang).
 
 ## Provisioning Editor super
 
@@ -503,7 +672,7 @@ Isi `SUPER_ACCOUNT_EDITOR_EMAIL`, `SUPER_ACCOUNT_EDITOR_PASSWORD`, URL/public ke
 `npm.cmd run provision:super-accounts -- --check` untuk preflight, lalu
 `npm.cmd run provision:super-accounts` untuk membuat/memperbarui Editor super.
 Script hanya membuat Editor; kredensial akun umum lama tidak dibaca. Tidak ada email
-undangan dikirim. Editor super mendapat empat jenjang dan membership admin kompatibilitas.
+undangan dikirim. Editor super mendapat empat jenjang dan `is_super=true` di membership akun.
 Gunakan provisioning Editor per jenjang di atas untuk akun non-super.
 
 ## Dashboard Editor dan migration katalog
@@ -948,3 +1117,56 @@ Verifikasi browser fixture: `node scripts/verify-favorites-browser.mjs` dengan
 `PLAYWRIGHT_MODULE_PATH`. Test integrasi mutasi `scripts/verify-favorites.mjs` hanya
 untuk project pengujian yang sudah dimigrasi; jangan dipakai sebagai bukti database live
 sebelum migration diterapkan. Catatan historis tentang akun umum di atas digantikan bagian ini.
+
+## Pemulihan login dan pendaftaran Sales (4 November 2026)
+
+Bagian ini menggantikan ketentuan Editor-only dan signup ditutup pada catatan historis di bawah.
+Sales dan Editor dapat login serta menggunakan Favorit pribadi. Registrasi mandiri hanya
+menyediakan Sales biasa; Editor tetap dibuat pengelola melalui script provisioning yang ada.
+Katalog, Flyer, PPT Produk, dan Dummy published tetap publik tanpa akun.
+
+Urutan rollout untuk database existing:
+
+1. Cadangkan database dan catat membership serta Favorit lama. Terapkan seluruh migration
+   sebelumnya, lalu `202611040001_restore_sales_registration.sql`. Jangan menjalankan ulang
+   `setup.sql` pada database existing. Database baru memakai bundle 36 migration terbaru.
+2. Migration memasang trigger `auth_user_sales_account` pada insert `auth.users`. Trigger
+   menetapkan `role='sales'`, `is_super=false` tanpa membaca metadata pengguna. Signup
+   langsung melalui public key juga hanya mendapat Sales. Client tidak diberi hak tulis
+   membership atau scope; provisioning Editor memakai upsert server dengan secret key.
+3. Aktifkan **Allow new users to sign up**, email/password, dan **Confirm email** di Supabase
+   Auth. Periksa Site URL, redirect URL, SMTP, dan batas pengiriman email pada domain tujuan.
+   Aktifkan signup setelah trigger terpasang. Jangan menonaktifkan konfirmasi email untuk
+   mengatasi masalah pengiriman. Jika konfirmasi memang nonaktif pada lingkungan pengujian,
+   pengguna dapat langsung login setelah daftar; UI tetap menyarankan memeriksa email.
+4. Deploy aplikasi. `/register` memvalidasi email, kata sandi 8–128 karakter dan konfirmasi.
+   `POST /api/auth/register` hanya menerima email/password, menolak field role/super/scope,
+   lalu memanggil Supabase signup memakai client anonim terpisah. Endpoint tidak mengubah
+   cookie sesi aktif, tidak mengembalikan token, dan tidak mengungkap apakah email sudah ada.
+   Batas signup Supabase tetap berlaku; respons 429 ditampilkan sebagai permintaan mencoba nanti.
+5. Uji daftar, konfirmasi email, login Sales lama/baru, login Editor, logout, tujuan login
+   buku/Favorit, Favorit terpisah antar akun, penolakan draf, serta penolakan dashboard/API
+   Editor untuk Sales. Pastikan metadata `role=editor` atau `is_super=true` pada signup langsung
+   tetap menghasilkan Sales biasa. Editor biasa tetap dibatasi jenjang dan Editor super
+   tetap mengelola konfigurasi global.
+
+Migration mengembalikan pembacaan membership milik sendiri dan membuka RLS Favorit untuk
+pemilik yang memiliki role Sales/Editor. Akun legacy tanpa membership tetap ditolak, tanpa
+konversi otomatis. Tidak ada akun, scope, Favorit, statistik, atau materi yang dihapus.
+Migration dapat diulang; pemasangan trigger tidak mengubah akun yang sudah ada.
+
+Rollback: tutup signup di Supabase Auth, jalankan
+`supabase/rollback/202611040001_editor_only_access.sql`, lalu deploy versi Editor-only.
+Rollback menghapus trigger pendaftaran dan memulihkan RLS Editor-only; seluruh akun Sales
+dan Favorit tetap disimpan. Role akun baru tidak otomatis diubah saat rollback.
+
+Verifikasi terisolasi: `node scripts/verify-sales-registration.mjs` dengan
+`PGLITE_MODULE_PATH` menunjuk instalasi PGlite sementara. Test mencakup rantai migration,
+metadata role palsu, Sales lama/baru, Favorit lintas akun, penolakan draf/publik/tanpa role,
+scope Editor, retry, dan rollback. Ini bukan bukti Auth, email, atau RLS Supabase live.
+Migration dan perubahan pengaturan Auth live belum dijalankan oleh agent.
+
+Setelah `npm.cmd run build`, uji browser terisolasi melalui
+`node scripts/verify-sales-browser.mjs` dengan `PLAYWRIGHT_MODULE_PATH` ke `index.mjs`
+Playwright sementara. Script memakai Chrome dan port lokal 3198/3199 untuk hasil build
+serta fixture Auth, tanpa membaca `.env`, mengirim email, atau mengakses Supabase live.

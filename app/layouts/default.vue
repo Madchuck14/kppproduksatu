@@ -1,17 +1,22 @@
 <script setup lang="ts">
 import type { FavoriteIds } from '#shared/types/favorite'
 import { educationLevelSchema } from '#shared/schemas/auth'
+import { loginReturnToSchema } from '#shared/schemas/navigation'
 const config = useRuntimeConfig()
 const route = useRoute()
 const isLanding = computed(() => route.path === '/')
 const isCatalog = computed(() => route.path === '/products')
 const isFavorites = computed(() => route.path === '/favorites')
-const isBrowse = computed(() => route.path === '/jenjang' || route.path === '/divisi')
+const isBrowse = computed(
+  () => route.path === '/jenjang' || route.path === '/divisi' || route.path === '/struktur-produk',
+)
 const isBookDetail = computed(() => /^\/products\/[^/]+$/.test(route.path))
 const isBookForm = computed(() => /^\/admin\/books\/[^/]+$/.test(route.path))
 const isAuthPage = computed(() => route.path === '/login' || route.path === '/register')
 const isContact = computed(() => route.path === '/contact')
-const isDashboard = computed(() => route.path === '/admin')
+const isDashboard = computed(
+  () => route.path === '/admin' || route.path === '/admin/struktur-produk',
+)
 const isSearchOpen = ref(false)
 const headerSearch = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const headerSearchInput = useTemplateRef<HTMLInputElement>('headerSearchInput')
@@ -44,12 +49,16 @@ const { data: navigationAccount } = await useAsyncData(
   },
   { watch: [() => user.value?.sub], default: () => null },
 )
-const editorAccount = useEditorAccount()
+const account = useAccount()
+const salesAreaReturnTo = computed(() => {
+  const parsed = loginReturnToSchema.safeParse(route.fullPath)
+  return parsed.success ? parsed.data : '/products'
+})
 const favorites = useFavorites()
 await useAsyncData<FavoriteIds>(
   'favorite-ids',
   async () => {
-    const ownerId = editorAccount.value?.id ?? null
+    const ownerId = account.value?.id ?? null
     if (!ownerId) return { ownerId: null, ids: [] }
     try {
       return await requestFetch<FavoriteIds>('/api/favorites/ids')
@@ -57,7 +66,7 @@ await useAsyncData<FavoriteIds>(
       return { ownerId, ids: [], unavailable: true }
     }
   },
-  { watch: [() => editorAccount.value?.id], default: () => ({ ownerId: null, ids: [] }) },
+  { watch: [() => account.value?.id], default: () => ({ ownerId: null, ids: [] }) },
 )
 const loggingOut = ref(false)
 const logoutMessage = ref('')
@@ -199,8 +208,8 @@ async function logout() {
             v-else
             to="/login"
             class="header-icon-button"
-            aria-label="Login Editor"
-            title="Login Editor"
+            aria-label="Login Sales / Editor"
+            title="Login Sales / Editor"
           >
             <svg
               viewBox="0 0 24 24"
@@ -218,7 +227,7 @@ async function logout() {
             </svg>
           </NuxtLink>
           <NuxtLink
-            v-if="isShowcase && editorAccount"
+            v-if="isShowcase && account"
             to="/favorites"
             class="header-icon-button favorites-link"
             :aria-label="
@@ -280,6 +289,16 @@ async function logout() {
       <p v-if="logoutMessage" role="alert" class="mx-auto max-w-6xl px-6 pb-4 text-sm text-red-700">
         {{ logoutMessage }}
       </p>
+      <div v-if="account?.role === 'sales' && !isAuthPage" class="sales-area-summary">
+        <span class="sales-area-title">Area Sales:</span>
+        <span v-for="area in account.salesAreas ?? []" :key="area" class="sales-area-tag">{{
+          area
+        }}</span>
+        <span v-if="!account.salesAreas?.length">Belum diisi</span>
+        <NuxtLink :to="{ path: '/login', query: { returnTo: salesAreaReturnTo } }"
+          >Ubah area</NuxtLink
+        >
+      </div>
     </header>
     <main
       id="main-content"
@@ -342,7 +361,7 @@ async function logout() {
                 <h2>Jelajahi</h2>
                 <NuxtLink to="/products">Katalog Buku</NuxtLink>
                 <NuxtLink to="/#kategori">Jenjang Sekolah</NuxtLink>
-                <NuxtLink to="/login">Login Editor</NuxtLink>
+                <NuxtLink to="/login">Login Sales / Editor</NuxtLink>
               </template>
             </div>
           </div>
@@ -385,6 +404,32 @@ async function logout() {
 </template>
 
 <style scoped>
+.sales-area-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 1280px;
+  margin: auto;
+  padding: 8px 20px 12px;
+  color: #1f5c3f;
+  font-size: 13px;
+}
+.sales-area-title {
+  font-weight: 600;
+}
+.sales-area-tag {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #f4f8f5;
+}
+.sales-area-summary a {
+  margin-left: auto;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .login-main {
   padding: 80px 24px 82px;
 }
@@ -522,6 +567,7 @@ async function logout() {
   top: -135.89%;
   height: 370.49%;
   transform: none;
+  pointer-events: none;
 }
 .site-header {
   border-bottom: 1px solid #dce8e0;

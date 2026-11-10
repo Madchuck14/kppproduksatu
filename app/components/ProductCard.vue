@@ -67,6 +67,10 @@ withDefaults(defineProps<{ product: Product; variant?: 'default' | 'landing' | '
   color: #242b26;
   font-family: var(--font-landing-sans);
 }
+.landing-book:not(.catalog-book) .cover-display {
+  border-radius: 20px;
+  overflow: hidden;
+}
 .cover-display {
   position: relative;
   display: flex;
@@ -137,6 +141,8 @@ withDefaults(defineProps<{ product: Product; variant?: 'default' | 'landing' | '
   height: auto;
   aspect-ratio: 1;
   background: #f6f3ee;
+  border-radius: 20px;
+  overflow: hidden;
 }
 .catalog-book .cover-link {
   width: 100%;

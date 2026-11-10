@@ -1,7 +1,11 @@
 # Roadmap
 
-Model akses saat ini: katalog/materi published publik tanpa akun; hanya Editor yang login
-dan menggunakan Favorit/dashboard. Akun umum dan registrasi mandiri tidak tersedia.
+Autentikasi NIP: daftar/login memakai NIP + kata sandi tanpa email, dengan registry pegawai
+kosong yang diisi pengelola. Role/jenjang dicocokkan di server dan trigger. Rollout memerlukan
+migration `202611060001` dan pemetaan akun lama. Lihat [panduan NIP](nip-auth.md).
+
+Model akses saat ini: katalog/materi published publik tanpa akun. Sales dan Editor dapat login
+dan memakai Favorit. Pendaftaran tersedia bagi NIP Sales dan Editor terdaftar. Editor mendapat akses sesuai satu jenjang pada registry; dashboard dan CRUD tetap khusus Editor.
 
 1. **Fondasi (folder ini):** Nuxt, UI, API katalog, fixture, schema Supabase, login/guard admin, konfigurasi dua target deploy. Instalasi dari cache dan halaman katalog pada development server sudah diverifikasi; build produksi dan integrasi Supabase masih perlu diuji.
 2. **Showcase:** branding asli, layout mengacu theme referensi, produk/gambar klien, filter jenjang/pagination, kontak, banner, dan staging online.

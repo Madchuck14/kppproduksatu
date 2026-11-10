@@ -13,7 +13,7 @@ async function prepare(connection) {
   await connection.exec(`
     create role anon; create role authenticated; create role service_role bypassrls;
     create schema auth;
-    create table auth.users (id uuid primary key);
+    create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz, raw_user_meta_data jsonb default '{}', raw_app_meta_data jsonb default '{}');
     create function auth.uid() returns uuid language sql stable as $$
       select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
     $$;
@@ -30,15 +30,15 @@ async function prepare(connection) {
 async function snapshot(connection) {
   const queries = {
     columns: `select table_schema, table_name, column_name, data_type, is_nullable, column_default, is_identity, identity_generation
-      from information_schema.columns where table_schema in ('public', 'catalog_cleanup_archive') order by table_schema, table_name, ordinal_position`,
+      from information_schema.columns where table_schema in ('public', 'catalog_cleanup_archive', 'account_access_archive', 'product_structure_private') order by table_schema, table_name, ordinal_position`,
     tables: `select n.nspname, c.relname, c.relrowsecurity, c.relforcerowsecurity, c.relacl::text
-      from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname in ('public', 'catalog_cleanup_archive') and c.relkind in ('r', 'S') order by 1, 2`,
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname in ('public', 'catalog_cleanup_archive', 'account_access_archive', 'product_structure_private') and c.relkind in ('r', 'S') order by 1, 2`,
     constraints: `select n.nspname, c.relname, x.conname, pg_get_constraintdef(x.oid) as definition
       from pg_constraint x join pg_class c on c.oid = x.conrelid join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname in ('public', 'storage', 'catalog_cleanup_archive') order by 1, 2, 3`,
+      where n.nspname in ('public', 'storage', 'catalog_cleanup_archive', 'account_access_archive', 'product_structure_private') order by 1, 2, 3`,
     indexes: `select schemaname, tablename, indexname, indexdef from pg_indexes
-      where schemaname in ('public', 'storage', 'catalog_cleanup_archive') order by 1, 2, 3`,
-    policies: `select * from pg_policies where schemaname in ('public', 'storage', 'catalog_cleanup_archive') order by schemaname, tablename, policyname`,
+      where schemaname in ('public', 'storage', 'catalog_cleanup_archive', 'account_access_archive', 'product_structure_private') order by 1, 2, 3`,
+    policies: `select * from pg_policies where schemaname in ('public', 'storage', 'catalog_cleanup_archive', 'account_access_archive', 'product_structure_private') order by schemaname, tablename, policyname`,
     functions: `select n.nspname, p.proname, pg_get_functiondef(p.oid) as definition, p.proacl::text
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' order by 1, 2, 3`,
     triggers: `select n.nspname, c.relname, t.tgname, pg_get_triggerdef(t.oid) as definition
@@ -47,6 +47,9 @@ async function snapshot(connection) {
     classifications:
       'select * from public.book_classifications order by kind, code, education_level',
     buckets: 'select * from storage.buckets order by id',
+    contact: 'select * from public.contact_page order by id',
+    structure: 'select * from public.product_structure_nodes order by id',
+    structureGuard: 'select * from product_structure_private.write_guard order by id',
   }
   const result = {}
   for (const [key, sql] of Object.entries(queries)) {
@@ -89,9 +92,11 @@ try {
     null,
   )
   await db.exec(`
-    insert into auth.users values ('11111111-1111-4111-8111-111111111111'), ('22222222-2222-4222-8222-222222222222');
+    insert into auth.users (id,raw_app_meta_data) values
+      ('11111111-1111-4111-8111-111111111111','{"employee_provisioning":true}'),
+      ('22222222-2222-4222-8222-222222222222','{"employee_provisioning":true}');
     insert into public.account_memberships (user_id, role) values
-      ('11111111-1111-4111-8111-111111111111', 'editor'), ('22222222-2222-4222-8222-222222222222', 'sales');
+      ('11111111-1111-4111-8111-111111111111', 'editor'), ('22222222-2222-4222-8222-222222222222', 'sales') on conflict (user_id) do update set role = excluded.role;
     insert into public.editor_scopes values ('11111111-1111-4111-8111-111111111111', 'SD');
     insert into public.products (slug, title, book_code, education_level, division_code, subject, published)
       values ('bundle-public', 'Judul Sama', '123', 'SD', 'smk', 'Matematika', true),
@@ -147,7 +152,7 @@ try {
     "insert into public.book_classifications (kind, code, name, education_level) values ('subject', 'Test', 'Test', 'SMP')",
   )
   console.log(
-    'PASS: 35-section bundle equals sequential schema/RLS/grants/functions/triggers/data; existing-DB guard, atomic rollback, public/draft separation, popularity, duplicate titles, and final Editor classification rules (isolated PostgreSQL).',
+    'PASS: bundle equals sequential schema/RLS/grants/functions/triggers/data; existing-DB guard, atomic rollback, public/draft separation, popularity, duplicate titles, and final Editor classification rules (isolated PostgreSQL).',
   )
 } finally {
   await Promise.all([db.close(), sequential.close(), failed.close()])

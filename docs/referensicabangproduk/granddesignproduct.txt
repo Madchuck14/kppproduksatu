@@ -1,0 +1,116 @@
+SD
+- Buku Teks
+  - ESPS
+    - Buku Teks Berwarna Kedua
+    - Erlangga Sprint
+    - ESPS CP Revisi
+  - Buku Reguler
+    - Buku Premium
+    - NEO
+    - Buku Reguler CP Revisi
+- Buku Soal
+  - Asesmen Formatif
+    - Bupena Merdeka
+    - Erlangga Sprint Asesmen
+  - Asesmen Sumatif
+    - Simaster
+    - Buku Soal NEO
+  - AKM dan US
+    - AKM
+    - SPM Plus Sumatif
+  - OSN
+    - Inroads to OSN
+    - Eksplorasi to OSN
+- Buku Mulok
+  - Buku Teks Mulok
+  - Buku Saku Mulok
+- P5 & Aktivitas
+  - Bidik P5
+  - P5 Mulok
+- Buku Referensi
+  - Referensi Guru
+    - Anotes
+  - Referensi Siswa
+SMP
+- Buku Teks
+  - Buku KM Revisi PM
+  - Buku Teks Nuansa Islami
+  - Buku Teks Seri Best
+  - Buku Teks BW
+  - Buku Teks Full Colour
+- Buku Soal
+  - Kelompok asesmen — posisi persis label Asesmen Sumatif, Buku Per Semester, dan Buku Per Mapel perlu dicocokkan dengan bagan.
+    - Bupena Merdeka
+    - Bupena KM Revisi PM
+    - Mandiri
+    - Simaster KM Revisi PM
+    - Fokus Sumatif
+    - Simaster
+    - Fast Track Asesmen Sumatif
+  - AKM dan TKA
+    - Erlangga Fokus AKM
+    - Erlangga Xpress AKM
+    - Paket Soal Digital AKM
+    - Siaga TKA
+    - Erlangga Fokus TKA
+    - Erlangga Fast Track TKA
+  - OSN
+    - Gemilang OSN
+- Buku P5
+  - Bidik P5
+  - Bidik P5 Mulok
+  - Kreasi Kokurikuler
+  - Eksakta
+SMA — terbaca sebagian
+- Buku Teks
+  - Buku Teks Full Colour
+  - Buku NGC — induk persisnya belum terverifikasi.
+- Buku Soal
+  - Asesmen Formatif
+    - Bupena Merdeka
+    - Bupena KM Revisi PM
+  - Asesmen Sumatif — label kategori terbaca, daftar produknya belum lengkap.
+  - Persiapan TKA
+    - Siaga TKA
+    - Siaga Persiapan TKA per Kelas
+    - Erlangga Fast Track TKA
+    - Label Mata Uji Wajib terbaca, tetapi posisinya belum terverifikasi.
+  - OSN
+    - Gemilang OSN
+- Buku Kerja
+  - Bidik P5
+SMK
+- Buku Teks
+  - Mapel Umum
+  - Mapel Kejuruan
+    - Fase E Dasar-Dasar (PK) Program Keahlian
+    - Fase F Konsentrasi Keahlian (KK)
+    - Fase F PKK (Bidang Keahlian)
+  - Buku Penilaian (Layak Terbit)
+  - Seri Point to Point (PtP) dan PP (Pendidikan Pancasila) Revisi — induk persisnya perlu dicek.
+- Buku Kerja
+  - Panduan Praktik per Unit Kompetensi
+    - Erlangga Skill
+  - Panduan P5
+    - Unjuk P5
+  - Projek IPAS
+    - Panduan dan Pendamping Buku Teks Projek IPAS
+- Buku Soal
+  - Bupena
+- Buku Soal AN / AKM
+  - Erlangga Fokus AKM
+  - Erlangga Xpress AKM
+  - Paket Soal Digital AKM
+  - Siaga AN
+- Buku Soal SNBT
+  - Teropong SNBT
+- Buku Soal SKKNI
+  - Siap Sertifikasi
+- Buku Mulok
+  - Lantip Basa lan Sastra Jawa
+- Buku Referensi
+  - Profesi
+  - Skill
+  - Tren
+- Buku PKL
+  - PKL

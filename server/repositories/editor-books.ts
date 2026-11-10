@@ -23,13 +23,15 @@ import { assertBookScope } from '../utils/require-editor'
 import { validateBookClassifications } from './classifications'
 import { getProductImageUrl } from '../utils/storage'
 import type { LandingHero } from '#shared/schemas/landing-hero'
+import { validateBookStructure, structureError } from './product-structure'
 
 const columns =
-  'id,book_code,education_level,division_code,grade,subject,title,slug,author,curriculum,isbn,synopsis,target_market,highlights,price,publication_year,featured,published,image_path,flyer_path,dummy_book_path,product_knowledge_path,product_knowledge_preview_path,updated_at'
+  'id,book_code,education_level,structure_node_id,division_code,grade,subject,title,slug,author,curriculum,isbn,synopsis,target_market,highlights,price,publication_year,featured,published,image_path,flyer_path,dummy_book_path,product_knowledge_path,product_knowledge_preview_path,updated_at'
 const rowSchema = z.object({
   id: z.string().uuid(),
   book_code: z.string().nullable(),
   education_level: educationLevelSchema.nullable(),
+  structure_node_id: z.string().uuid().nullable().default(null),
   division_code: divisionCodeSchema.nullable(),
   subject: bookSubjectSchema.nullable(),
   grade: z.number().int().min(1).max(12).nullable(),
@@ -55,6 +57,12 @@ const rowSchema = z.object({
 
 function fail(error: { code?: string; message?: string } | null) {
   if (!error) return
+  if (
+    error.message?.startsWith('book_structure_') ||
+    error.code === '40001' ||
+    error.code === '40P01'
+  )
+    structureError(error)
   if (error.code === 'P0001' && error.message === 'featured_product_limit_exceeded')
     throw createError({ statusCode: 409, statusMessage: 'Maksimal 8 buku pilihan.' })
   if (error.code === '23505')
@@ -176,6 +184,7 @@ function mapBook(event: H3Event, value: unknown): EditorBook {
     id: row.id,
     bookCode: row.book_code,
     educationLevel: row.education_level,
+    structureNodeId: row.structure_node_id,
     divisionCode: row.division_code,
     subject: row.subject,
     grade: row.grade,
@@ -221,6 +230,7 @@ function toRow(input: BookInput, existingSlug?: string) {
   return {
     book_code: input.bookCode,
     education_level: input.educationLevel,
+    ...(input.structureNodeId !== undefined ? { structure_node_id: input.structureNodeId } : {}),
     division_code: input.divisionCode,
     subject: input.subject,
     ...(input.grade !== undefined ? { grade: input.grade } : {}),
@@ -313,6 +323,11 @@ export async function saveEditorBook(
   const existingBook = id ? await getEditorBook(event, account, id) : null
   assertBookScope(account, input.educationLevel)
   await validateBookClassifications(event, input)
+  await validateBookStructure(
+    event,
+    input.structureNodeId === undefined ? existingBook?.structureNodeId : input.structureNodeId,
+    input.educationLevel,
+  )
   const client = await serverSupabaseClient<EditorDatabase>(event)
   const row = toRow(input, existingBook?.slug)
   const query = id

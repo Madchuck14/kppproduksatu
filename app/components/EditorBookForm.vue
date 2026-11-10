@@ -8,6 +8,7 @@ import type { EditorBook } from '#shared/types/editor'
 import type { AccountSession } from '#shared/types/account'
 import type { StorageUsage } from '#shared/types/storage-usage'
 import { uploadFile } from '~/utils/upload-file'
+import { structureOptions } from '#shared/schemas/product-structure'
 
 const props = defineProps<{
   book?: EditorBook
@@ -58,6 +59,7 @@ const materials = [
 const form = reactive({
   bookCode: props.book?.bookCode ?? '',
   educationLevel: props.book?.educationLevel ?? '',
+  structureNodeId: props.book?.structureNodeId ?? (null as string | null),
   divisionCode: (props.book?.divisionCode ?? '') as DivisionCode | '',
   grade: props.book?.grade ?? null,
   subject: (props.book?.subject ?? '') as BookSubject | '',
@@ -85,6 +87,24 @@ const subjectOptions = computed(() =>
   form.educationLevel ? subjectsForLevel(form.educationLevel) : [],
 )
 const gradeOptions = computed(() => getGradesForLevel(form.educationLevel))
+const structureLevel = computed(() => form.educationLevel || 'SD')
+const {
+  data: structureData,
+  error: structureError,
+  status: structureStatus,
+  refresh: refreshStructure,
+} = await useFetch('/api/catalog/product-structure', { query: { level: structureLevel } })
+const structureItems = computed(() =>
+  structureOptions(
+    (structureData.value ?? []).filter((node) => node.educationLevel === form.educationLevel),
+  ),
+)
+const structureChoice = computed({
+  get: () => form.structureNodeId ?? undefined,
+  set: (id: string | undefined) => {
+    form.structureNodeId = id ?? null
+  },
+})
 const curriculumOptions = computed(() =>
   [...new Set([props.book?.curriculum, ...curricula.value])].filter((item): item is string =>
     Boolean(item),
@@ -93,6 +113,7 @@ const curriculumOptions = computed(() =>
 watch(
   () => form.educationLevel,
   () => {
+    form.structureNodeId = null
     if (!subjectOptions.value.some((item) => item === form.subject)) form.subject = ''
     if (form.grade !== null && !gradeOptions.value.includes(form.grade)) form.grade = null
   },
@@ -495,6 +516,47 @@ async function save() {
                 <option v-for="item in levels" :key="item" :value="item">{{ item }}</option>
               </select>
               <p v-if="errors.educationLevel" class="field-error">{{ errors.educationLevel }}</p>
+            </div>
+            <div class="form-field">
+              <label for="new-book-structure">Struktur Produk (opsional)</label>
+              <USelectMenu
+                id="new-book-structure"
+                v-model="structureChoice"
+                :items="structureItems"
+                value-key="id"
+                label-key="label"
+                :disabled="
+                  !form.educationLevel || structureStatus === 'pending' || !!structureError
+                "
+                :loading="structureStatus === 'pending'"
+                placeholder="Pilih atau cari jalur struktur"
+                :search-input="{ placeholder: 'Cari nama atau jalur cabang...' }"
+                class="w-full"
+              />
+              <p v-if="form.structureNodeId" class="field-help">
+                {{
+                  structureItems.find((item) => item.id === form.structureNodeId)?.label ??
+                  'Pilihan tersimpan belum dapat dimuat.'
+                }}
+                <button type="button" class="underline" @click="form.structureNodeId = null">
+                  Lepas pilihan
+                </button>
+              </p>
+              <p v-if="structureError && form.educationLevel" class="field-error">
+                Struktur belum dapat dimuat.
+                <button type="button" class="underline" @click="refreshStructure()">
+                  Coba lagi
+                </button>
+              </p>
+              <p
+                v-else-if="
+                  form.educationLevel && structureStatus !== 'pending' && !structureItems.length
+                "
+                class="field-help"
+              >
+                Belum ada cabang aktif untuk jenjang ini. Buku tetap dapat disimpan tanpa struktur.
+              </p>
+              <p v-if="errors.structureNodeId" class="field-error">{{ errors.structureNodeId }}</p>
             </div>
             <div class="form-field">
               <label for="new-book-grade">Kelas <span class="required">*</span></label>

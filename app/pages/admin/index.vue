@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ContactPageManager from '~/components/ContactPageManager.vue'
 import { editorQuerySchema, maxFeaturedBooks } from '#shared/schemas/editor'
 import type { BookSubject } from '#shared/utils/book-subjects'
 import { getProductPath } from '#shared/utils/product-path'
@@ -214,6 +215,13 @@ const fieldClass =
       </div>
       <div class="dashboard-header-actions">
         <ClassificationManager v-if="data?.account.isSuper" :levels="levels" />
+        <ContactPageManager v-if="data?.account.isSuper" />
+        <UButton
+          v-if="data?.account.isSuper"
+          to="/admin/struktur-produk"
+          class="featured-manager-button"
+          >Kelola Struktur Produk</UButton
+        >
         <UButton
           v-if="data?.account.isSuper"
           type="button"

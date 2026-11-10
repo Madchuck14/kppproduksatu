@@ -42,8 +42,11 @@ async function account(role) {
   if (role) {
     const membership = await admin
       .from('account_memberships')
-      .insert({ user_id: id, role, is_super: role === 'editor' })
+      .upsert({ user_id: id, role, is_super: role === 'editor' })
     check(!membership.error, 'Membership uji gagal dibuat')
+  } else {
+    const removed = await admin.from('account_memberships').delete().eq('user_id', id)
+    check(!removed.error, 'Reset membership uji gagal')
   }
   const jar = new Map()
   const client = createServerClient(url, key, {
@@ -75,7 +78,7 @@ async function main() {
   const firstEditor = await account('editor')
   const editor = await account('editor')
   const ordinary = await account()
-  await api(sales, '/api/auth/session', 'GET', 403)
+  check((await api(sales, '/api/auth/session')).role === 'sales', 'Session Sales gagal')
   check((await api(editor, '/api/auth/session')).role === 'editor', 'Session Editor gagal')
   await api(ordinary, '/api/auth/session', 'GET', 403)
   await api(sales, '/api/admin/books', 'GET', 403)
@@ -106,7 +109,7 @@ async function main() {
     books.push(result.data)
   }
   const [sd, sma, draft] = books
-  for (const denied of [sales, ordinary]) {
+  for (const denied of [ordinary]) {
     await api(denied, '/api/favorites', 'GET', 403)
     await api(denied, '/api/favorites/ids', 'GET', 403)
     await api(denied, `/api/favorites/${sd.id}`, 'PUT', 403)
@@ -114,7 +117,7 @@ async function main() {
     const raw = await denied.client
       .from('product_favorites')
       .insert({ user_id: denied.id, product_id: sd.id })
-    check(raw.error?.code === '42501', 'RLS non-Editor tidak ditolak')
+    check(raw.error?.code === '42501', 'RLS akun tanpa membership tidak ditolak')
   }
   for (const path of [
     '/',
@@ -131,7 +134,7 @@ async function main() {
   await api(null, '/api/favorites/ids', 'GET', 401)
   await api(firstEditor, '/api/favorites/not-a-uuid', 'PUT', 400)
   await api(firstEditor, '/api/favorites?page=0', 'GET', 400)
-  for (const session of [firstEditor, editor]) {
+  for (const session of [sales, firstEditor, editor]) {
     await api(session, `/api/favorites/${sd.id}`, 'PUT')
     await api(session, `/api/favorites/${sd.id}`, 'PUT')
     check((await api(session, '/api/favorites')).total === 1, 'Favorit duplikat atau role ditolak')
@@ -190,7 +193,7 @@ async function main() {
     .eq('product_id', sma.id)
   check(!remaining.error && remaining.data.length === 0, 'Cascade hapus buku gagal')
   console.log(
-    'PASS favorit hanya Editor; Sales/akun biasa ditolak, idempotensi, pencarian/filter/pagination, SSR, published-only, RLS lintas akun, cascade',
+    'PASS favorit Sales/Editor; akun tanpa membership ditolak, idempotensi, pencarian/filter/pagination, SSR, published-only, RLS lintas akun, cascade',
   )
 }
 try {

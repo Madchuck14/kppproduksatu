@@ -3,6 +3,7 @@ import { parseEnv } from 'node:util'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { z } from 'zod'
+import { planEditorNips } from './convert-editor-nips.mjs'
 
 // Local administrative provisioning only. Never import this file into the application.
 const levels = ['SD', 'SMP', 'SMA', 'SMK']
@@ -23,7 +24,8 @@ async function main() {
   const credentials = parseEnv(readFileSync('.env.editor-accounts', 'utf8'))
   const url = env.NUXT_PUBLIC_SUPABASE_URL
   const publicKey = env.NUXT_PUBLIC_SUPABASE_KEY
-  const adminKey = env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY
+  const adminKey =
+    env.NUXT_SUPABASE_SECRET_KEY || env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY
   check(url && publicKey && adminKey, 'Konfigurasi Supabase belum lengkap.')
   const accounts = levels.map((level) => {
     const parsed = z.object({ email: z.email(), password: z.string().min(8).max(128) }).safeParse({
@@ -50,7 +52,7 @@ async function main() {
     }
     if (data.users.length < 100) break
   }
-  for (const table of ['account_memberships', 'editor_scopes', 'admin_memberships']) {
+  for (const table of ['account_memberships', 'editor_scopes', 'employee_registry']) {
     checked(await admin.from(table).select('user_id').limit(0), 'Pemeriksaan tabel akses')
   }
   for (const user of existing.values()) {
@@ -62,16 +64,21 @@ async function main() {
         .maybeSingle(),
       'Pemeriksaan membership',
     )
-    const legacy = checked(
-      await admin.from('admin_memberships').select('user_id').eq('user_id', user.id),
-      'Pemeriksaan admin',
-    )
     check(
       !membership || (membership.role === 'editor' && !membership.is_super),
       'Email target sudah memiliki role lain atau hak super; tidak diubah.',
     )
-    check(legacy.length === 0, 'Email target sudah memiliki hak admin; tidak diubah.')
   }
+  const registry = checked(
+    await admin.from('employee_registry').select('nip,user_id,role,education_level'),
+    'Pemeriksaan registry NIP',
+  )
+  const plan = planEditorNips(
+    accounts.map((account) => ({ level: account.level, user_id: existing.get(account.email)?.id })),
+    registry,
+  )
+  for (const row of plan.mappings)
+    console.log(`RENCANA: Editor ${row.education_level} = ${row.nip}`)
   if (process.argv.includes('--check')) {
     console.log(
       'PASS: konfigurasi, kredensial empat jenjang, tabel, dan akun target siap; belum ada perubahan.',
@@ -80,12 +87,29 @@ async function main() {
   }
   for (const account of accounts) {
     const previous = existing.get(account.email)
-    const attributes = { email: account.email, password: account.password, email_confirm: true }
+    const attributes = {
+      email: account.email,
+      password: account.password,
+      email_confirm: true,
+      ...(!previous ? { app_metadata: { employee_provisioning: true } } : {}),
+    }
     const result = previous
       ? await admin.auth.admin.updateUserById(previous.id, attributes)
       : await admin.auth.admin.createUser(attributes)
     const { user } = checked(result, `Provisioning Editor ${account.level}`)
     check(user, 'Auth tidak mengembalikan akun.')
+    const mapping = plan.mappings.find((row) => row.education_level === account.level)
+    check(mapping, 'Rencana NIP tidak ditemukan.')
+    if (mapping.created)
+      checked(
+        await admin.from('employee_registry').insert({
+          nip: mapping.nip,
+          user_id: user.id,
+          role: 'editor',
+          education_level: account.level,
+        }),
+        'Pengaitan NIP (jika gagal, periksa akun dan registry sebelum mengulang)',
+      )
     checked(
       await admin
         .from('account_memberships')
@@ -135,6 +159,11 @@ async function main() {
         membership.role === 'editor' && membership.is_super === false,
         'Role Editor biasa tidak sesuai.',
       )
+      const employee = checked(
+        await client.from('employee_registry').select('nip').eq('user_id', user.id).single(),
+        'Verifikasi NIP',
+      )
+      check(employee.nip === mapping.nip, 'NIP Editor tidak sesuai.')
       const scopes = checked(
         await client.from('editor_scopes').select('education_level').eq('user_id', user.id),
         'Verifikasi scope',

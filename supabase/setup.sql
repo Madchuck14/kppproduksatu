@@ -1,5 +1,5 @@
 -- KPP PRODUK SATU - SETUP SUPABASE LENGKAP
--- Gabungan 35 migrasi berurutan, sampai versi 202610200001.
+-- Gabungan 44 migrasi berurutan, sampai versi 202611100005.
 -- Untuk database Supabase BARU yang belum memiliki tabel aplikasi ini.
 -- Jalankan seluruh file sebagai database owner melalui SQL Editor.
 -- Jangan jalankan pada database existing atau hanya memilih section tertentu.
@@ -2084,6 +2084,640 @@ $$;
 
 revoke all on function public.editor_storage_usage_bytes() from public, anon;
 grant execute on function public.editor_storage_usage_bytes() to authenticated;
+
+-- ============================================================================
+-- BAGIAN 36: PEMULIHAN AKUN SALES
+-- Penjelasan: Menetapkan akun baru sebagai Sales biasa dan membuka kembali akses Favorit pemilik Sales/Editor.
+-- Sumber: migrations/202611040001_restore_sales_registration.sql
+-- ============================================================================
+
+-- New Auth users always start as ordinary Sales, including direct Auth signups.
+-- Never trust user-editable metadata for Editor, super access, or education scopes.
+create or replace function public.assign_new_sales_account()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.account_memberships (user_id, role, is_super)
+  values (new.id, 'sales', false)
+  on conflict (user_id) do nothing;
+  return new;
+end;
+$$;
+revoke all on function public.assign_new_sales_account() from public, anon, authenticated;
+drop trigger if exists auth_user_sales_account on auth.users;
+create trigger auth_user_sales_account after insert on auth.users
+  for each row execute function public.assign_new_sales_account();
+
+-- Existing memberships and accounts without membership are deliberately preserved.
+drop policy if exists "Accounts read their membership" on public.account_memberships;
+create policy "Accounts read their membership" on public.account_memberships
+  for select to authenticated using (user_id = (select auth.uid()));
+
+drop policy if exists "Editors read their favorites" on public.product_favorites;
+drop policy if exists "Editors favorite published books" on public.product_favorites;
+drop policy if exists "Editors remove their favorites" on public.product_favorites;
+drop policy if exists "Accounts read their favorites" on public.product_favorites;
+drop policy if exists "Accounts favorite published books" on public.product_favorites;
+drop policy if exists "Accounts remove their favorites" on public.product_favorites;
+
+create policy "Accounts read their favorites" on public.product_favorites
+  for select to authenticated using (
+    user_id = (select auth.uid()) and exists (
+      select 1 from public.account_memberships m
+      where m.user_id = (select auth.uid()) and m.role in ('sales', 'editor')
+    )
+  );
+create policy "Accounts favorite published books" on public.product_favorites
+  for insert to authenticated with check (
+    user_id = (select auth.uid()) and exists (
+      select 1 from public.account_memberships m
+      where m.user_id = (select auth.uid()) and m.role in ('sales', 'editor')
+    ) and exists (
+      select 1 from public.products p where p.id = product_id and p.published = true
+    )
+  );
+create policy "Accounts remove their favorites" on public.product_favorites
+  for delete to authenticated using (
+    user_id = (select auth.uid()) and exists (
+      select 1 from public.account_memberships m
+      where m.user_id = (select auth.uid()) and m.role in ('sales', 'editor')
+    )
+  );
+
+notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- BAGIAN 37: PENGAJUAN PENDAFTARAN EDITOR
+-- Penjelasan: Mencatat jenjang yang diajukan dan membatasi persetujuan akses Editor biasa pada Editor super.
+-- Sumber: migrations/202611040002_editor_registration_requests.sql
+-- ============================================================================
+
+create table if not exists public.editor_enrollment_requests (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  email text not null,
+  education_level text not null check (education_level in ('SD', 'SMP', 'SMA', 'SMK')),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz,
+  reviewed_by uuid references auth.users(id) on delete set null,
+  check ((status = 'pending' and reviewed_at is null) or (status <> 'pending' and reviewed_at is not null))
+);
+alter table public.editor_enrollment_requests enable row level security;
+revoke all on public.editor_enrollment_requests from anon, authenticated;
+grant select on public.editor_enrollment_requests to authenticated;
+grant all on public.editor_enrollment_requests to service_role;
+create index if not exists editor_enrollment_pending_idx
+  on public.editor_enrollment_requests (created_at, user_id) where status = 'pending';
+drop policy if exists "Accounts read editor requests" on public.editor_enrollment_requests;
+create policy "Accounts read editor requests" on public.editor_enrollment_requests
+  for select to authenticated using (
+    user_id = (select auth.uid()) or exists (
+      select 1 from public.account_memberships m
+      where m.user_id = (select auth.uid()) and m.role = 'editor' and m.is_super
+    )
+  );
+
+create or replace function public.assign_new_sales_account()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.account_memberships (user_id, role, is_super)
+  values (new.id, 'sales', false) on conflict (user_id) do nothing;
+  -- User metadata can request a scope, never grant it. Invalid direct-Auth metadata is ignored.
+  if new.raw_user_meta_data ->> 'registration_role' = 'editor'
+    and new.raw_user_meta_data ->> 'requested_education_level' in ('SD', 'SMP', 'SMA', 'SMK') then
+    insert into public.editor_enrollment_requests (user_id, email, education_level)
+    values (new.id, new.email, new.raw_user_meta_data ->> 'requested_education_level')
+    on conflict (user_id) do nothing;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.assign_new_sales_account() from public, anon, authenticated;
+
+create or replace function public.review_editor_enrollment_request(target_user uuid, decision text)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  enrollment public.editor_enrollment_requests%rowtype;
+  caller uuid := (select auth.uid());
+  target_role text;
+  target_super boolean;
+begin
+  if not exists (
+    select 1 from public.account_memberships m
+    where m.user_id = caller and m.role = 'editor' and m.is_super
+  ) then
+    raise exception 'enrollment_forbidden' using errcode = '42501';
+  end if;
+  if decision not in ('approved', 'rejected') or decision is null then
+    raise exception 'enrollment_invalid_decision' using errcode = '22023';
+  end if;
+  select * into enrollment from public.editor_enrollment_requests
+    where user_id = target_user for update;
+  if not found then
+    raise exception 'enrollment_not_found' using errcode = 'P0002';
+  end if;
+  if enrollment.status <> 'pending' then
+    raise exception 'enrollment_already_reviewed' using errcode = 'P0001';
+  end if;
+  if decision = 'approved' then
+    -- Lock membership too: never overwrite a concurrently provisioned Editor/super account.
+    select role, is_super into target_role, target_super from public.account_memberships
+      where user_id = target_user for update;
+    if target_role is distinct from 'sales' or target_super is distinct from false
+      or exists (select 1 from public.editor_scopes where user_id = target_user) then
+      raise exception 'enrollment_account_changed' using errcode = 'P0001';
+    end if;
+    if not exists (select 1 from auth.users where id = target_user and email_confirmed_at is not null) then
+      raise exception 'enrollment_email_unconfirmed' using errcode = 'P0001';
+    end if;
+    update public.account_memberships set role = 'editor', is_super = false where user_id = target_user;
+    insert into public.editor_scopes (user_id, education_level) values (target_user, enrollment.education_level);
+  end if;
+  update public.editor_enrollment_requests
+    set status = decision, reviewed_at = now(), reviewed_by = caller where user_id = target_user;
+end;
+$$;
+revoke all on function public.review_editor_enrollment_request(uuid, text) from public, anon;
+grant execute on function public.review_editor_enrollment_request(uuid, text) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- BAGIAN 38: PENDAFTARAN EDITOR LANGSUNG PER JENJANG
+-- Penjelasan: Menetapkan Editor biasa dan satu scope jenjang langsung saat signup tanpa persetujuan; hak super tetap ditutup.
+-- Sumber: migrations/202611040003_direct_editor_registration.sql
+-- ============================================================================
+
+-- Enrollment policy: ordinary Editors may self-select exactly one education level.
+-- Super membership and additional scopes remain exclusive to trusted provisioning.
+create or replace function public.assign_new_sales_account()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare
+  selected_role text := coalesce(new.raw_user_meta_data ->> 'registration_role', 'sales');
+  selected_level text := new.raw_user_meta_data ->> 'requested_education_level';
+  assigned_role text;
+begin
+  if selected_role not in ('sales', 'editor') then
+    raise exception 'registration_invalid_role' using errcode = '22023';
+  end if;
+  if selected_role = 'editor' and (selected_level is null or selected_level not in ('SD', 'SMP', 'SMA', 'SMK')) then
+    raise exception 'registration_invalid_level' using errcode = '22023';
+  end if;
+  if selected_role = 'sales' and selected_level is not null then
+    raise exception 'registration_sales_has_level' using errcode = '22023';
+  end if;
+  insert into public.account_memberships (user_id, role, is_super)
+  values (new.id, selected_role, false)
+  on conflict (user_id) do nothing returning role into assigned_role;
+  if assigned_role = 'editor' then
+    insert into public.editor_scopes (user_id, education_level)
+    values (new.id, selected_level);
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.assign_new_sales_account() from public, anon, authenticated;
+
+-- Retain historical requests and memberships without allowing the obsolete review flow.
+revoke all on function public.review_editor_enrollment_request(uuid, text) from public, anon, authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- BAGIAN 39: PENDAFTARAN DAN LOGIN MEMAKAI NIP
+-- Penjelasan: Membuat registry pegawai kosong dan menetapkan akun serta scope dari NIP yang disiapkan pengelola.
+-- Sumber: migrations/202611060001_employee_nip_auth.sql
+-- ============================================================================
+
+-- Intentionally empty; trusted operators populate employee identities and access.
+create table if not exists public.employee_registry (
+  nip text primary key check (nip ~ '^[0-9]{1,32}$'),
+  role text not null default 'sales' check (role in ('sales', 'editor')),
+  education_level text check (education_level in ('SD', 'SMP', 'SMA', 'SMK')),
+  user_id uuid unique references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  check ((role = 'sales' and education_level is null)
+    or (role = 'editor' and education_level is not null))
+);
+alter table public.employee_registry enable row level security;
+revoke all on public.employee_registry from public, anon, authenticated;
+grant all on public.employee_registry to service_role;
+grant select (nip, user_id) on public.employee_registry to authenticated;
+drop policy if exists employee_reads_own_nip on public.employee_registry;
+create policy employee_reads_own_nip on public.employee_registry
+  for select to authenticated using (user_id = (select auth.uid()));
+
+create or replace function public.assign_new_sales_account()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare
+  employee public.employee_registry%rowtype;
+  selected_nip text := new.raw_user_meta_data ->> 'nip';
+begin
+  -- app_metadata is writable only through trusted Auth administration.
+  if new.raw_app_meta_data ->> 'employee_provisioning' = 'true' then
+    return new;
+  end if;
+  if coalesce(new.raw_app_meta_data ->> 'employee_registration', '') <> 'true' then
+    raise exception 'employee_registration_server_required' using errcode = '42501';
+  end if;
+  select * into employee from public.employee_registry where nip = selected_nip for update;
+  if not found or employee.user_id is not null then
+    raise exception 'employee_registration_unavailable' using errcode = '22023';
+  end if;
+  if new.email is distinct from selected_nip || '@nip.invalid'
+    or new.raw_user_meta_data ->> 'registration_role' is distinct from employee.role
+    or new.raw_user_meta_data ->> 'requested_education_level' is distinct from employee.education_level then
+    raise exception 'employee_registration_mismatch' using errcode = '22023';
+  end if;
+  update public.employee_registry set user_id = new.id where nip = selected_nip;
+  insert into public.account_memberships (user_id, role, is_super)
+    values (new.id, employee.role, false);
+  if employee.role = 'editor' then
+    insert into public.editor_scopes (user_id, education_level)
+      values (new.id, employee.education_level);
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.assign_new_sales_account() from public, anon, authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- BAGIAN 40: SATU SUMBER HAK AKSES AKUN
+-- Penjelasan: Memusatkan role aktif pada account_memberships dan mengarsipkan membership admin lama secara privat untuk rollback.
+-- Sumber: migrations/202611100001_retire_admin_memberships.sql
+-- ============================================================================
+
+-- Compatibility RPC: permissions now come exclusively from active membership.
+-- Never promote legacy admins or overwrite existing Sales/Editor permissions.
+create or replace function public.is_admin()
+returns boolean language sql stable security definer set search_path = ''
+as $$
+  select exists (
+    select 1 from public.account_memberships
+    where user_id = (select auth.uid()) and role = 'editor' and is_super
+  );
+$$;
+revoke all on function public.is_admin() from public, anon;
+grant execute on function public.is_admin() to authenticated;
+
+-- Preserve the original rows, constraints, and grants for rollback, outside the
+-- exposed public schema. The application must never read this archive.
+create schema if not exists account_access_archive;
+revoke all on schema account_access_archive from public, anon, authenticated;
+do $archive$
+begin
+  if to_regclass('public.admin_memberships') is not null then
+    if to_regclass('account_access_archive.admin_memberships') is not null then
+      raise exception 'admin_memberships archive already exists; inspect before retrying';
+    end if;
+    alter table public.admin_memberships set schema account_access_archive;
+  end if;
+end;
+$archive$;
+
+comment on table public.account_memberships is
+  'Authoritative active account role and super status. Registry role/level are registration defaults only.';
+comment on table public.employee_registry is
+  'Allowed employee NIPs and Auth links. Role/education_level initialize membership/scopes at registration; later changes do not update active access.';
+
+notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- BAGIAN 41: PENGATURAN HALAMAN KONTAK
+-- Penjelasan: Menyimpan konten Kontak publik dengan validasi dan izin ubah khusus Editor super melalui RLS.
+-- Sumber: migrations/202611100002_contact_page.sql
+-- ============================================================================
+
+-- Validate public content even when a trusted Editor writes through PostgREST.
+create or replace function public.valid_contact_page(content jsonb)
+returns boolean language plpgsql immutable set search_path = ''
+as $$
+declare
+  field text;
+  limit_length integer;
+  entry jsonb;
+  keys text[] := array['heading','headingHighlight','description','officeName','address',
+    'email','phone','fax','hotline','whatsapp','mapEmbedUrl','hoursHeading',
+    'hoursHighlight','hoursDescription','hours'];
+begin
+  if jsonb_typeof(content) is distinct from 'object' then return false; end if;
+  if not content ?& keys or exists (
+    select 1 from jsonb_object_keys(content) as k(name) where not name = any(keys)
+  ) then return false; end if;
+  for field, limit_length in select * from (values
+    ('heading',120),('headingHighlight',120),('description',600),('officeName',120),
+    ('address',400),('email',254),('phone',40),('fax',40),('hotline',40),
+    ('whatsapp',40),('mapEmbedUrl',3000),('hoursHeading',120),
+    ('hoursHighlight',120),('hoursDescription',600)
+  ) as limits(name,max_length) loop
+    if jsonb_typeof(content -> field) is distinct from 'string'
+      or char_length(btrim(content ->> field)) not between 1 and limit_length
+      or (content ->> field) !~ '[^[:space:]]' then return false; end if;
+  end loop;
+  if (content ->> 'email') !~ '^[^[:space:]@]+@[^[:space:]@]+[.][^[:space:]@]+$'
+    or (content ->> 'mapEmbedUrl') !~ '^https://www[.]google[.]com/maps/embed([?#][^[:space:]]*)?$'
+    then return false; end if;
+  foreach field in array array['phone','fax','hotline','whatsapp'] loop
+    if (content ->> field) !~ '^[+0-9().[:space:]-]+$'
+      or (content ->> field) !~ '[0-9]' then return false; end if;
+  end loop;
+  if char_length(regexp_replace(content ->> 'whatsapp','[^0-9]','','g')) not between 8 and 16
+    then return false; end if;
+  if jsonb_typeof(content -> 'hours') is distinct from 'array' then return false; end if;
+  if jsonb_array_length(content -> 'hours') <> 2 then return false; end if;
+  for entry in select * from jsonb_array_elements(content -> 'hours') loop
+    if jsonb_typeof(entry) is distinct from 'object' then return false; end if;
+    if not entry ?& array['day','time','note'] or exists (
+      select 1 from jsonb_object_keys(entry) as k(name) where name not in ('day','time','note')
+    ) then return false; end if;
+    foreach field in array array['day','time','note'] loop
+      limit_length := case when field = 'day' then 60 else 100 end;
+      if jsonb_typeof(entry -> field) is distinct from 'string'
+        or char_length(btrim(entry ->> field)) not between 1 and limit_length
+        or (entry ->> field) !~ '[^[:space:]]' then return false; end if;
+    end loop;
+  end loop;
+  return true;
+end;
+$$;
+revoke all on function public.valid_contact_page(jsonb) from public, anon;
+grant execute on function public.valid_contact_page(jsonb) to authenticated, service_role;
+
+create table if not exists public.contact_page (
+  id boolean primary key default true check (id),
+  content jsonb not null check (public.valid_contact_page(content))
+);
+insert into public.contact_page (id,content) values (true,$contact${
+  "heading": "Berbagai cara untuk",
+  "headingHighlight": "terhubung dengan kami",
+  "description": "Pilih saluran komunikasi yang paling nyaman untuk Anda. Tim kami siap membantu pertanyaan seputar buku dan pemesanan.",
+  "officeName": "Kantor Pusat Erlangga",
+  "address": "Jl. H. Baping Raya No. 100, Ciracas, Jakarta Timur 13740",
+  "email": "info@erlangga.co.id",
+  "phone": "(021) 871 7006",
+  "fax": "(021) 877 946 09",
+  "hotline": "1500-885",
+  "whatsapp": "08191-1500-885",
+  "mapEmbedUrl": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3965.564382405313!2d106.86915197481105!3d-6.3208058618512855!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69ed0c8e2945cf%3A0x532ab84fc45f49c6!2sPenerbit%20Erlangga!5e0!3m2!1sen!2sid!4v1791865021196!5m2!1sen!2sid",
+  "hoursHeading": "Kami siap melayani",
+  "hoursHighlight": "setiap hari kerja",
+  "hoursDescription": "Tim dukungan kami aktif menerima pertanyaan dan keluhan melalui berbagai saluran komunikasi yang tersedia.",
+  "hours": [
+    {
+      "day": "Senin – Jumat",
+      "time": "08.00 – 17.00 WIB",
+      "note": "Siap melayani Anda"
+    },
+    {
+      "day": "Sabtu",
+      "time": "08.00 – 13.00 WIB",
+      "note": "Siap melayani Anda"
+    }
+  ]
+}$contact$::jsonb)
+on conflict (id) do nothing;
+
+alter table public.contact_page enable row level security;
+revoke all on public.contact_page from public, anon, authenticated;
+grant select on public.contact_page to anon, authenticated;
+grant update (content) on public.contact_page to authenticated;
+grant all on public.contact_page to service_role;
+drop policy if exists contact_page_public_read on public.contact_page;
+create policy contact_page_public_read on public.contact_page
+  for select to anon, authenticated using (true);
+drop policy if exists contact_page_super_update on public.contact_page;
+create policy contact_page_super_update on public.contact_page
+  for update to authenticated
+  using (exists (select 1 from public.account_memberships m
+    where m.user_id = (select auth.uid()) and m.role = 'editor' and m.is_super))
+  with check (exists (select 1 from public.account_memberships m
+    where m.user_id = (select auth.uid()) and m.role = 'editor' and m.is_super));
+
+notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- BAGIAN 42: NOMOR TELEPON BERLABEL
+-- Penjelasan: Menambahkan daftar nomor telepon dan tanda pengenal tanpa mengubah konten Kontak existing; izin Editor super tetap berlaku.
+-- Sumber: migrations/202611100003_contact_phones.sql
+-- ============================================================================
+
+-- Additive: legacy content.phone and existing content CHECK remain valid.
+-- NULL means the existing phone is shown with the default label Telepon.
+create or replace function public.valid_contact_phones(phones jsonb)
+returns boolean language plpgsql immutable set search_path = ''
+as $$
+declare entry jsonb;
+begin
+  if phones is null then return true; end if;
+  if jsonb_typeof(phones) is distinct from 'array' then return false; end if;
+  if jsonb_array_length(phones) not between 1 and 10 then return false; end if;
+  for entry in select * from jsonb_array_elements(phones) loop
+    if jsonb_typeof(entry) is distinct from 'object' then return false; end if;
+    if not entry ?& array['label','number'] or exists (
+      select 1 from jsonb_object_keys(entry) as k(name) where name not in ('label','number')
+    ) then return false; end if;
+    if jsonb_typeof(entry -> 'label') is distinct from 'string'
+      or char_length(btrim(entry ->> 'label')) not between 1 and 60
+      or (entry ->> 'label') !~ '[^[:space:]]'
+      or jsonb_typeof(entry -> 'number') is distinct from 'string'
+      or char_length(btrim(entry ->> 'number')) not between 1 and 40
+      or (entry ->> 'number') !~ '^[+0-9().[:space:]-]+$'
+      or (entry ->> 'number') !~ '[0-9]' then return false; end if;
+  end loop;
+  return true;
+end;
+$$;
+revoke all on function public.valid_contact_phones(jsonb) from public, anon;
+grant execute on function public.valid_contact_phones(jsonb) to authenticated, service_role;
+
+alter table public.contact_page add column if not exists phones jsonb
+  constraint contact_page_phones_valid check (public.valid_contact_phones(phones));
+grant update (phones) on public.contact_page to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- BAGIAN 43: AREA SALES YANG DIISI PENGGUNA
+-- Penjelasan: Menambahkan label area pada membership dan membatasi perubahan ke Sales pemilik tanpa mengubah role atau scope.
+-- Sumber: migrations/202611100004_sales_areas.sql
+-- ============================================================================
+
+-- Self-reported profile labels, never an authorization scope.
+create or replace function public.valid_sales_areas(areas text[])
+returns boolean language plpgsql immutable set search_path = ''
+as $$
+declare area text;
+begin
+  if areas is null or cardinality(areas) > 10 then return false; end if;
+  if cardinality(areas) > 0 and array_ndims(areas) <> 1 then return false; end if;
+  foreach area in array areas loop
+    if area is null or char_length(btrim(area)) not between 1 and 100
+      or area !~ '[^[:space:]]' then return false; end if;
+  end loop;
+  return not exists (
+    select 1 from unnest(areas) as a(value) group by lower(btrim(value)) having count(*) > 1
+  );
+end;
+$$;
+revoke all on function public.valid_sales_areas(text[]) from public, anon;
+grant execute on function public.valid_sales_areas(text[]) to authenticated, service_role;
+
+alter table public.account_memberships add column if not exists sales_areas text[] not null
+  default '{}'::text[] constraint account_sales_areas_valid check (public.valid_sales_areas(sales_areas));
+grant update (sales_areas) on public.account_memberships to authenticated;
+drop policy if exists sales_update_own_areas on public.account_memberships;
+create policy sales_update_own_areas on public.account_memberships
+  for update to authenticated
+  using (user_id = (select auth.uid()) and role = 'sales')
+  with check (user_id = (select auth.uid()) and role = 'sales');
+
+comment on column public.account_memberships.sales_areas is
+  'Self-reported Sales areas. Profile only; not trusted IT assignment and never grants permissions.';
+notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- BAGIAN 44: STRUKTUR PRODUK PER JENJANG
+-- Penjelasan: Membuat hierarki aktif/arsip, referensi buku opsional, RLS Editor super, dan penguncian perubahan struktur serta posisi buku.
+-- Sumber: migrations/202611100005_product_structure.sql
+-- ============================================================================
+
+create table public.product_structure_nodes (
+  id uuid primary key default gen_random_uuid(),
+  education_level text not null check (education_level in ('SD','SMP','SMA','SMK')),
+  parent_id uuid,
+  name text not null check (char_length(btrim(name)) between 1 and 200 and name ~ '[^[:space:]]'),
+  sort_order integer not null default 0 check (sort_order >= 0),
+  product_status text check (product_status is null or (char_length(btrim(product_status)) between 1 and 80 and product_status ~ '[^[:space:]]')),
+  archived boolean not null default false,
+  unique (id, education_level),
+  foreign key (parent_id, education_level) references public.product_structure_nodes(id, education_level),
+  check (parent_id is distinct from id)
+);
+create index product_structure_parent_idx on public.product_structure_nodes(education_level,parent_id,sort_order,id);
+alter table public.products add column structure_node_id uuid references public.product_structure_nodes(id);
+create index products_structure_node_idx on public.products(structure_node_id) where structure_node_id is not null;
+
+-- Every topology write and every book placement write updates the same private row.
+-- This serializes writers at READ COMMITTED. At REPEATABLE READ/SERIALIZABLE an
+-- outdated writer fails with 40001 instead of validating against an old snapshot.
+create schema if not exists product_structure_private;
+revoke all on schema product_structure_private from public, anon, authenticated;
+create table product_structure_private.write_guard (id boolean primary key check(id), revision bigint not null default 0);
+insert into product_structure_private.write_guard(id) values(true);
+create function public.lock_product_structure_write()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  update product_structure_private.write_guard set revision = revision + 1 where id = true;
+  return null;
+end;
+$$;
+revoke all on function public.lock_product_structure_write() from public, anon, authenticated;
+create trigger structure_serialize_writes before insert or update or delete on public.product_structure_nodes
+  for each statement execute function public.lock_product_structure_write();
+create trigger product_structure_serialize_writes before insert or update of structure_node_id,education_level on public.products
+  for each statement execute function public.lock_product_structure_write();
+
+create function public.validate_product_structure_node()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare parent_level text; parent_archived boolean;
+begin
+  if TG_OP = 'UPDATE' then
+    if old.education_level <> new.education_level then raise exception 'structure_level_immutable' using errcode='22023'; end if;
+    if old.archived then raise exception 'structure_archived' using errcode='22023'; end if;
+  end if;
+  if new.parent_id is not null then
+    select education_level,archived into parent_level,parent_archived from public.product_structure_nodes where id=new.parent_id;
+    if not found or parent_level <> new.education_level or parent_archived then
+      raise exception 'structure_parent_invalid' using errcode='22023';
+    end if;
+    if exists (
+      with recursive ancestors as (
+        select id,parent_id from public.product_structure_nodes where id=new.parent_id
+        union select n.id,n.parent_id from public.product_structure_nodes n join ancestors a on n.id=a.parent_id
+      ) select 1 from ancestors where id=new.id
+    ) then raise exception 'structure_cycle' using errcode='22023'; end if;
+  end if;
+  if new.archived then
+    if exists (
+      with recursive descendants as (
+        select new.id as id
+        union select n.id from public.product_structure_nodes n join descendants d on n.parent_id=d.id
+      ) select 1 from public.products p join descendants d on p.structure_node_id=d.id
+    ) then raise exception 'structure_in_use' using errcode='23514'; end if;
+    if exists(select 1 from public.product_structure_nodes where parent_id=new.id and not archived) then
+      raise exception 'structure_archive_children_first' using errcode='22023';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.validate_product_structure_node() from public, anon, authenticated;
+create trigger validate_structure_node before insert or update on public.product_structure_nodes
+  for each row execute function public.validate_product_structure_node();
+
+create function public.validate_book_structure()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if new.structure_node_id is not null and not exists (
+    select 1 from public.product_structure_nodes n where n.id=new.structure_node_id
+      and n.education_level=new.education_level and not n.archived
+  ) then raise exception 'book_structure_invalid' using errcode='23514'; end if;
+  return new;
+end;
+$$;
+revoke all on function public.validate_book_structure() from public, anon, authenticated;
+create trigger validate_book_structure before insert or update of structure_node_id,education_level on public.products
+  for each row execute function public.validate_book_structure();
+
+alter table public.product_structure_nodes enable row level security;
+revoke all on public.product_structure_nodes from public,anon,authenticated;
+grant select on public.product_structure_nodes to anon,authenticated;
+grant insert,update on public.product_structure_nodes to authenticated;
+grant all on public.product_structure_nodes to service_role;
+create policy structure_public_active on public.product_structure_nodes for select to anon,authenticated using(not archived);
+create policy structure_super_read on public.product_structure_nodes for select to authenticated using(exists(
+  select 1 from public.account_memberships m where m.user_id=(select auth.uid()) and m.role='editor' and m.is_super));
+create policy structure_super_insert on public.product_structure_nodes for insert to authenticated with check(exists(
+  select 1 from public.account_memberships m where m.user_id=(select auth.uid()) and m.role='editor' and m.is_super));
+create policy structure_super_update on public.product_structure_nodes for update to authenticated using(exists(
+  select 1 from public.account_memberships m where m.user_id=(select auth.uid()) and m.role='editor' and m.is_super)) with check(exists(
+  select 1 from public.account_memberships m where m.user_id=(select auth.uid()) and m.role='editor' and m.is_super));
+
+create function public.archive_product_structure_node(target_id uuid)
+returns integer language plpgsql security definer set search_path = '' as $$
+declare branch record; archived_count integer := 0;
+begin
+  if not exists(select 1 from public.account_memberships m where m.user_id=(select auth.uid()) and m.role='editor' and m.is_super) then
+    raise exception 'structure_forbidden' using errcode='42501';
+  end if;
+  update product_structure_private.write_guard set revision=revision+1 where id=true;
+  if not exists(select 1 from public.product_structure_nodes where id=target_id and not archived) then
+    raise exception 'structure_missing' using errcode='22023';
+  end if;
+  if exists (
+    with recursive descendants as (
+      select id from public.product_structure_nodes where id=target_id
+      union select n.id from public.product_structure_nodes n join descendants d on n.parent_id=d.id
+    ) select 1 from public.products p join descendants d on p.structure_node_id=d.id
+  ) then raise exception 'structure_in_use' using errcode='23514'; end if;
+  for branch in
+    with recursive descendants as (
+      select id,0 as depth from public.product_structure_nodes where id=target_id
+      union all select n.id,d.depth+1 from public.product_structure_nodes n join descendants d on n.parent_id=d.id
+    ) select d.id from descendants d join public.product_structure_nodes n on n.id=d.id where not n.archived order by depth desc,d.id
+  loop
+    update public.product_structure_nodes set archived=true where id=branch.id;
+    archived_count := archived_count+1;
+  end loop;
+  return archived_count;
+end;
+$$;
+revoke all on function public.archive_product_structure_node(uuid) from public,anon;
+grant execute on function public.archive_product_structure_node(uuid) to authenticated;
+
+-- Intentionally no production seed: supplied diagrams are reference/test evidence.
+notify pgrst,'reload schema';
 
 -- SELESAI: simpan seluruh perubahan setup secara atomik.
 commit;

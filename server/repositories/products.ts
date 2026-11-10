@@ -14,6 +14,8 @@ import type { Product, ProductList } from '#shared/types/product'
 import { demoProducts } from '../data/products'
 import { getCatalogClient } from '../utils/catalog-client'
 import { getProductImageUrl } from '../utils/storage'
+import { listProductStructure } from './product-structure'
+import { structurePath } from '#shared/schemas/product-structure'
 
 const rowSchema = z.object({
   id: z.string().uuid(),
@@ -31,12 +33,13 @@ const rowSchema = z.object({
   featured: z.boolean(),
   book_code: z.string().nullable(),
   education_level: educationLevelSchema.nullable(),
+  structure_node_id: z.string().uuid().nullable().default(null),
   subject: bookSubjectSchema.nullable(),
   grade: z.number().int().min(1).max(12).nullable(),
   publication_year: z.number().int().nullable(),
 })
 export const productColumns =
-  'id,slug,title,author,curriculum,isbn,division_code,synopsis,target_market,highlights,price,image_path,featured,book_code,education_level,grade,subject,publication_year'
+  'id,slug,title,author,curriculum,isbn,structure_node_id,division_code,synopsis,target_market,highlights,price,image_path,featured,book_code,education_level,grade,subject,publication_year'
 
 function sourceFor(event: H3Event): ProductList['source'] {
   const source = useRuntimeConfig(event).catalogSource
@@ -64,6 +67,7 @@ export function mapProductRow(event: H3Event, value: unknown): Product {
     featured: row.featured,
     bookCode: row.book_code,
     educationLevel: row.education_level,
+    structureNodeId: row.structure_node_id,
     subject: row.subject,
     grade: row.grade,
     publicationYear: row.publication_year,
@@ -218,13 +222,19 @@ export async function getProduct(event: H3Event, identifier: string): Promise<Pr
     .eq('book_code', identifier)
     .maybeSingle()
   if (codeError) throw createError({ statusCode: 503, statusMessage: 'Katalog tidak tersedia' })
-  if (codeMatch) return mapProductRow(event, codeMatch)
+  if (codeMatch) return withStructure(event, mapProductRow(event, codeMatch))
   const { data: slugMatch, error: slugError } = await selectPublicProduct()
     .eq('slug', identifier)
     .maybeSingle()
   if (slugError) throw createError({ statusCode: 503, statusMessage: 'Katalog tidak tersedia' })
   if (!slugMatch) throw createError({ statusCode: 404, statusMessage: 'Produk tidak ditemukan' })
-  return mapProductRow(event, slugMatch)
+  return withStructure(event, mapProductRow(event, slugMatch))
+}
+
+async function withStructure(event: H3Event, product: Product): Promise<Product> {
+  if (!product.structureNodeId || !product.educationLevel) return product
+  const nodes = await listProductStructure(event, product.educationLevel)
+  return { ...product, structurePath: structurePath(nodes, product.structureNodeId) }
 }
 
 // Count the same search results used by category links, without the list's 60-row cap.

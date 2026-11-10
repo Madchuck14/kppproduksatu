@@ -2,18 +2,20 @@
 import { loginReturnToSchema } from '#shared/schemas/navigation'
 import { loginSchema } from '#shared/schemas/auth'
 import type { AccountSession } from '#shared/types/account'
+import { maxSalesAreas, saveSalesAreasSchema } from '#shared/schemas/sales-areas'
 
 const config = useRuntimeConfig()
 useSeoMeta({ title: `Login | ${config.public.siteName}`, robots: 'noindex, nofollow' })
 const route = useRoute()
 const account = ref<AccountSession | null>(null)
+const areas = ref<string[]>([''])
 const returnTo = computed(() => {
   const result = loginReturnToSchema.safeParse(route.query.returnTo)
-  return result.success ? result.data : '/admin'
+  return result.success ? result.data : account.value?.role === 'editor' ? '/admin' : '/products'
 })
 const client = useSupabaseClient()
 const user = useSupabaseUser()
-const email = ref('')
+const nip = ref('')
 const password = ref('')
 const loading = ref(false)
 const message = ref('')
@@ -21,13 +23,14 @@ const showPassword = ref(false)
 const requestFetch = useRequestFetch()
 async function loadAccount() {
   account.value = await requestFetch<AccountSession>('/api/auth/session')
+  areas.value = account.value.salesAreas?.length ? [...account.value.salesAreas] : ['']
 }
 if (user.value) {
   try {
     await loadAccount()
   } catch {
     account.value = null
-    message.value = 'Login hanya tersedia untuk Editor. Keluar untuk memakai akun Editor.'
+    message.value = 'Akun belum memiliki akses Sales atau Editor. Hubungi pengelola.'
   }
 }
 const configured = computed(
@@ -39,28 +42,61 @@ const configured = computed(
 async function login() {
   if (!configured.value || loading.value) return
   message.value = ''
-  const result = loginSchema.safeParse({ email: email.value, password: password.value })
+  const result = loginSchema.safeParse({ nip: nip.value, password: password.value })
   if (!result.success) {
-    message.value = result.error.issues[0]?.message ?? 'Periksa email dan kata sandi Anda.'
+    message.value = result.error.issues[0]?.message ?? 'Periksa NIP dan kata sandi Anda.'
     return
   }
   loading.value = true
   message.value = ''
   try {
-    const { error } = await client.auth.signInWithPassword(result.data)
-    if (error) {
-      message.value = 'Login gagal. Periksa email dan kata sandi Anda.'
-      return
-    }
+    const session = await $fetch('/api/auth/login', { method: 'POST', body: result.data })
+    const { error } = await client.auth.setSession(session)
+    if (error) throw error
     await loadAccount()
-    await navigateTo(returnTo.value)
+    password.value = ''
+    if (account.value?.role !== 'sales') await navigateTo(returnTo.value)
   } catch (error) {
     await client.auth.signOut({ scope: 'local' })
     account.value = null
+    const status = (error as { statusCode?: number }).statusCode
     message.value =
-      (error as { statusCode?: number }).statusCode === 403
-        ? 'Login hanya tersedia untuk akun Editor.'
-        : 'Login belum dapat diproses. Coba lagi nanti.'
+      status === 401
+        ? 'Login gagal. Periksa NIP dan kata sandi Anda.'
+        : status === 429
+          ? 'Terlalu banyak percobaan. Coba lagi nanti.'
+          : status === 403
+            ? 'NIP atau hak akses akun belum terdaftar. Hubungi pengelola.'
+            : 'Login belum dapat diproses. Coba lagi nanti.'
+  } finally {
+    loading.value = false
+  }
+}
+async function addArea() {
+  if (loading.value || areas.value.length >= maxSalesAreas) return
+  areas.value.push('')
+  await nextTick()
+  document.getElementById(`sales-area-${areas.value.length - 1}`)?.focus()
+}
+async function saveAreas() {
+  if (loading.value || account.value?.role !== 'sales') return
+  message.value = ''
+  const parsed = saveSalesAreasSchema.safeParse({ areas: areas.value })
+  if (!parsed.success) {
+    message.value = parsed.error.issues[0]?.message ?? 'Periksa area Sales Anda.'
+    return
+  }
+  loading.value = true
+  try {
+    const saved = await $fetch('/api/auth/sales-areas', { method: 'PUT', body: parsed.data })
+    areas.value = saved.areas
+    account.value = { ...account.value, salesAreas: saved.areas }
+    await refreshNuxtData('navigation-account')
+    await navigateTo(returnTo.value)
+  } catch (error) {
+    message.value =
+      (error as { data?: { statusMessage?: string } }).data?.statusMessage ??
+      'Area belum dapat disimpan. Isian Anda tetap tersedia. Silakan coba lagi.'
   } finally {
     loading.value = false
   }
@@ -95,14 +131,12 @@ async function logout() {
       </div>
       <div>
         <h2>Selamat datang kembali</h2>
-        <p>
-          Katalog dan materi buku terbuka untuk umum. Masuk sebagai Editor untuk mengelola buku.
-        </p>
+        <p>Masuk sebagai Sales untuk menyimpan buku favorit atau Editor untuk mengelola katalog.</p>
       </div>
     </div>
     <div class="login-panel">
-      <h1 id="login-title">Masuk Editor</h1>
-      <p class="login-intro">Gunakan email dan kata sandi akun Editor Anda.</p>
+      <h1 id="login-title">Masuk akun</h1>
+      <p class="login-intro">Gunakan NIP dan kata sandi akun Sales atau Editor Anda.</p>
       <p v-if="returnTo !== '/' && returnTo !== '/products'" class="login-notice">
         Setelah login, Anda akan kembali ke konten yang dipilih. Akses mengikuti hak akun dan
         ketersediaan berkas.
@@ -113,8 +147,57 @@ async function logout() {
       </p>
       <p v-if="message" id="login-message" role="alert" class="login-alert">{{ message }}</p>
       <div v-if="user" class="login-account">
-        <p>Anda sudah masuk. Lanjutkan ke tujuan Anda atau keluar untuk memakai akun lain.</p>
-        <UButton v-if="account" :to="returnTo" class="login-primary" :disabled="loading"
+        <form
+          v-if="account?.role === 'sales'"
+          class="sales-area-form"
+          :aria-busy="loading"
+          @submit.prevent="saveAreas"
+        >
+          <h2>Area Sales Anda</h2>
+          <p>Masukkan satu atau beberapa area yang Anda tangani. Area ini diisi oleh Anda.</p>
+          <div v-for="(_area, index) in areas" :key="index" class="sales-area-row">
+            <div class="login-field">
+              <label :for="`sales-area-${index}`">Area {{ index + 1 }}</label>
+              <input
+                :id="`sales-area-${index}`"
+                v-model="areas[index]"
+                type="text"
+                maxlength="100"
+                placeholder="Contoh: Jakarta Timur"
+                required
+                :disabled="loading"
+              />
+            </div>
+            <UButton
+              type="button"
+              color="error"
+              variant="ghost"
+              :aria-label="`Hapus area ${index + 1}`"
+              :disabled="loading || areas.length === 1"
+              @click="areas.splice(index, 1)"
+              >Hapus</UButton
+            >
+          </div>
+          <UButton
+            type="button"
+            color="neutral"
+            variant="outline"
+            :disabled="loading || areas.length >= maxSalesAreas"
+            @click="addArea"
+            >+ Tambah area</UButton
+          >
+          <UButton type="submit" class="login-primary" :loading="loading" :disabled="loading"
+            >Simpan area dan lanjutkan</UButton
+          >
+        </form>
+        <p v-else>
+          Anda sudah masuk. Lanjutkan ke tujuan Anda atau keluar untuk memakai akun lain.
+        </p>
+        <UButton
+          v-if="account && account.role !== 'sales'"
+          :to="returnTo"
+          class="login-primary"
+          :disabled="loading"
           >Lanjutkan</UButton
         >
         <UButton variant="outline" class="login-secondary" :loading="loading" @click="logout"
@@ -129,15 +212,17 @@ async function logout() {
         @submit.prevent="login"
       >
         <div class="login-field">
-          <label for="email">Email</label>
+          <label for="nip">Nomor Induk Pegawai (NIP)</label>
           <input
-            id="email"
-            v-model="email"
+            id="nip"
+            v-model="nip"
             required
-            type="email"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]{1,32}"
             autocomplete="username"
-            maxlength="254"
-            placeholder="nama@email.com"
+            maxlength="32"
+            placeholder="Masukkan NIP Anda"
             autocapitalize="none"
             :spellcheck="false"
             :disabled="!configured || loading"
@@ -174,9 +259,19 @@ async function logout() {
           >{{ loading ? 'Memproses login...' : 'Masuk' }}</UButton
         >
       </form>
+      <div class="login-register">
+        <p>Belum memiliki akun?</p>
+        <UButton
+          :to="{ path: '/register', query: route.query.returnTo ? { returnTo } : {} }"
+          variant="outline"
+          class="login-secondary"
+          >Daftar akun</UButton
+        >
+      </div>
       <p class="registration-note">
-        Akun Editor disediakan pengelola. <NuxtLink to="/contact">Hubungi pengelola</NuxtLink>
-        jika memerlukan akses.
+        NIP harus terdaftar pada data pegawai. Akses Editor mengikuti jenjang yang ditetapkan
+        pengelola.
+        <NuxtLink to="/contact">Hubungi pengelola</NuxtLink> jika memerlukan bantuan.
       </p>
     </div>
   </section>
@@ -342,6 +437,27 @@ async function logout() {
   font-size: 14px;
   line-height: 22px;
   color: #6b6f6b;
+}
+.sales-area-form {
+  display: grid;
+  gap: 16px;
+}
+.sales-area-form h2 {
+  color: #222;
+  font-size: 20px;
+  font-weight: 600;
+}
+.sales-area-row {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+.sales-area-row .login-field {
+  flex: 1;
+  min-width: 0;
+}
+.sales-area-row .login-field input {
+  width: 100%;
 }
 .login-notice,
 .login-alert {

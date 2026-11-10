@@ -1,5 +1,14 @@
 # KPP Produk Satu
 
+Hak akses aktif memakai `account_memberships` dan `editor_scopes`; `employee_registry`
+menyimpan NIP dan ketentuan pendaftaran. Deploy aplikasi baru dahulu, lalu terapkan
+`202611100001_retire_admin_memberships.sql` untuk mengarsipkan tabel admin lama secara
+privat tanpa mengubah izin atau data akun. Ikuti [rollout dan rollback akses](docs/nip-auth.md#sumber-hak-akses-aktif-10-november-2026).
+
+Login dan daftar memakai **NIP + kata sandi, tanpa email**. Terapkan migration
+`202611060001_employee_nip_auth.sql`, isi tabel kosong `employee_registry`, dan kaitkan akun
+lama dengan NIP sebelum deploy. Ikuti [setup, rollout, dan rollback NIP](docs/nip-auth.md).
+
 Cleanup schema produk tersedia melalui migration `202610140001_remove_legacy_product_columns.sql`.
 Kolom `description` dan `flyer_slide_paths` diarsipkan privat lalu dihapus; aplikasi memakai
 sinopsis dan preview PPT Produk. Ikuti [urutan rollout dan rollback](docs/supabase.md#penghapusan-kolom-produk-lama-14-oktober-2026)
@@ -10,7 +19,7 @@ Fondasi katalog produk dengan Nuxt 4, Vue 3, TypeScript, Tailwind CSS, Nuxt UI, 
 ## Mulai di Windows
 
 Untuk menyiapkan database Supabase baru lewat satu file, gunakan
-[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 35 migrasi
+[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 44 migrasi
 dengan komentar section dan penjelasan singkat. Ikuti [panduan file gabungan](docs/supabase.md#setup-satu-file-untuk-database-baru).
 Database yang sudah terpasang tetap memakai migrasi incremental; jangan jalankan ulang file setup.
 
@@ -33,6 +42,27 @@ Build Vercel dan typecheck lulus; lint memiliki warning gaya HTML, tanpa error. 
 Docker, dan pemeriksaan interaksi browser belum diverifikasi untuk dashboard ini.
 
 ## Yang tersedia
+
+**Kelola Struktur Produk** tersedia untuk Editor super pada `/admin`. Hierarki per
+jenjang mendukung kategori/subcabang, urutan, status produk opsional, serta arsip subtree
+yang ditolak bila masih dipakai buku termasuk draf. Form buku menyediakan pilihan jalur
+yang bisa dicari; detail published menghubungkan ke struktur publik dengan cabang disorot.
+Terapkan `202611100005_product_structure.sql` sebelum deploy. Produksi mulai tanpa seed;
+lihat [model, rollout, dan pengujian Struktur Produk](docs/product-structure.md).
+
+Sales mengisi satu atau beberapa area setelah login NIP berhasil, sebelum melanjutkan
+ke tujuan awal. Area tersimpan pada akun, tampil di bagian atas halaman, dan dapat diubah
+melalui **Ubah area**. Ini label yang diisi pengguna, bukan scope izin atau data resmi IT.
+Terapkan `202611100004_sales_areas.sql` sebelum deploy. Lihat [rollout area Sales](docs/supabase.md#area-sales-yang-diisi-pengguna).
+
+Editor super dapat membuka **Atur Halaman Kontak** dari dashboard untuk mengubah
+judul/deskripsi, alamat, saluran kontak, peta Google Maps, dan dua jadwal operasional.
+Terapkan `202611100002_contact_page.sql` sebelum deploy. Konten dibaca publik melalui SSR;
+perubahan dibatasi di server dan RLS. Lihat [rollout Kontak](docs/supabase.md#pengaturan-halaman-kontak).
+
+Nomor telepon mendukung tanda pengenal dan tombol **+ Tambah nomor telepon**, hingga
+10 nomor. Terapkan `202611100003_contact_phones.sql` sebelum menjalankan versi ini;
+nomor lama tetap tampil sebagai satu entri berlabel Telepon.
 
 Hanya Editor super yang dapat memakai modal **Edit Klasifikasi Buku** untuk menambah kurikulum, divisi,
 dan mata pelajaran per jenjang, serta menghapus opsi tambahan yang belum dipakai buku melalui
@@ -57,21 +87,21 @@ tanpa spasi/tanda hubung agar nol di depan tidak hilang. Ikuti [rollout metadata
   `202610150001_featured_books_limit.sql` sebelum mengelola pilihan buku di Supabase.
 - API `GET /api/products` dan `GET /api/products/:identifier`, dengan validasi Zod.
 - Pilihan data fixture atau Supabase; kegagalan Supabase tidak diam-diam diganti fixture.
-- Login email/password dan dashboard Editor `/admin`: ringkasan, pencarian, filter jenjang/status,
+- Login NIP/password dan dashboard Editor `/admin`: ringkasan, pencarian, filter jenjang/status,
   tambah/edit/hapus buku, publikasi, unggah sampul, dan pengelolaan buku pilihan. Akses dibatasi
   di server dan RLS.
-- Login khusus Editor; tidak ada pendaftaran akun umum. `/register` lama diarahkan ke login Editor.
-- Provisioning Editor super dan Editor per jenjang melalui script lokal; akun umum tidak dibuat.
+- Login Sales/Editor dan pendaftaran keduanya di `/register`; NIP, role, dan jenjang harus cocok dengan data pegawai yang disiapkan pengelola.
+- Provisioning Editor super dan Editor per jenjang melalui script lokal; akun Editor biasa juga dapat dibuat melalui pendaftaran per jenjang.
 - Migration produk/admin membership, RLS, bucket gambar, dan seed demo. Tabel kategori lama tidak
   lagi dipakai aplikasi.
 - Endpoint `/healthz` untuk liveness aplikasi (bukan pemeriksaan database).
 - Konfigurasi Cloudflare Workers, Dockerfile, dan Compose untuk aplikasi Node.
 
-Katalog dan seluruh materi buku published terbuka tanpa akun. Favorit pribadi hanya tersedia
-untuk Editor: tombol di kartu/detail dan navigasi disembunyikan bagi publik. `/favorites`
-dilindungi guard Editor; API dan RLS menolak akun lama non-Editor. Terapkan migration
-`202610160003_editor_only_favorites.sql` sebelum menjalankan versi ini. Data Auth, membership,
-dan favorit lama dipertahankan untuk rollback; tidak ada penghapusan akun live oleh aplikasi.
+Katalog dan seluruh materi buku published terbuka tanpa akun. Sales dan Editor dapat memakai
+Favorit pribadi setelah login NIP. Pendaftaran tidak membutuhkan email dan hanya menerima
+NIP yang belum diklaim dalam registry. Role serta jenjang ditetapkan dari data pegawai;
+pendaftaran tidak memberikan hak super. Data akun serta Favorit lama tetap dipertahankan.
+Lihat [rollout NIP](docs/nip-auth.md), termasuk konfigurasi key server dan penutupan signup publik Auth.
 
 Pagination tersedia pada dashboard Editor dan katalog publik. Cart, checkout, Midtrans, blog,
 banner CMS, sitemap, dan structured data belum diimplementasikan.

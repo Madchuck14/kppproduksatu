@@ -13,6 +13,7 @@ node_modules/
 .dev.vars.*
 *.log
 coverage/
+artifacts/nip-auth/
 supabase/.temp/
 supabase/.branches/
 codex

@@ -5,10 +5,10 @@ import type { FavoriteQuery } from '#shared/schemas/favorites'
 import type { FavoriteIds, FavoriteList } from '#shared/types/favorite'
 import type { FavoriteDatabase } from '#shared/types/favorite-database'
 import { mapProductRow, productColumns } from './products'
-import { requireEditor } from '../utils/require-editor'
+import { requireAccount } from '../utils/require-account'
 
 async function favoriteSession(event: H3Event) {
-  const user = await requireEditor(event)
+  const user = await requireAccount(event)
   const client = await serverSupabaseClient<FavoriteDatabase>(event)
   return { client, user }
 }

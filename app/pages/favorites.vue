@@ -2,7 +2,7 @@
 import { educationLevelSchema } from '#shared/schemas/auth'
 import type { FavoriteList } from '#shared/types/favorite'
 
-definePageMeta({ middleware: 'admin' })
+definePageMeta({ middleware: 'account' })
 const config = useRuntimeConfig()
 useSeoMeta({ title: `Favorit | ${config.public.siteName}`, robots: 'noindex, nofollow' })
 const user = useSupabaseUser()

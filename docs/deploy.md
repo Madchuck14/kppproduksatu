@@ -1,5 +1,14 @@
 # Staging dan serah-terima
 
+## Prasyarat autentikasi NIP
+
+Sebelum deploy, terapkan migration `202611060001_employee_nip_auth.sql`, isi registry kosong,
+dan hubungkan akun lama ke NIP terverifikasi sesuai [panduan NIP](nip-auth.md).
+Daftar/login memerlukan `NUXT_SUPABASE_SECRET_KEY` pada environment server, selain URL/key publik.
+Simpan sebagai environment rahasia Vercel, secret binding Worker, atau environment container;
+jangan memasukkannya ke `vars` publik, browser, atau commit. Contoh produksi ada di
+`.env.production.example`. Public signup Auth ditutup; server membuat akun NIP yang disetujui.
+
 ## Vercel
 
 Repository menyertakan `vercel.json` yang menetapkan framework Nuxt, instalasi `npm ci`, dan build `npm run build:vercel`. Build ini memakai preset Nitro `vercel` untuk mempertahankan SSR dan API, dengan output `.vercel/output`. Folder tersebut di-ignore dan tidak perlu di-commit. Build Node untuk Docker tetap memakai `npm run build`.

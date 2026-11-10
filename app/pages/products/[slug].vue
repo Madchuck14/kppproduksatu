@@ -201,6 +201,17 @@ useSeoMeta({
             <dd>{{ detail.value }}</dd>
           </div>
         </dl>
+        <div v-if="product.structurePath?.length" class="detail-structure">
+          <h2>Struktur Produk</h2>
+          <p>{{ product.structurePath.map((node) => node.name).join(' → ') }}</p>
+          <NuxtLink
+            :to="{
+              path: '/struktur-produk',
+              query: { level: product.educationLevel, node: product.structureNodeId },
+            }"
+            >Lihat struktur {{ product.educationLevel }}</NuxtLink
+          >
+        </div>
       </div>
     </div>
 
@@ -294,20 +305,20 @@ useSeoMeta({
     </section>
 
     <section aria-label="Informasi lengkap buku" class="detail-content">
-      <div>
+      <div class="detail-content-card">
         <h2>Sinopsis</h2>
         <p>{{ product.synopsis || 'Informasi sinopsis buku belum tersedia.' }}</p>
       </div>
-      <div>
+      <div class="detail-content-card">
         <h2>Keunggulan</h2>
-        <ul v-if="product.highlights?.length" class="detail-highlights">
+        <ul v-if="product.highlights?.length" class="detail-highlight-cards" role="list">
           <li v-for="(item, index) in product.highlights" :key="index">{{ item }}</li>
         </ul>
         <p v-else>Informasi keunggulan buku belum tersedia.</p>
       </div>
-      <div>
+      <div class="detail-content-card">
         <h2>Target pasar</h2>
-        <ul v-if="product.targetMarket?.length" class="detail-highlights">
+        <ul v-if="product.targetMarket?.length" class="detail-highlight-cards" role="list">
           <li v-for="(item, index) in product.targetMarket" :key="index">{{ item }}</li>
         </ul>
         <p v-else>Informasi target pasar buku belum tersedia.</p>
@@ -407,6 +418,27 @@ useSeoMeta({
 </template>
 
 <style scoped>
+.detail-structure {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #e6e8e4;
+  border-radius: 12px;
+}
+.detail-structure h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b6f6b;
+}
+.detail-structure p {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.detail-structure a {
+  color: #1f5c3f;
+  text-decoration: underline;
+  font-size: 14px;
+}
 .detail-highlights {
   list-style: disc;
   padding-left: 20px;
@@ -574,18 +606,42 @@ useSeoMeta({
 }
 .detail-content {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 36px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
   padding-top: 48px;
+}
+.detail-content-card {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid #dce5de;
+  border-radius: 20px;
+  background: #f4f8f5;
+  overflow-wrap: anywhere;
 }
 .detail-content h2 {
   font: 500 22px/1.3 var(--font-landing-serif);
 }
 .detail-content p {
   margin-top: 8px;
-  color: #6b6f6b;
+  color: #454c46;
   font-size: 15px;
   line-height: 24px;
+  white-space: pre-line;
+}
+.detail-highlight-cards {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  list-style: none;
+  color: #454c46;
+  font-size: 15px;
+  line-height: 24px;
+}
+.detail-highlight-cards li {
+  padding: 14px 16px;
+  border: 1px solid #dce5de;
+  border-radius: 12px;
+  background: #fff;
   white-space: pre-line;
 }
 .detail-resources {
@@ -837,8 +893,10 @@ useSeoMeta({
     font-size: 32px;
   }
   .detail-content {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 24px;
+    padding-top: 32px;
+  }
+  .detail-content-card {
+    padding: 20px;
   }
   .detail-related {
     margin-top: 40px;

@@ -1,53 +1,74 @@
 <script setup lang="ts">
+import { contactPhoneHref, contactWhatsappHref } from '#shared/schemas/contact-page'
+
 useSeoMeta({
   title: 'Kontak | Penerbit Erlangga',
   description: 'Informasi kontak, lokasi kantor pusat, dan jam operasional Penerbit Erlangga.',
 })
-const address = 'Jl. H. Baping Raya No. 100, Ciracas, Jakarta Timur 13740'
-const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`Penerbit Erlangga ${address}`)}`
-const mapEmbedUrl =
-  'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3965.564382405313!2d106.86915197481105!3d-6.3208058618512855!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69ed0c8e2945cf%3A0x532ab84fc45f49c6!2sPenerbit%20Erlangga!5e0!3m2!1sen!2sid!4v1791865021196!5m2!1sen!2sid'
-const channels = [
-  { name: 'Kantor pusat', icon: 'location', value: address, wide: true },
-  {
-    name: 'Email',
-    icon: 'email',
-    value: 'info@erlangga.co.id',
-    href: 'mailto:info@erlangga.co.id',
-  },
-  { name: 'Telepon', icon: 'phone', value: '(021) 871 7006', href: 'tel:+62218717006' },
-  { name: 'Fax', icon: 'fax', value: '(021) 877 946 09' },
-  { name: 'Hotline', icon: 'hotline', value: '1500-885', href: 'tel:1500885' },
-  {
-    name: 'WhatsApp',
-    icon: 'whatsapp',
-    value: '08191-1500-885',
-    href: 'https://wa.me/6281911500885',
-    wide: true,
-  },
-]
-const hours = [
-  { day: 'Senin – Jumat', time: '08.00 – 17.00 WIB', icon: 'clock' },
-  { day: 'Sabtu', time: '08.00 – 13.00 WIB', icon: 'saturday' },
-]
+const {
+  data: contact,
+  error,
+  refresh,
+} = await useFetch('/api/catalog/contact', { key: 'contact-page' })
+const mapsUrl = computed(
+  () =>
+    'https://www.google.com/maps/search/?api=1&query=' +
+    encodeURIComponent((contact.value?.officeName ?? '') + ' ' + (contact.value?.address ?? '')),
+)
+const channels = computed(() => {
+  const content = contact.value
+  if (!content) return []
+  return [
+    { name: 'Kantor pusat', icon: 'location', value: content.address, wide: true, href: undefined },
+    { name: 'Email', icon: 'email', value: content.email, href: 'mailto:' + content.email },
+    ...content.phones.map((phone) => ({
+      name: phone.label,
+      icon: 'phone',
+      value: phone.number,
+      href: contactPhoneHref(phone.number),
+    })),
+    { name: 'Fax', icon: 'fax', value: content.fax, href: undefined },
+    {
+      name: 'Hotline',
+      icon: 'hotline',
+      value: content.hotline,
+      href: contactPhoneHref(content.hotline),
+    },
+    {
+      name: 'WhatsApp',
+      icon: 'whatsapp',
+      value: content.whatsapp,
+      href: contactWhatsappHref(content.whatsapp),
+      wide: true,
+    },
+  ]
+})
 </script>
 
 <template>
-  <div class="contact-page">
+  <div
+    v-if="error"
+    role="alert"
+    class="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-900"
+  >
+    <h1 class="text-xl font-semibold">Halaman Kontak belum dapat dimuat.</h1>
+    <p class="my-3">Silakan coba lagi. Jika tetap gagal, hubungi pengelola.</p>
+    <UButton variant="outline" @click="refresh()">Coba lagi</UButton>
+  </div>
+  <div v-else-if="contact" class="contact-page">
     <header class="contact-heading">
       <span class="section-badge">Informasi Kontak</span>
-      <h1>Berbagai cara untuk <span>terhubung dengan kami</span></h1>
-      <p>
-        Pilih saluran komunikasi yang paling nyaman untuk Anda. Tim kami siap membantu pertanyaan
-        seputar buku dan pemesanan.
-      </p>
+      <h1>
+        {{ contact.heading }} <span>{{ contact.headingHighlight }}</span>
+      </h1>
+      <p>{{ contact.description }}</p>
     </header>
     <section class="contact-grid" aria-label="Saluran komunikasi dan lokasi kantor">
       <div class="contact-channels">
         <component
           :is="item.href ? 'a' : 'div'"
-          v-for="item in channels"
-          :key="item.name"
+          v-for="(item, index) in channels"
+          :key="index"
           :href="item.href"
           class="contact-card"
           :class="{ 'wide-card': item.wide, 'linked-card': item.href }"
@@ -65,8 +86,8 @@ const hours = [
       <div class="location-card">
         <div class="location-map">
           <iframe
-            :src="mapEmbedUrl"
-            title="Peta lokasi Kantor Pusat Erlangga"
+            :src="contact.mapEmbedUrl"
+            :title="'Peta lokasi ' + contact.officeName"
             width="600"
             height="450"
             allowfullscreen
@@ -79,8 +100,8 @@ const hours = [
             ><img src="/images/contact/location.svg" alt="" width="20" height="20"
           /></span>
           <div>
-            <h2>Kantor Pusat Erlangga</h2>
-            <p>{{ address }}</p>
+            <h2>{{ contact.officeName }}</h2>
+            <p>{{ contact.address }}</p>
           </div>
           <a :href="mapsUrl" target="_blank" rel="noopener noreferrer" class="maps-link"
             >Buka di Google Maps<span class="sr-only"> (tab baru)</span></a
@@ -90,19 +111,22 @@ const hours = [
     </section>
     <section class="opening-hours" aria-labelledby="hours-heading">
       <span class="section-badge">Jam Operasional</span>
-      <h2 id="hours-heading">Kami siap melayani <span>setiap hari kerja</span></h2>
-      <p>
-        Tim dukungan kami aktif menerima pertanyaan dan keluhan melalui berbagai saluran komunikasi
-        yang tersedia.
-      </p>
+      <h2 id="hours-heading">
+        {{ contact.hoursHeading }} <span>{{ contact.hoursHighlight }}</span>
+      </h2>
+      <p>{{ contact.hoursDescription }}</p>
       <div class="hours-grid">
-        <div v-for="item in hours" :key="item.day" class="hours-card">
+        <div v-for="(item, index) in contact.hours" :key="index" class="hours-card">
           <span class="hours-icon"
-            ><img :src="`/images/contact/${item.icon}.svg`" alt="" width="20" height="20"
+            ><img
+              :src="`/images/contact/${index === 0 ? 'clock' : 'saturday'}.svg`"
+              alt=""
+              width="20"
+              height="20"
           /></span>
           <h3>{{ item.day }}</h3>
           <p>{{ item.time }}</p>
-          <span>Siap melayani Anda</span>
+          <span>{{ item.note }}</span>
         </div>
       </div>
     </section>

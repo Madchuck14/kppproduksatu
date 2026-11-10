@@ -1,16 +1,57 @@
-# Model akses saat ini: publik dan Editor
+# Model akses saat ini: publik, Sales, dan Editor
 
-Katalog dan seluruh materi buku published terbuka tanpa akun. Satu-satunya role aplikasi
-adalah Editor; Editor biasa dibatasi jenjang untuk CRUD dan Editor super memiliki akses
-penuh. Favorit hanya untuk Editor, dengan tombol/navigasi yang tidak dirender bagi publik,
-guard route, validasi session server, dan RLS pemilik + membership Editor. Tidak ada
-pendaftaran akun umum. URL `/register` lama mengalihkan ke login Editor; login default
-menuju `/admin`, tujuan buku/Favorit yang tervalidasi tetap dihormati.
+**Struktur Produk:** hierarki `product_structure_nodes` terpisah dari klasifikasi buku.
+Editor super mengelola `/admin/struktur-produk`; cabang aktif dibaca publik. Satu posisi
+buku disimpan melalui `products.structure_node_id` nullable. Jalur dihitung dari hierarki
+aktif, dipakai pada detail SSR dan `/struktur-produk`, sehingga rename/reparent tidak
+memerlukan penyalinan path ke buku. Server/RLS memisahkan kelola struktur dari CRUD buku
+Editor per jenjang. Trigger dan pengunci transaksi bersama mencegah siklus, pilihan salah
+jenjang/arsip, dan arsip subtree yang masih dirujuk buku draf/published. Lihat
+[arsitektur dan batas verifikasi Struktur Produk](product-structure.md).
 
-Migration `202610160003_editor_only_favorites.sql` mempertahankan baris akun legacy dan
-favorit untuk rollback, tetapi mencabut akses aplikasinya. Provisioning hanya membuat
-Editor. Ketentuan historis tentang Sales, registrasi, atau favorit akun umum di bawah
-sudah digantikan. Ikuti urutan rollout/rollback di [panduan Supabase](supabase.md#transisi-akun-hanya-editor-16-oktober-2026).
+**Area Sales, 10 November 2026:** setelah kredensial NIP terverifikasi, Sales mengisi
+1–10 area bebas sebelum melanjutkan dari halaman login. `account_memberships.sales_areas`
+menyimpan label profil; `/api/auth/session` mengembalikannya sebagai `salesAreas` dan
+`PUT /api/auth/sales-areas` hanya mengizinkan Sales memperbarui areanya sendiri. RLS serta
+privilege kolom melindungi role/status super dan akun lain. Area ditampilkan sebagai teks
+pada navigasi, dapat diubah ulang, dan tidak dipakai sebagai syarat akses. Editor tidak
+mengikuti langkah area. Data saat ini diisi pengguna; integrasi sumber resmi tim IT belum
+dibuat. Terapkan `202611100004_sales_areas.sql` sebelum deploy. Lihat [rollout area](supabase.md#area-sales-yang-diisi-pengguna).
+
+**Sumber izin aktif, 10 November 2026:** `account_memberships` menetapkan role/status
+super dan `editor_scopes` menetapkan jenjang Editor. `employee_registry` menetapkan NIP
+serta role/jenjang awal saat registrasi. Endpoint admin kompatibilitas kini memeriksa
+Editor super dari membership, tanpa tabel admin terpisah. Migration
+`202611100001_retire_admin_memberships.sql` memindahkan tabel admin lama ke schema arsip
+privat; tidak mempromosikan akun atau mengubah izin existing. Ikuti [rollout akses](nip-auth.md#sumber-hak-akses-aktif-10-november-2026).
+
+**Pembaruan NIP, 10 November 2026:** daftar/login menggunakan NIP + kata sandi tanpa email.
+Server mencocokkan NIP, role, dan jenjang pada registry pegawai yang diisi pengelola.
+Trigger mengikat akun dan membership/scope secara atomik; Editor tidak dapat memilih hak
+di luar registry. Runtime Auth admin memakai key server saja. Akun lama dipetakan melalui
+user ID, tanpa menghapus Favorit atau mengganti password. Lihat [arsitektur dan rollout NIP](nip-auth.md).
+Paragraf pendaftaran email berikut adalah riwayat sebelum migration NIP.
+
+Pendaftaran menyediakan Sales atau Editor. Editor memilih satu jenjang SD, SMP, SMA,
+atau SMK dan langsung memperoleh membership Editor biasa serta scope tersebut saat signup.
+Tidak ada persetujuan atau pilihan Editor super. Supabase Auth tetap menangani konfirmasi
+email sebelum login bila diaktifkan. Dashboard dan CRUD dibatasi role serta scope server/RLS.
+
+Endpoint server memvalidasi role dan jenjang memakai Zod. Trigger Auth memvalidasi ulang
+pilihan, menyimpan membership dengan is_super=false, serta membuat satu scope Editor secara
+atomik. Client tidak memiliki hak tulis membership/scope. Field metadata super atau daftar
+jenjang tambahan tidak dipakai; perubahan metadata setelah signup tidak mengubah hak akses.
+Provisioning server tetap tersedia untuk Editor super dan perubahan hak oleh pengelola.
+
+Sales dan Editor dapat memakai Favorit pribadi. Katalog serta materi published tetap publik.
+Login tanpa tujuan mengarah ke katalog untuk Sales dan dashboard untuk Editor. Tujuan buku
+atau Favorit yang tervalidasi dipertahankan melalui tautan daftar/login. Registrasi memakai
+public key di server, tidak mengganti session aktif dan tidak mengembalikan token.
+
+Terapkan migration sampai `202611040003_direct_editor_registration.sql` sebelum deploy.
+Tabel pengajuan dan migration persetujuan lama hanya riwayat; aplikasi tidak memakainya dan
+RPC review dicabut. Akun/scope lama tidak diubah otomatis. Lihat [rollout pendaftaran langsung](supabase.md#pendaftaran-editor-langsung-per-jenjang-4-november-2026).
+Catatan historis tentang persetujuan, signup ditutup, atau Editor-only di bawah sudah digantikan.
 
 ## Akses Dummy Buku publik
 
@@ -249,7 +290,8 @@ Tabel `categories` serta `products.category_id` lama dipertahankan sementara unt
 schema dan rollback, tetapi tidak dibaca atau ditulis aplikasi.
 
 Session diverifikasi dengan `auth.getUser()` pada server. Endpoint lama `/api/admin/session`
-tetap memakai `requireAdmin`. Dashboard dan endpoint buku memakai `requireEditor` serta membership
+memakai `requireAdmin` yang memeriksa role Editor super dari `account_memberships`.
+Dashboard dan endpoint buku memakai `requireEditor` serta membership
 tepercaya dan scope, bukan metadata pengguna. RLS memeriksa jenjang asal dan tujuan perubahan.
 Daftar Editor tidak mencakup buku di luar scope meskipun buku published dapat dibaca publik.
 
@@ -456,7 +498,28 @@ Alamat, telepon (021) 8717006, fax (021) 87794609, hotline 1500-885, dan WhatsAp
 08191-1500-885 mengikuti [kontak kantor pusat resmi](https://www2.erlangga.co.id/kontak/kantor-pusat.html).
 Email info@erlangga.co.id mengikuti [situs Erlangga saat ini](https://erlangga.co.id/).
 Tautan email, telepon, hotline, dan WhatsApp memakai tujuan nyata. Jam operasional masih
-mengikuti desain dan belum dikonfirmasi sumber resmi. Halaman tidak mengirim pesan atau menyimpan data.
+mengikuti desain dan belum dikonfirmasi sumber resmi. Nilai tersebut menjadi konten awal
+migration `202611100002_contact_page.sql`. Halaman tidak mengirim pesan.
+
+Tombol **Atur Halaman Kontak** hanya tersedia pada dashboard Editor super. Modal memuat
+konten terbaru, memvalidasi input, mempertahankan perubahan bila penyimpanan gagal, dan
+memberi konfirmasi berhasil. `GET /api/catalog/contact` membaca konten publik untuk SSR;
+`GET/PUT /api/admin/contact` memeriksa `requireSuperEditor` sebelum membaca/menulis.
+Repository memakai client anonim saat membaca dan sesi pengguna saat menyimpan, tanpa
+service-role key. Singleton `contact_page` menyimpan JSON tervalidasi dengan public SELECT
+dan UPDATE khusus role Editor + `is_super=true` melalui RLS. Editor biasa dan Sales tidak
+dapat mengubah konten lewat API atau akses database langsung. Data Supabase yang gagal
+dimuat menghasilkan error, tanpa fallback ke demo; demo memakai konten awal dan tidak
+menyediakan penyimpanan. Semua teks dirender sebagai teks biasa. URL iframe hanya menerima
+sematan HTTPS `www.google.com/maps/embed`; tautan telepon/WhatsApp dibentuk dari nomor.
+
+Migration `202611100003_contact_phones.sql` menambahkan kolom JSON `contact_page.phones`
+berupa daftar 1–10 pasangan label/nomor. Modal menyediakan tanda pengenal, tambah, dan
+hapus nomor; halaman publik menampilkan tiap nomor sebagai kartu dengan labelnya.
+Nomor lama tetap berada di `content.phone` dan dibaca sebagai label Telepon bila kolom
+baru NULL. Saat menyimpan, repository memperbarui daftar dan nomor pertama legacy dalam
+satu operasi. JSON konten lama dan CHECK sebelumnya tetap dipertahankan; RLS Editor super
+mencakup kolom baru. Rollback aplikasi tidak memerlukan penghapusan kolom/data.
 
 ## Keunggulan buku
 

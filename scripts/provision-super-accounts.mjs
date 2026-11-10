@@ -6,6 +6,10 @@ import { z } from 'zod'
 const levels = ['SD', 'SMP', 'SMA', 'SMK']
 class ProvisioningError extends Error {}
 const accountSchema = z.object({
+  nip: z
+    .string()
+    .trim()
+    .regex(/^\d{1,32}$/),
   email: z.string().trim().email(),
   password: z.string().min(8).max(128),
   role: z.literal('editor'),
@@ -25,6 +29,7 @@ async function main() {
   const accounts = [
     {
       role: 'editor',
+      nip: process.env.SUPER_ACCOUNT_EDITOR_NIP || '000000000',
       email: process.env.SUPER_ACCOUNT_EDITOR_EMAIL,
       password: process.env.SUPER_ACCOUNT_EDITOR_PASSWORD,
     },
@@ -39,11 +44,11 @@ async function main() {
       fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(20000) }),
     },
   })
-  for (const table of ['account_memberships', 'editor_scopes', 'admin_memberships']) {
+  for (const table of ['account_memberships', 'editor_scopes', 'employee_registry']) {
     const { error } = await client.from(table).select('user_id').limit(0)
     if (error)
       throw new ProvisioningError(
-        'Tabel akses belum siap. Jalankan migration 202610050001_account_access.sql.',
+        'Tabel akses belum siap. Jalankan migration sampai 202611060001_employee_nip_auth.sql.',
       )
   }
   const existingUsers = []
@@ -57,6 +62,29 @@ async function main() {
     )
     if (data.users.length < 100 || existingUsers.length === accounts.length) break
   }
+  for (const account of accounts) {
+    const existing = existingUsers.find(
+      (user) => user.email?.toLowerCase() === account.email.toLowerCase(),
+    )
+    const { data: registry, error } = await client
+      .from('employee_registry')
+      .select('user_id')
+      .eq('nip', account.nip)
+      .maybeSingle()
+    if (error) fail('Pemeriksaan NIP', error)
+    if (registry?.user_id && registry.user_id !== existing?.id)
+      throw new ProvisioningError('NIP sudah terhubung dengan akun lain. Tidak ada akun diubah.')
+    if (existing) {
+      const { data: linked, error: linkedError } = await client
+        .from('employee_registry')
+        .select('nip')
+        .eq('user_id', existing.id)
+        .maybeSingle()
+      if (linkedError) fail('Pemeriksaan hubungan NIP', linkedError)
+      if (linked && linked.nip !== account.nip)
+        throw new ProvisioningError('Akun sudah terhubung dengan NIP lain. Tidak ada akun diubah.')
+    }
+  }
   if (process.argv.includes('--check')) {
     console.log('Konfigurasi, akses admin, kredensial, dan tabel siap. Belum ada akun diubah.')
     return
@@ -65,12 +93,38 @@ async function main() {
     const existing = existingUsers.find(
       (user) => user.email?.toLowerCase() === account.email.toLowerCase(),
     )
-    const attributes = { email: account.email, password: account.password, email_confirm: true }
+    const attributes = {
+      email: account.email,
+      password: account.password,
+      email_confirm: true,
+      app_metadata: { employee_provisioning: true },
+    }
     const result = existing
       ? await client.auth.admin.updateUserById(existing.id, attributes)
       : await client.auth.admin.createUser(attributes)
     if (result.error || !result.data.user) fail(`Pembuatan akun ${account.role}`, result.error)
     const userId = result.data.user.id
+    // Ignore duplicate NIP rows rather than overwriting a concurrent operator's link.
+    const { error: registryError } = await client
+      .from('employee_registry')
+      .upsert(
+        { nip: account.nip, user_id: userId, role: 'editor', education_level: 'SD' },
+        { onConflict: 'nip', ignoreDuplicates: true },
+      )
+    if (registryError) fail('Pengaitan NIP', registryError)
+    const { error: linkError } = await client
+      .from('employee_registry')
+      .update({ user_id: userId })
+      .eq('nip', account.nip)
+      .is('user_id', null)
+    if (linkError) fail('Pengaitan NIP kosong', linkError)
+    const { data: registry, error: registryReadError } = await client
+      .from('employee_registry')
+      .select('user_id')
+      .eq('nip', account.nip)
+      .single()
+    if (registryReadError || registry?.user_id !== userId)
+      fail('Pengaitan NIP (data berubah; periksa hubungan akun lalu ulangi)', registryReadError)
     const { error: membershipError } = await client
       .from('account_memberships')
       .upsert({ user_id: userId, role: account.role, is_super: true }, { onConflict: 'user_id' })
@@ -81,10 +135,6 @@ async function main() {
         { onConflict: 'user_id,education_level' },
       )
       if (scopeError) fail('Penetapan empat jenjang Editor', scopeError)
-      const { error: adminError } = await client
-        .from('admin_memberships')
-        .upsert({ user_id: userId }, { onConflict: 'user_id' })
-      if (adminError) fail('Penetapan admin Editor super', adminError)
     }
     const verification = createClient(url, process.env.NUXT_PUBLIC_SUPABASE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -111,15 +161,13 @@ async function main() {
         levels.some((level) => !scopes.some((scope) => scope.education_level === level)))
     )
       fail(`Verifikasi scope ${account.role}`, scopesError)
-    const { data: admin, error: adminReadError } = await verification
-      .from('admin_memberships')
-      .select('user_id')
+    const { data: employee, error: employeeError } = await verification
+      .from('employee_registry')
+      .select('nip')
       .eq('user_id', userId)
-    if (adminReadError || admin.length !== 1)
-      fail(`Verifikasi batas admin ${account.role}`, adminReadError)
-    console.log(
-      `Akun super ${account.role} siap; login, role, scope, dan batas admin terverifikasi.`,
-    )
+      .single()
+    if (employeeError || employee?.nip !== account.nip) fail('Verifikasi NIP', employeeError)
+    console.log(`Akun super ${account.role} siap; login, role super, scope, dan NIP terverifikasi.`)
   }
 }
 

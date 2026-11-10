@@ -63,6 +63,7 @@ export const bookInputSchema = z
       .trim()
       .regex(/^\d{1,50}$/, 'Kode buku wajib diisi dengan angka, maksimal 50 digit.'),
     educationLevel: educationLevelSchema,
+    structureNodeId: z.string().uuid().nullable().optional(),
     divisionCode: divisionCodeSchema.nullable().default(null),
     grade: z.number().int().min(1).max(12).nullable().optional(),
     subject: bookSubjectSchema.nullable().default(null),
