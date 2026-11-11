@@ -6,9 +6,9 @@ import {
   type ContactPage,
 } from '#shared/schemas/contact-page'
 
-const dialog = useTemplateRef<HTMLDialogElement>('dialog')
+const manager = useTemplateRef<HTMLElement>('manager')
 const form = ref<ContactPage>(structuredClone(defaultContactPage))
-const loading = ref(false)
+const loading = ref(true)
 const saving = ref(false)
 const ready = ref(false)
 const failure = ref('')
@@ -71,15 +71,12 @@ async function load() {
     loading.value = false
   }
 }
-function open() {
-  dialog.value?.showModal()
-  void load()
-}
+onMounted(load)
 async function addPhone() {
   if (saving.value || form.value.phones.length >= maxContactPhones) return
   form.value.phones.push({ label: '', number: '' })
   await nextTick()
-  dialog.value
+  manager.value
     ?.querySelector<HTMLInputElement>(`#contact-phone-label-${form.value.phones.length - 1}`)
     ?.focus()
 }
@@ -110,26 +107,12 @@ async function save() {
 </script>
 
 <template>
-  <UButton type="button" class="contact-manager-button" @click="open">Atur Halaman Kontak</UButton>
-  <dialog
-    ref="dialog"
-    class="contact-dialog"
-    aria-labelledby="contact-manager-title"
-    @cancel="saving ? $event.preventDefault() : null"
-  >
+  <section ref="manager" class="contact-page" aria-labelledby="contact-manager-title">
     <header class="dialog-heading">
       <div>
-        <h2 id="contact-manager-title">Atur Halaman Kontak</h2>
+        <h1 id="contact-manager-title">Atur Halaman Kontak</h1>
         <p>Informasi yang disimpan langsung tampil pada halaman Kontak publik.</p>
       </div>
-      <button
-        type="button"
-        aria-label="Tutup pengaturan kontak"
-        :disabled="saving"
-        @click="dialog?.close()"
-      >
-        ×
-      </button>
     </header>
     <p v-if="loading" role="status">Memuat informasi kontak...</p>
     <div v-else-if="!ready">
@@ -242,45 +225,27 @@ async function save() {
       <p v-if="failure" role="alert" class="failure">{{ failure }}</p>
       <p v-if="message" role="status" class="success">{{ message }}</p>
       <footer class="dialog-actions">
-        <UButton color="neutral" variant="outline" :disabled="saving" @click="dialog?.close()">{{
-          message && !dirty ? 'Selesai' : 'Batal'
-        }}</UButton>
+        <UButton type="button" color="neutral" variant="outline" :disabled="saving" @click="load"
+          >Batalkan perubahan</UButton
+        >
         <UButton type="submit" :loading="saving" :disabled="saving || !dirty"
           >Simpan perubahan</UButton
         >
       </footer>
     </form>
-  </dialog>
+  </section>
 </template>
 
 <style scoped>
-.contact-manager-button {
-  min-height: 44px;
-  padding: 10px 18px;
-  border: 1px solid #1f5c3f;
-  border-radius: 12px;
-  background: white;
-  color: #1f5c3f;
-  font-size: 15px;
-  font-weight: 500;
-}
-.contact-manager-button:hover {
-  background: #f4f8f5;
-}
-.contact-dialog {
-  width: min(860px, calc(100% - 32px));
-  max-height: 90dvh;
-  margin: auto;
+.contact-page {
+  width: 100%;
+  margin-top: 20px;
   padding: 28px;
-  overflow-y: auto;
   border: 1px solid #e6e8e4;
   border-radius: 20px;
   background: white;
   color: #222;
   color-scheme: light;
-}
-.contact-dialog::backdrop {
-  background: rgb(0 0 0 / 40%);
 }
 .dialog-heading {
   display: flex;
@@ -289,7 +254,7 @@ async function save() {
   gap: 16px;
   margin-bottom: 24px;
 }
-.dialog-heading h2 {
+.dialog-heading h1 {
   font-size: 24px;
   font-weight: 600;
 }
@@ -299,11 +264,6 @@ async function save() {
   color: #6b6f6b;
   font-size: 13px;
   line-height: 1.6;
-}
-.dialog-heading button {
-  flex: 0 0 40px;
-  min-height: 40px;
-  font-size: 28px;
 }
 fieldset {
   margin-top: 20px;
@@ -380,7 +340,7 @@ button:focus-visible {
   border-top: 1px solid #e6e8e4;
 }
 @media (max-width: 600px) {
-  .contact-dialog {
+  .contact-page {
     padding: 20px 16px;
   }
   .fields-grid {

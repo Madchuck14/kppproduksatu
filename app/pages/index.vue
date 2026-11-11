@@ -270,12 +270,24 @@ async function searchCatalog() {
         <span class="level-filter-value" aria-hidden="true">
           {{ level || 'Semua Jenjang' }}
         </span>
-        <select id="landing-level" v-model="level" name="level">
-          <option value="">Semua Jenjang</option>
-          <option v-for="item in educationLevelSchema.options" :key="item" :value="item">
-            {{ item }}
-          </option>
-        </select>
+        <USelect
+          id="landing-level"
+          :model-value="level || 'all'"
+          :items="[
+            { label: 'Semua Jenjang', value: 'all' },
+            ...schoolLevels.map((item) => ({ label: item, value: item })),
+          ]"
+          variant="none"
+          :trailing="false"
+          :content="{ position: 'popper', align: 'start', sideOffset: 0 }"
+          class="level-menu-trigger"
+          :ui="{
+            content: 'min-w-[200px] rounded-xl border-0 text-[#344e41] ring-0',
+          }"
+          @update:model-value="level = $event === 'all' ? '' : $event"
+        >
+          <span class="sr-only">{{ level || 'Semua Jenjang' }}</span>
+        </USelect>
         <img src="/images/landing/chevron.svg" alt="" width="14" height="14" />
       </div>
       <div class="search-filter">
@@ -292,10 +304,11 @@ async function searchCatalog() {
           :open-on-focus="false"
           :open-on-click="false"
           :reset-model-value-on-clear="true"
+          :content="{ sideOffset: 0 }"
           :ui="{
             root: 'w-full',
             base: 'w-full rounded-none bg-transparent p-0 text-[13px] leading-4 text-[#344e41] placeholder:text-[#9bafa3]',
-            content: 'w-80 max-w-[calc(100vw-2rem)]',
+            content: 'w-80 max-w-[calc(100vw-2rem)] rounded-xl border-0 ring-0',
           }"
           @update:model-value="subject = $event ?? ''"
           @update:open="subjectOpen = $event"
@@ -558,7 +571,7 @@ async function searchCatalog() {
   text-transform: uppercase;
   color: #687169;
 }
-.search-filter select {
+.level-filter :deep(.level-menu-trigger) {
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -570,10 +583,6 @@ async function searchCatalog() {
   appearance: none;
   background: transparent;
   cursor: pointer;
-}
-.search-filter select option {
-  color: #344e41;
-  background: white;
 }
 .level-filter-value {
   display: block;
@@ -977,7 +986,7 @@ async function searchCatalog() {
   box-shadow: inset 0 0 0 1px #2f6b4f;
 }
 .search-input input:focus-visible,
-.search-filter select:focus-visible {
+.level-filter :deep(.level-menu-trigger:focus-visible) {
   outline: none;
 }
 .search-submit:focus-visible {

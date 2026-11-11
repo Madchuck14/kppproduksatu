@@ -1,16 +1,14 @@
 <script setup lang="ts">
-import ContactPageManager from '~/components/ContactPageManager.vue'
-import { editorQuerySchema, maxFeaturedBooks } from '#shared/schemas/editor'
+import { editorQuerySchema } from '#shared/schemas/editor'
 import type { BookSubject } from '#shared/utils/book-subjects'
 import { getProductPath } from '#shared/utils/product-path'
 import { educationLevelSchema } from '#shared/schemas/auth'
-import type { EditorBook, FeaturedBookOption, FeaturedBooksPage } from '#shared/types/editor'
-import { defaultLandingHero, landingHeroSchema } from '#shared/schemas/landing-hero'
+import type { EditorBook } from '#shared/types/editor'
 
 definePageMeta({ middleware: 'admin' })
 useSeoMeta({ title: 'Dashboard Editor', robots: 'noindex, nofollow' })
 const route = useRoute()
-const { divisions: bookDivisions, subjectsForLevel } = await useClassifications()
+const { subjectsForLevel } = await useClassifications()
 const filters = computed(() => {
   const parsed = editorQuerySchema.safeParse(route.query)
   return parsed.success ? parsed.data : editorQuerySchema.parse({})
@@ -58,123 +56,6 @@ const deleteTarget = ref<EditorBook | null>(null)
 const confirmation = ref('')
 const message = ref('')
 const deleteDialog = useTemplateRef('deleteDialog')
-const featuredDialog = useTemplateRef<HTMLDialogElement>('featuredDialog')
-const featuredSearch = ref('')
-const featuredBooks = ref<FeaturedBookOption[]>([])
-const featuredBookIds = ref<string[]>([])
-const originalFeaturedBookIds = ref<string[]>([])
-const featuredTotal = ref(0)
-const featuredCount = ref(0)
-const featuredPage = ref(1)
-const featuredLoading = ref(false)
-const featuredSaving = ref(false)
-const featuredError = ref('')
-const featuredReady = ref(false)
-const hero = reactive({ ...defaultLandingHero })
-const originalHero = ref({ ...defaultLandingHero })
-const featuredPageCount = computed(() => Math.max(1, Math.ceil(featuredTotal.value / 12)))
-const featuredCountOutsideScope = computed(() =>
-  Math.max(0, featuredCount.value - originalFeaturedBookIds.value.length),
-)
-const hasFeaturedChanges = computed(
-  () =>
-    hero.heading !== originalHero.value.heading ||
-    hero.body !== originalHero.value.body ||
-    featuredBookIds.value.length !== originalFeaturedBookIds.value.length ||
-    featuredBookIds.value.some((id) => !originalFeaturedBookIds.value.includes(id)),
-)
-function featuredRequestError(error: unknown, fallback: string) {
-  const response = error as { data?: { statusMessage?: string }; statusMessage?: string }
-  return response.data?.statusMessage ?? response.statusMessage ?? fallback
-}
-async function loadFeaturedBooks(page = 1, initialize = !featuredReady.value) {
-  featuredLoading.value = true
-  featuredError.value = ''
-  try {
-    const result = await $fetch<FeaturedBooksPage>('/api/admin/featured-books', {
-      query: { q: featuredSearch.value.trim(), page },
-    })
-    featuredBooks.value = result.books
-    featuredTotal.value = result.total
-    featuredPage.value = result.page
-    if (initialize) {
-      Object.assign(hero, result.hero)
-      originalHero.value = { ...result.hero }
-      featuredReady.value = true
-      featuredBookIds.value = [...result.selectedIds]
-      originalFeaturedBookIds.value = [...result.selectedIds]
-      featuredCount.value = result.selectedCount
-    }
-  } catch (error) {
-    featuredError.value = featuredRequestError(
-      error,
-      'Daftar buku pilihan gagal dimuat. Silakan coba lagi.',
-    )
-  } finally {
-    featuredLoading.value = false
-  }
-}
-function openFeaturedBooksDialog() {
-  if (!data.value?.account.isSuper) return
-  featuredReady.value = false
-  featuredSearch.value = ''
-  featuredBookIds.value = []
-  originalFeaturedBookIds.value = []
-  featuredCount.value = 0
-  featuredTotal.value = 0
-  featuredPage.value = 1
-  featuredError.value = ''
-  featuredDialog.value?.showModal()
-  void loadFeaturedBooks(1, true)
-}
-function toggleFeaturedBook(book: FeaturedBookOption, event: Event) {
-  const input = event.target
-  if (!(input instanceof HTMLInputElement)) return
-  const selected = featuredBookIds.value.includes(book.id)
-  if (input.checked && !selected) {
-    if (featuredBookIds.value.length + featuredCountOutsideScope.value >= maxFeaturedBooks) {
-      input.checked = false
-      return
-    }
-    featuredBookIds.value = [...featuredBookIds.value, book.id]
-  } else if (!input.checked && selected) {
-    featuredBookIds.value = featuredBookIds.value.filter((id) => id !== book.id)
-  }
-}
-async function saveFeaturedSelection() {
-  if (!data.value?.account.isSuper) return
-  if (featuredSaving.value || !featuredReady.value || !hasFeaturedChanges.value) return
-  const parsedHero = landingHeroSchema.safeParse(hero)
-  if (!parsedHero.success) {
-    featuredError.value = parsedHero.error.issues[0]?.message ?? 'Teks hero tidak valid.'
-    return
-  }
-  featuredSaving.value = true
-  featuredError.value = ''
-  try {
-    await $fetch('/api/admin/featured-books', {
-      method: 'PUT',
-      body: { bookIds: featuredBookIds.value, hero: parsedHero.data },
-    })
-  } catch (error) {
-    featuredError.value = featuredRequestError(
-      error,
-      'Buku pilihan gagal diperbarui. Silakan coba lagi.',
-    )
-    featuredSaving.value = false
-    return
-  }
-  featuredDialog.value?.close()
-  message.value = 'Buku pilihan dan teks hero berhasil diperbarui.'
-  featuredSaving.value = false
-  try {
-    await refresh()
-    if (error.value)
-      message.value = 'Buku pilihan tersimpan, tetapi daftar dashboard belum dapat dimuat ulang.'
-  } catch {
-    message.value = 'Buku pilihan tersimpan, tetapi daftar dashboard belum dapat dimuat ulang.'
-  }
-}
 function confirmDelete(book: EditorBook) {
   deleteTarget.value = book
   confirmation.value = ''
@@ -205,372 +86,225 @@ const fieldClass =
 
 <template>
   <section class="editor-dashboard">
-    <div class="dashboard-heading">
-      <div>
-        <p class="dashboard-eyebrow">Ruang Kerja Editorial</p>
-        <h1>Dashboard Editor</h1>
-        <p class="dashboard-description">
-          Kelola informasi buku agar pengunjung mendapatkan katalog yang tepat.
-        </p>
-      </div>
-      <div class="dashboard-header-actions">
-        <ClassificationManager v-if="data?.account.isSuper" :levels="levels" />
-        <ContactPageManager v-if="data?.account.isSuper" />
-        <UButton
-          v-if="data?.account.isSuper"
-          to="/admin/struktur-produk"
-          class="featured-manager-button"
-          >Kelola Struktur Produk</UButton
-        >
-        <UButton
-          v-if="data?.account.isSuper"
-          type="button"
-          class="featured-manager-button"
-          @click="openFeaturedBooksDialog"
-          >Atur Buku Pilihan</UButton
-        >
-        <UButton to="/admin/books/new" class="dashboard-primary" :disabled="!levels.length"
-          >Tambah buku</UButton
-        >
-      </div>
-    </div>
-    <div v-if="error" role="alert" class="dashboard-error">
-      <p class="font-semibold">Dashboard belum dapat dimuat.</p>
-      <p>
-        Coba muat ulang. Jika tetap gagal, hubungi pengelola untuk memeriksa akses dan kesiapan
-        katalog.
-      </p>
-      <UButton variant="outline" @click="refresh()">Coba lagi</UButton>
-    </div>
-    <template v-else-if="data">
-      <div class="dashboard-access">
+    <div class="dashboard-content">
+      <div class="dashboard-heading">
         <div>
-          <p class="access-title">{{ data.account.isSuper ? 'Editor super' : 'Editor' }}</p>
-          <p>
-            {{
-              data.account.isSuper
-                ? 'Akses seluruh jenjang pendidikan'
-                : 'Jenjang yang dapat Anda kelola'
-            }}
+          <p class="dashboard-eyebrow">Ruang Kerja Editorial</p>
+          <h1>Dashboard Editor</h1>
+          <p class="dashboard-description">
+            Rawat informasi buku agar tim Sales selalu membawa katalog yang tepat.
           </p>
         </div>
-        <div class="access-levels">
-          <span v-for="item in levels" :key="item">{{ item }}</span>
-          <p v-if="!levels.length">Belum ada jenjang. Hubungi pengelola.</p>
+        <div class="dashboard-header-actions">
+          <UButton to="/admin/books/new" class="dashboard-primary" :disabled="!levels.length"
+            >+ Tambah buku</UButton
+          >
         </div>
       </div>
-      <dl class="dashboard-stats">
-        <div
-          v-for="stat in [
-            { label: 'Total buku', value: data.stats.total },
-            { label: 'Dipublikasikan', value: data.stats.published },
-            { label: 'Draf', value: data.stats.draft },
-            { label: 'Perlu dilengkapi', value: data.stats.incomplete },
-          ]"
-          :key="stat.label"
-        >
-          <dt>{{ stat.label }}</dt>
-          <dd>{{ stat.value }}</dd>
+      <div v-if="error" role="alert" class="dashboard-error">
+        <p class="font-semibold">Dashboard belum dapat dimuat.</p>
+        <p>
+          Coba muat ulang. Jika tetap gagal, hubungi pengelola untuk memeriksa akses dan kesiapan
+          katalog.
+        </p>
+        <UButton variant="outline" @click="refresh()">Coba lagi</UButton>
+      </div>
+      <template v-else-if="data">
+        <div class="dashboard-access">
+          <div>
+            <p class="access-title">{{ data.account.isSuper ? 'Editor super' : 'Editor' }}</p>
+            <p>
+              {{
+                data.account.isSuper
+                  ? 'Akses seluruh jenjang pendidikan'
+                  : 'Jenjang yang dapat Anda kelola'
+              }}
+            </p>
+          </div>
+          <div class="access-levels">
+            <span v-for="item in levels" :key="item">{{ item }}</span>
+            <p v-if="!levels.length">Belum ada jenjang. Hubungi pengelola.</p>
+          </div>
         </div>
-      </dl>
-      <p v-if="data.stats.incomplete" class="dashboard-warning">
-        {{ data.stats.incomplete }} buku belum memiliki kode atau jenjang. Buka Edit untuk
-        melengkapi sebelum menyimpan perubahan.
-      </p>
-      <p v-if="message && !deleteTarget" role="status" class="dashboard-notice">{{ message }}</p>
-      <p v-else-if="route.query.notice === 'saved'" role="status" class="dashboard-notice">
-        Buku berhasil disimpan.
-      </p>
-      <section class="dashboard-collection" aria-labelledby="collection-title">
-        <h2 id="collection-title">Koleksi buku</h2>
-        <form class="dashboard-filters" @submit.prevent="applyFilters()">
-          <div class="search-field">
-            <label for="editor-search">Cari buku</label>
-            <input
-              id="editor-search"
-              v-model="search"
-              type="search"
-              maxlength="100"
-              placeholder="Judul, kode buku, atau penulis"
-            />
-          </div>
-          <div>
-            <label for="editor-level">Jenjang</label>
-            <select id="editor-level" v-model="level">
-              <option value="">Semua jenjang</option>
-              <option v-for="item in levels" :key="item" :value="item">{{ item }}</option>
-            </select>
-          </div>
-          <div>
-            <label for="editor-subject">Mata pelajaran</label>
-            <select id="editor-subject" v-model="subject">
-              <option value="">Semua mata pelajaran</option>
-              <option v-for="item in subjectOptions" :key="item" :value="item">{{ item }}</option>
-            </select>
-          </div>
-          <div>
-            <label for="editor-status">Status</label>
-            <select id="editor-status" v-model="publication">
-              <option value="all">Semua status</option>
-              <option value="published">Dipublikasikan</option>
-              <option value="draft">Draf</option>
-            </select>
-          </div>
-          <UButton
-            type="submit"
-            class="dashboard-primary filter-submit"
-            :loading="status === 'pending'"
-            >Terapkan</UButton
+        <dl class="dashboard-stats">
+          <div
+            v-for="stat in [
+              { label: 'Total buku', value: data.stats.total },
+              { label: 'Dipublikasikan', value: data.stats.published },
+              { label: 'Draf', value: data.stats.draft },
+              { label: 'Perlu dilengkapi', value: data.stats.incomplete },
+            ]"
+            :key="stat.label"
           >
-        </form>
-        <div
-          class="dashboard-table-scroll"
-          :aria-busy="status === 'pending'"
-          aria-label="Daftar buku"
-        >
-          <table v-if="data.books.length" class="dashboard-table">
-            <colgroup>
-              <col class="column-book" />
-              <col class="column-level" />
-              <col class="column-subject" />
-              <col class="column-price" />
-              <col class="column-division" />
-              <col class="column-materials" />
-              <col class="column-status" />
-              <col class="column-actions" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col">Buku</th>
-                <th scope="col">Jenjang</th>
-                <th scope="col">Mata pelajaran</th>
-                <th scope="col">Harga</th>
-                <th scope="col">Divisi</th>
-                <th scope="col">Materi</th>
-                <th scope="col">Status</th>
-                <th scope="col">Tindakan</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="book in data.books" :key="book.id">
-                <td data-label="Buku">
-                  <div class="dashboard-book">
-                    <img
-                      :src="book.imageUrl"
-                      :alt="`Sampul ${book.title}`"
-                      width="40"
-                      height="60"
-                      loading="lazy"
-                    />
-                    <div>
-                      <NuxtLink :to="`/admin/books/${book.id}`">{{ book.title }}</NuxtLink>
-                      <p>{{ book.bookCode || 'Kode belum diisi' }}</p>
-                      <p v-if="book.featured" class="book-featured">Buku pilihan</p>
+            <dt>{{ stat.label }}</dt>
+            <dd>{{ stat.value }}</dd>
+          </div>
+        </dl>
+        <p v-if="data.stats.incomplete" class="dashboard-warning">
+          {{ data.stats.incomplete }} buku belum memiliki kode atau jenjang. Buka Edit untuk
+          melengkapi sebelum menyimpan perubahan.
+        </p>
+        <p v-if="message && !deleteTarget" role="status" class="dashboard-notice">{{ message }}</p>
+        <p v-else-if="route.query.notice === 'saved'" role="status" class="dashboard-notice">
+          Buku berhasil disimpan.
+        </p>
+        <section class="dashboard-collection" aria-labelledby="collection-title">
+          <h2 id="collection-title">Koleksi buku</h2>
+          <form class="dashboard-filters" @submit.prevent="applyFilters()">
+            <div class="search-field">
+              <label for="editor-search">Cari buku</label>
+              <input
+                id="editor-search"
+                v-model="search"
+                type="search"
+                maxlength="100"
+                placeholder="Judul, kode buku, atau penulis"
+              />
+            </div>
+            <div>
+              <label for="editor-level">Jenjang</label>
+              <select id="editor-level" v-model="level">
+                <option value="">Semua jenjang</option>
+                <option v-for="item in levels" :key="item" :value="item">{{ item }}</option>
+              </select>
+            </div>
+            <div>
+              <label for="editor-subject">Mata pelajaran</label>
+              <select id="editor-subject" v-model="subject">
+                <option value="">Semua mata pelajaran</option>
+                <option v-for="item in subjectOptions" :key="item" :value="item">{{ item }}</option>
+              </select>
+            </div>
+            <div>
+              <label for="editor-status">Status</label>
+              <select id="editor-status" v-model="publication">
+                <option value="all">Semua status</option>
+                <option value="published">Dipublikasikan</option>
+                <option value="draft">Draf</option>
+              </select>
+            </div>
+            <UButton
+              type="submit"
+              class="dashboard-primary filter-submit"
+              :loading="status === 'pending'"
+              >Terapkan</UButton
+            >
+          </form>
+          <div
+            class="dashboard-table-scroll"
+            :aria-busy="status === 'pending'"
+            aria-label="Daftar buku"
+          >
+            <table v-if="data.books.length" class="dashboard-table">
+              <colgroup>
+                <col class="column-book" />
+                <col class="column-level" />
+                <col class="column-subject" />
+                <col class="column-price" />
+                <col class="column-materials" />
+                <col class="column-status" />
+                <col class="column-actions" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th scope="col">Buku</th>
+                  <th scope="col">Jenjang</th>
+                  <th scope="col">Mata pelajaran</th>
+                  <th scope="col">Harga</th>
+                  <th scope="col">Materi</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Tindakan</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="book in data.books" :key="book.id">
+                  <td data-label="Buku">
+                    <div class="dashboard-book">
+                      <img
+                        :src="book.imageUrl"
+                        :alt="`Sampul ${book.title}`"
+                        width="40"
+                        height="60"
+                        loading="lazy"
+                      />
+                      <div>
+                        <NuxtLink :to="`/admin/books/${book.id}`">{{ book.title }}</NuxtLink>
+                        <p>{{ book.bookCode || 'Kode belum diisi' }}</p>
+                        <p v-if="book.featured" class="book-featured">Buku pilihan</p>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td data-label="Jenjang">{{ book.educationLevel || 'Belum diisi' }}</td>
-                <td data-label="Mata pelajaran">{{ book.subject || 'Belum ditentukan' }}</td>
-                <td data-label="Harga" class="book-price">{{ formatPrice(book.price) }}</td>
-                <td data-label="Divisi">
-                  {{
-                    bookDivisions.find((division) => division.code === book.divisionCode)?.name ??
-                    'Belum diisi'
-                  }}
-                </td>
-                <td data-label="Materi">
-                  <div class="material-dots">
-                    <span
-                      v-for="material in [
-                        { label: 'Flyer', available: book.resources.flyer },
-                        { label: 'Presentasi', available: book.resources.productKnowledge },
-                        { label: 'Dummy', available: book.resources.dummy },
-                      ]"
-                      :key="material.label"
-                      :class="{ available: material.available }"
-                      :title="`${material.label}: ${material.available ? 'tersedia' : 'belum tersedia'}`"
-                    >
-                      <span class="sr-only"
-                        >{{ material.label }}:
-                        {{ material.available ? 'tersedia' : 'belum tersedia' }}.</span
+                  </td>
+                  <td data-label="Jenjang">{{ book.educationLevel || 'Belum diisi' }}</td>
+                  <td data-label="Mata pelajaran">{{ book.subject || 'Belum ditentukan' }}</td>
+                  <td data-label="Harga" class="book-price">{{ formatPrice(book.price) }}</td>
+                  <td data-label="Materi">
+                    <div class="material-dots">
+                      <span
+                        v-for="material in [
+                          { label: 'Flyer', available: book.resources.flyer },
+                          { label: 'Presentasi', available: book.resources.productKnowledge },
+                          { label: 'Dummy', available: book.resources.dummy },
+                        ]"
+                        :key="material.label"
+                        :class="{ available: material.available }"
+                        :title="`${material.label}: ${material.available ? 'tersedia' : 'belum tersedia'}`"
                       >
-                    </span>
-                  </div>
-                </td>
-                <td data-label="Status">
-                  <span class="book-status" :class="{ published: book.published }">{{
-                    book.published ? 'Dipublikasikan' : 'Draf'
-                  }}</span>
-                </td>
-                <td data-label="Tindakan">
-                  <div class="book-actions">
-                    <NuxtLink :to="`/admin/books/${book.id}`">Edit</NuxtLink>
-                    <NuxtLink v-if="book.published" :to="getProductPath(book)">Lihat</NuxtLink>
-                    <button
-                      type="button"
-                      :aria-label="`Hapus ${book.title}`"
-                      @click="confirmDelete(book)"
-                    >
-                      Hapus
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-else class="dashboard-empty">
-            <h3>Belum ada buku yang cocok</h3>
-            <p>Ubah pencarian atau tambahkan buku untuk jenjang Anda.</p>
+                        <span class="sr-only"
+                          >{{ material.label }}:
+                          {{ material.available ? 'tersedia' : 'belum tersedia' }}.</span
+                        >
+                      </span>
+                    </div>
+                  </td>
+                  <td data-label="Status">
+                    <span class="book-status" :class="{ published: book.published }">{{
+                      book.published ? 'Dipublikasikan' : 'Draf'
+                    }}</span>
+                  </td>
+                  <td data-label="Tindakan">
+                    <div class="book-actions">
+                      <NuxtLink :to="`/admin/books/${book.id}`">Edit</NuxtLink>
+                      <NuxtLink v-if="book.published" :to="getProductPath(book)">Lihat</NuxtLink>
+                      <button
+                        type="button"
+                        :aria-label="`Hapus ${book.title}`"
+                        @click="confirmDelete(book)"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-else class="dashboard-empty">
+              <h3>Belum ada buku yang cocok</h3>
+              <p>Ubah pencarian atau tambahkan buku untuk jenjang Anda.</p>
+            </div>
           </div>
-        </div>
-        <div class="dashboard-pagination">
-          <p>{{ data.total }} buku &middot; Halaman {{ filters.page }} dari {{ totalPages }}</p>
-          <div>
-            <UButton
-              variant="outline"
-              :disabled="filters.page <= 1 || status === 'pending'"
-              @click="applyFilters(filters.page - 1)"
-              >Sebelumnya</UButton
-            >
-            <UButton
-              variant="outline"
-              :disabled="filters.page >= totalPages || status === 'pending'"
-              @click="applyFilters(filters.page + 1)"
-              >Berikutnya</UButton
-            >
+          <div class="dashboard-pagination">
+            <p>
+              {{ data.books.length }} dari {{ data.total }} buku &middot; Halaman
+              {{ filters.page }} dari {{ totalPages }}
+            </p>
+            <div>
+              <UButton
+                variant="outline"
+                :disabled="filters.page <= 1 || status === 'pending'"
+                @click="applyFilters(filters.page - 1)"
+                >Sebelumnya</UButton
+              >
+              <UButton
+                variant="outline"
+                :disabled="filters.page >= totalPages || status === 'pending'"
+                @click="applyFilters(filters.page + 1)"
+                >Berikutnya</UButton
+              >
+            </div>
           </div>
-        </div>
-      </section>
-    </template>
-    <dialog
-      ref="featuredDialog"
-      aria-labelledby="featured-dialog-title"
-      aria-describedby="featured-dialog-description"
-      class="featured-dialog m-auto w-[calc(100%-2rem)] max-w-2xl rounded-2xl border border-stone-200 bg-white p-6 text-stone-900 shadow-xl backdrop:bg-stone-950/50"
-      @cancel="featuredSaving ? $event.preventDefault() : null"
-    >
-      <div class="featured-dialog-heading">
-        <div>
-          <h2 id="featured-dialog-title">Atur Buku Pilihan</h2>
-          <p id="featured-dialog-description">
-            Pilih maksimal {{ maxFeaturedBooks }} buku. Buku draf baru tampil di beranda setelah
-            dipublikasikan.
-          </p>
-        </div>
-        <p class="featured-count" aria-live="polite">
-          {{ featuredBookIds.length + featuredCountOutsideScope }} / {{ maxFeaturedBooks }}
-        </p>
-      </div>
-      <p v-if="featuredCountOutsideScope" class="featured-scope-note" role="status">
-        {{ featuredCountOutsideScope }} buku pilihan berada di jenjang di luar akses Anda.
-      </p>
-      <fieldset
-        class="hero-settings"
-        :disabled="!featuredReady || featuredLoading || featuredSaving"
-      >
-        <legend>Teks hero landing</legend>
-        <label for="hero-heading">Heading</label>
-        <input id="hero-heading" v-model="hero.heading" type="text" maxlength="100" required />
-        <p class="field-help">Maksimal 100 karakter.</p>
-        <label for="hero-body">Isi</label>
-        <textarea id="hero-body" v-model="hero.body" rows="3" maxlength="400" required />
-        <p class="field-help">Maksimal 400 karakter. Perubahan tampil untuk semua pengunjung.</p>
-      </fieldset>
-      <form class="featured-search" @submit.prevent="loadFeaturedBooks(1)">
-        <label for="featured-search">Cari buku</label>
-        <input
-          id="featured-search"
-          v-model="featuredSearch"
-          type="search"
-          maxlength="100"
-          placeholder="Judul, kode buku, atau penulis"
-          :disabled="featuredLoading || featuredSaving"
-        />
-        <UButton
-          type="submit"
-          variant="outline"
-          :loading="featuredLoading"
-          :disabled="featuredLoading || featuredSaving"
-          >Cari</UButton
-        >
-      </form>
-      <p v-if="featuredError" role="alert" class="featured-error">{{ featuredError }}</p>
-      <div
-        class="featured-books-list"
-        :aria-busy="featuredLoading"
-        aria-label="Pilih buku untuk ditampilkan di beranda"
-      >
-        <p v-if="featuredLoading" role="status" class="featured-empty">Memuat buku...</p>
-        <label
-          v-for="book in featuredBooks"
-          v-else
-          :key="book.id"
-          class="featured-book-option"
-          :class="{ selected: featuredBookIds.includes(book.id) }"
-        >
-          <input
-            type="checkbox"
-            :checked="featuredBookIds.includes(book.id)"
-            :disabled="
-              featuredSaving ||
-              (!featuredBookIds.includes(book.id) &&
-                featuredBookIds.length + featuredCountOutsideScope >= maxFeaturedBooks)
-            "
-            @change="toggleFeaturedBook(book, $event)"
-          />
-          <img :src="book.imageUrl" :alt="`Sampul ${book.title}`" width="44" height="64" />
-          <span class="featured-book-details">
-            <span class="featured-book-title">{{ book.title }}</span>
-            <span>
-              {{ book.bookCode || 'Kode buku belum diisi' }} ·
-              {{ book.educationLevel || 'Jenjang belum diisi' }}
-            </span>
-            <span :class="book.published ? 'featured-published' : 'featured-draft'">{{
-              book.published ? 'Dipublikasikan' : 'Draf'
-            }}</span>
-          </span>
-        </label>
-        <p
-          v-if="!featuredLoading && !featuredError && !featuredBooks.length"
-          class="featured-empty"
-        >
-          Tidak ada buku yang cocok. Coba kata pencarian lain.
-        </p>
-      </div>
-      <div class="featured-dialog-footer">
-        <p>{{ featuredTotal }} buku · Halaman {{ featuredPage }} dari {{ featuredPageCount }}</p>
-        <div class="featured-page-actions">
-          <UButton
-            variant="outline"
-            :disabled="featuredPage <= 1 || featuredLoading || featuredSaving"
-            @click="loadFeaturedBooks(featuredPage - 1)"
-            >Sebelumnya</UButton
-          >
-          <UButton
-            variant="outline"
-            :disabled="featuredPage >= featuredPageCount || featuredLoading || featuredSaving"
-            @click="loadFeaturedBooks(featuredPage + 1)"
-            >Berikutnya</UButton
-          >
-        </div>
-      </div>
-      <div class="featured-dialog-actions">
-        <UButton
-          color="neutral"
-          variant="outline"
-          :disabled="featuredSaving"
-          @click="featuredDialog?.close()"
-          >Batal</UButton
-        >
-        <UButton
-          class="dashboard-primary"
-          :loading="featuredSaving"
-          :disabled="!featuredReady || !hasFeaturedChanges || featuredLoading"
-          @click="saveFeaturedSelection"
-          >Simpan pilihan</UButton
-        >
-      </div>
-    </dialog>
+        </section>
+      </template>
+    </div>
     <dialog
       ref="deleteDialog"
       aria-labelledby="delete-title"
@@ -645,6 +379,9 @@ const fieldClass =
   color: #222;
   font-family: var(--font-landing-sans);
 }
+.dashboard-content {
+  min-width: 0;
+}
 .dashboard-heading {
   display: flex;
   flex-wrap: wrap;
@@ -658,190 +395,6 @@ const fieldClass =
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-}
-.featured-manager-button,
-:deep(.classification-manager-button) {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 18px;
-  border: 1px solid #1f5c3f;
-  border-radius: 12px;
-  background: white;
-  color: #1f5c3f;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 24px;
-  white-space: nowrap;
-}
-.featured-manager-button:hover,
-:deep(.classification-manager-button:hover) {
-  background: #f4f8f5;
-}
-.featured-dialog {
-  max-height: 90dvh;
-  overflow-y: auto;
-}
-.hero-settings {
-  display: grid;
-  gap: 6px;
-  margin-top: 20px;
-  padding: 16px;
-  border: 1px solid #dce8e0;
-  border-radius: 12px;
-}
-.hero-settings legend,
-.hero-settings label {
-  font-size: 13px;
-  font-weight: 600;
-}
-.hero-settings input,
-.hero-settings textarea {
-  width: 100%;
-  min-width: 0;
-  padding: 8px 12px;
-  border: 1px solid #d6d3d1;
-  border-radius: 10px;
-  background: white;
-  font-size: 14px;
-}
-.hero-settings textarea {
-  resize: vertical;
-}
-.hero-settings .field-help {
-  color: #6b6f6b;
-  font-size: 12px;
-}
-.featured-dialog-heading,
-.featured-dialog-footer,
-.featured-dialog-actions,
-.featured-search {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-.featured-dialog-heading h2 {
-  font: 500 24px/1.3 var(--font-landing-serif);
-}
-.featured-dialog-heading p,
-.featured-dialog-footer > p {
-  color: #6b6f6b;
-  font-size: 13px;
-  line-height: 20px;
-}
-.featured-count {
-  flex: 0 0 auto;
-  color: #1f5c3f !important;
-  font-weight: 700;
-}
-.featured-scope-note,
-.featured-error {
-  margin-top: 14px;
-  font-size: 13px;
-  line-height: 20px;
-}
-.featured-scope-note {
-  color: #92400e;
-}
-.featured-error {
-  color: #b91c1c;
-}
-.featured-search {
-  margin-top: 20px;
-}
-.featured-search label {
-  flex: 0 0 auto;
-  font-size: 13px;
-  font-weight: 600;
-}
-.featured-search input {
-  flex: 1;
-  min-width: 0;
-  height: 42px;
-  padding: 8px 12px;
-  border: 1px solid #d6d3d1;
-  border-radius: 10px;
-  font-size: 14px;
-}
-.featured-books-list {
-  display: flex;
-  max-height: min(48dvh, 430px);
-  flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-  margin-top: 16px;
-}
-.featured-book-option {
-  display: flex;
-  min-height: 82px;
-  align-items: center;
-  gap: 14px;
-  padding: 9px 12px;
-  border: 1px solid #e6e8e4;
-  border-radius: 12px;
-  cursor: pointer;
-}
-.featured-book-option.selected {
-  border-color: #8eb49d;
-  background: #f4f8f5;
-}
-.featured-book-option input {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 auto;
-  accent-color: #1f5c3f;
-}
-.featured-book-option img {
-  width: 44px;
-  height: 64px;
-  flex: 0 0 auto;
-  border-radius: 3px;
-  object-fit: contain;
-}
-.featured-book-details {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-  color: #6b6f6b;
-  font-size: 12px;
-  line-height: 18px;
-}
-.featured-book-details > span {
-  overflow-wrap: anywhere;
-}
-.featured-book-title {
-  color: #242b26;
-  font-size: 14px;
-  font-weight: 600;
-}
-.featured-published {
-  color: #1f5c3f;
-}
-.featured-draft {
-  color: #92400e;
-}
-.featured-empty {
-  padding: 28px 12px;
-  color: #6b6f6b;
-  font-size: 14px;
-  text-align: center;
-}
-.featured-dialog-footer {
-  flex-wrap: wrap;
-  margin-top: 16px;
-}
-.featured-page-actions,
-.featured-dialog-actions {
-  display: flex;
-  gap: 8px;
-}
-.featured-dialog-actions {
-  justify-content: flex-end;
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid #e6e8e4;
 }
 .dashboard-eyebrow {
   color: #1f5c3f;
@@ -970,7 +523,7 @@ const fieldClass =
 }
 .dashboard-filters {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 170px 200px 170px 113px;
+  grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr) auto;
   align-items: end;
   gap: 12px;
   padding: 16px 0 20px;
@@ -1018,28 +571,25 @@ const fieldClass =
   text-align: left;
 }
 .column-book {
-  width: 25%;
+  width: 26%;
 }
 .column-level {
   width: 7%;
 }
 .column-subject {
-  width: 15%;
+  width: 17%;
 }
 .column-price {
   width: 11%;
 }
-.column-division {
-  width: 11%;
-}
 .column-materials {
-  width: 6%;
+  width: 8%;
 }
 .column-status {
-  width: 11%;
+  width: 14%;
 }
 .column-actions {
-  width: 14%;
+  width: 17%;
 }
 .dashboard-table th {
   padding: 10px;
@@ -1052,7 +602,7 @@ const fieldClass =
   text-transform: uppercase;
 }
 .dashboard-table td {
-  padding: 18px 10px 14px;
+  padding: 14px 10px;
   border-bottom: 1px solid #e6e8e4;
   font-size: 15px;
   line-height: 24px;
@@ -1101,9 +651,11 @@ const fieldClass =
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #e6e8e4;
+  border: 1px solid #6b6f6b;
+  background: transparent;
 }
 .material-dots > span.available {
+  border-color: #1f5c3f;
   background: #1f5c3f;
 }
 .book-status {
@@ -1169,10 +721,10 @@ const fieldClass =
   gap: 8px;
 }
 .dashboard-pagination button {
-  min-height: 38px;
-  padding: 6px 16px;
-  border: 1px solid #e6e8e4;
-  border-radius: 10px;
+  min-height: 36px;
+  padding: 5px 22px;
+  border: 1px solid #1f5c3f;
+  border-radius: 12px;
   color: #1f5c3f;
   background: white;
   box-shadow: none;
@@ -1307,20 +859,6 @@ const fieldClass =
   }
   .dashboard-table .book-actions {
     flex-wrap: wrap;
-  }
-  .featured-dialog {
-    padding: 20px 16px;
-  }
-  .featured-dialog-heading,
-  .featured-search {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .featured-count {
-    align-self: flex-start;
-  }
-  .featured-search input {
-    width: 100%;
   }
 }
 </style>

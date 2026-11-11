@@ -119,8 +119,8 @@ try {
   )
   const response = await page.goto(`${base}/admin`, { waitUntil: 'networkidle' })
   assert.equal(response.status(), 200)
-  await page.getByRole('button', { name: 'Edit Klasifikasi Buku', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Edit Klasifikasi Buku' })
+  await page.getByRole('link', { name: 'Edit Klasifikasi Buku', exact: true }).click()
+  const dialog = page.getByRole('region', { name: 'Edit Klasifikasi Buku' })
   await dialog.waitFor()
   await page
     .getByRole('button', { name: 'Tambah kurikulum', exact: true })
@@ -147,13 +147,15 @@ try {
   await page.setViewportSize({ width: 390, height: 844 })
   assert.equal(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth), true)
   await page.screenshot({ path: join(tmpdir(), 'kpp-classifications-mobile.png') })
-  await page.keyboard.press('Escape')
+  await page.getByRole('link', { name: 'Kelola Buku', exact: true }).click()
   assert.equal(await dialog.isVisible(), false)
   await page.setViewportSize({ width: 1440, height: 1000 })
-  await page.getByRole('button', { name: 'Edit Klasifikasi Buku', exact: true }).click()
+  await page.getByRole('link', { name: 'Edit Klasifikasi Buku', exact: true }).click()
+  await page.locator('#classification-kind').selectOption('subject')
+  await page.locator('#classification-level').selectOption('SD')
   await dialog.locator('li').filter({ hasText: 'Mapel Uji Browser' }).waitFor()
-  await page.getByRole('button', { name: 'Selesai', exact: true }).click()
-  await page.getByRole('link', { name: 'Tambah buku', exact: true }).click()
+  await page.getByRole('link', { name: 'Kelola Buku', exact: true }).click()
+  await page.getByRole('link', { name: '+ Tambah buku', exact: true }).click()
   await page.locator('#new-book-level').selectOption('SD')
   await page.locator('#new-book-subject').selectOption('Mapel Uji Browser')
   await page.locator('#new-book-division').selectOption('divisi-uji-browser')
@@ -178,7 +180,7 @@ try {
     fullPage: true,
   })
   await page.getByRole('link', { name: 'Dashboard Editor', exact: true }).click()
-  await page.getByRole('button', { name: 'Edit Klasifikasi Buku', exact: true }).click()
+  await page.getByRole('link', { name: 'Edit Klasifikasi Buku', exact: true }).click()
   for (const [kind, name] of [
     ['curriculum', 'Kurikulum Uji Browser'],
     ['division', 'Divisi Uji Browser'],
@@ -206,7 +208,7 @@ try {
     await dialog.getByRole('status').filter({ hasText: 'berhasil dihapus.' }).waitFor()
     assert.equal(await dialog.locator('.default-label').count(), 0)
   }
-  await dialog.getByRole('button', { name: 'Selesai', exact: true }).click()
+  await page.getByRole('link', { name: 'Kelola Buku', exact: true }).click()
   await page
     .getByRole('navigation', { name: 'Navigasi utama' })
     .getByRole('link', { name: 'Divisi', exact: true })

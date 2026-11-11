@@ -35,3 +35,121 @@ body {
   font-family: var(--font-sans);
   letter-spacing: -0.04em;
 }
+
+select:not([aria-hidden='true']) {
+  appearance: none !important;
+  background-image: url('/images/landing/chevron.svg') !important;
+  background-repeat: no-repeat !important;
+  background-position: right 12px center !important;
+  background-size: 14px 14px !important;
+  padding-inline-end: 32px !important;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dropdown-chevron {
+  width: 14px !important;
+  height: 14px !important;
+  mask: none !important;
+  background: transparent url('/images/landing/chevron.svg') center / 14px 14px no-repeat !important;
+}
+
+.dropdown-scroll-area {
+  margin-block: 4px;
+  margin-inline-end: 4px;
+  border-radius: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #aec1b5 transparent;
+  overscroll-behavior: contain;
+}
+
+.dropdown-scroll-area:hover {
+  scrollbar-color: #8ba895 transparent;
+}
+
+.dropdown-scroll-area::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+}
+
+.dropdown-scroll-area::-webkit-scrollbar-track,
+.dropdown-scroll-area::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.dropdown-scroll-area::-webkit-scrollbar-thumb {
+  border-radius: 99px;
+  background: #aec1b5;
+}
+
+.dropdown-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: #8ba895;
+}
+
+.dropdown-scroll-area::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Keep native values, validation and form events while styling the option panel.
+   Older engines retain their native picker through this feature query. */
+@supports (appearance: base-select) {
+  select:not([aria-hidden='true']),
+  select:not([aria-hidden='true'])::picker(select) {
+    /* Overrides per-page appearance:none without changing trigger dimensions. */
+    appearance: base-select !important;
+  }
+
+  select:not([aria-hidden='true'])::picker(select) {
+    inset: auto;
+    top: anchor(bottom);
+    left: anchor(left);
+    min-width: anchor-size(width);
+    max-width: calc(100vw - 16px);
+    max-height: min(320px, 50dvh);
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #aec1b5 transparent;
+    overscroll-behavior: contain;
+    margin: 0;
+    padding: 4px;
+    border: 0;
+    border-radius: 12px;
+    background: white;
+    color: #344e41;
+    box-shadow: 0 8px 24px rgb(31 41 51 / 14%);
+    font: 400 14px/1.5 var(--font-sans);
+    position-try-fallbacks:
+      flip-block,
+      flip-inline,
+      flip-block flip-inline;
+  }
+
+  select:not([aria-hidden='true']) option {
+    min-height: 36px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 8px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  select:not([aria-hidden='true']) option:checked,
+  select:not([aria-hidden='true']) option:not(:disabled):hover {
+    background: #f0f7f3;
+    color: #1f5c3f;
+  }
+
+  select:not([aria-hidden='true']) option:focus-visible {
+    outline: none;
+    background: #dcefe5;
+    color: #1f5c3f;
+  }
+
+  select:not([aria-hidden='true'])::picker-icon {
+    display: none;
+  }
+}

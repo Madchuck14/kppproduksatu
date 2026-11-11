@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import EditorWorkspace from '~/components/EditorWorkspace.vue'
 import type { FavoriteIds } from '#shared/types/favorite'
 import { educationLevelSchema } from '#shared/schemas/auth'
 import { loginReturnToSchema } from '#shared/schemas/navigation'
@@ -14,9 +15,7 @@ const isBookDetail = computed(() => /^\/products\/[^/]+$/.test(route.path))
 const isBookForm = computed(() => /^\/admin\/books\/[^/]+$/.test(route.path))
 const isAuthPage = computed(() => route.path === '/login' || route.path === '/register')
 const isContact = computed(() => route.path === '/contact')
-const isDashboard = computed(
-  () => route.path === '/admin' || route.path === '/admin/struktur-produk',
-)
+const isDashboard = computed(() => route.path === '/admin' || route.path.startsWith('/admin/'))
 const isSearchOpen = ref(false)
 const headerSearch = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const headerSearchInput = useTemplateRef<HTMLInputElement>('headerSearchInput')
@@ -303,22 +302,25 @@ async function logout() {
     <main
       id="main-content"
       :class="
-        isLanding
-          ? 'landing-main'
-          : isAuthPage
-            ? 'login-main'
-            : isCatalog ||
-                isFavorites ||
-                isBrowse ||
-                isBookDetail ||
-                isBookForm ||
-                isDashboard ||
-                isContact
-              ? 'catalog-main'
-              : 'mx-auto max-w-6xl px-6 py-12'
+        isDashboard
+          ? 'catalog-main editor-dashboard-main'
+          : isLanding
+            ? 'landing-main'
+            : isAuthPage
+              ? 'login-main'
+              : isCatalog ||
+                  isFavorites ||
+                  isBrowse ||
+                  isBookDetail ||
+                  isBookForm ||
+                  isDashboard ||
+                  isContact
+                ? 'catalog-main'
+                : 'mx-auto max-w-6xl px-6 py-12'
       "
     >
-      <slot />
+      <EditorWorkspace v-if="isDashboard"><slot /></EditorWorkspace>
+      <slot v-else />
     </main>
     <footer id="kontak" class="site-footer">
       <div class="footer-inner">
@@ -442,6 +444,9 @@ async function logout() {
   max-width: 1280px;
   margin: auto;
   padding: 0 32px 72px;
+}
+.editor-dashboard-main {
+  max-width: 1440px;
 }
 @media (max-width: 700px) {
   .catalog-main {

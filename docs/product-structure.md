@@ -67,12 +67,15 @@ memeriksa parser, penundaan subtree/prosa, konflik, pengulangan, serta rollback 
 4. Detail buku published yang terhubung menampilkan jalur dan **Lihat struktur [jenjang]**.
    Tautan menuju `/struktur-produk?level=SD&node=<UUID>`; jalur leluhur dibuka dan cabang
    disorot. Nama dan induk yang berubah tercermin dari hierarki yang sama.
-5. **Arsipkan cabang** meminta konfirmasi dan mengarsipkan seluruh subtree. Jika ada
-   buku yang masih merujuk cabang atau turunannya, termasuk draf, arsip ditolak. Pindahkan
-   atau lepas posisi buku dahulu. Arsip tidak menghapus buku dan tidak memutus referensi.
+5. **Hapus cabang** membuka konfirmasi **Hapus permanen** dan menghapus cabang beserta
+   seluruh turunannya dari database. Tindakan ini tidak dapat dibatalkan dari aplikasi.
+   Jika ada buku yang masih merujuk cabang atau turunannya, termasuk draf, hapus ditolak.
+   Pindahkan atau lepas posisi buku dahulu. Buku tidak ikut dihapus.
 
-Pengarsipan bersifat penonaktifan; versi pertama tidak menyediakan pemulihan arsip atau
-penghapusan permanen. Cabang yang sudah diarsipkan tidak dapat diedit/dipilih sebagai induk.
+Sejak migration `202611110001_delete_product_structure.sql`, UI memakai hapus permanen.
+Kolom arsip dan RPC lama tetap dipertahankan untuk kompatibilitas klien lama. Migration
+tidak menghapus arsip existing. Cabang yang sudah diarsipkan tidak dapat diedit/dipilih
+sebagai induk; jika menjadi turunan cabang aktif yang dihapus, baris arsip itu ikut dihapus.
 Input form tetap tersedia ketika penyimpanan gagal. Tidak ada fallback diam-diam ke
 data contoh jika Supabase gagal. Demo menampilkan struktur kosong dan tidak menyediakan mutasi.
 
@@ -85,6 +88,7 @@ data contoh jika Supabase gagal. Demo menampilkan struktur kosong dan tidak meny
 | `POST /api/admin/product-structure`             | Editor super, tambah cabang tervalidasi Zod.                                                            |
 | `PUT /api/admin/product-structure/:id`          | Editor super, edit cabang aktif; jenjang tetap.                                                         |
 | `POST /api/admin/product-structure/:id/archive` | Editor super, RPC pengarsipan subtree atomik.                                                           |
+| `DELETE /api/admin/product-structure/:id`       | Editor super, hapus permanen subtree yang tidak dipakai buku, termasuk turunan arsip.                   |
 
 Endpoint kelola memakai `requireSuperEditor` dan verifikasi Auth server. RLS mengizinkan
 SELECT publik hanya untuk cabang aktif dan INSERT/UPDATE hanya untuk role Editor dengan
@@ -118,9 +122,22 @@ secara global agar aturan lintas tabel konsisten. Transaksi harus tetap singkat.
 
 ## Migration dan rollback
 
+Untuk fitur hapus, terapkan `202611110001_delete_product_structure.sql` setelah migration
+struktur dan sebelum deploy aplikasi baru. Migration hanya menambahkan RPC; tidak mengubah
+data atau memberi privilege DELETE langsung. RPC memakai pengunci transaksi yang sama
+dengan perubahan hierarki dan posisi buku, memeriksa Editor super serta seluruh referensi
+buku, kemudian menghapus subtree dalam satu statement. FK tetap aktif.
+Database baru memakai bundle 45 migration. Agent tidak menerapkan migration ke Supabase live.
+
+Rollback fitur: jalankan aplikasi sebelumnya, lalu bila diperlukan cabut RPC baru dengan
+`DROP FUNCTION public.delete_product_structure_node(uuid);`. Kolom, data, RPC arsip lama,
+serta kebijakan lama tetap tersedia. Penghapusan yang sudah dikonfirmasi tidak dapat
+dipulihkan dengan rollback aplikasi/migration; pemulihan memerlukan backup database.
+Tidak ada pembersihan massal arsip lama.
+
 Terapkan `supabase/migrations/202611100005_product_structure.sql` setelah migration
 sebelumnya, sebelum deploy aplikasi baru. Database baru memakai `supabase/setup.sql`
-berisi 44 migration. Jangan menjalankan ulang setup pada database existing. Sebelum
+berisi 45 migration. Jangan menjalankan ulang setup pada database existing. Sebelum
 pengelola mulai menghubungkan buku, pastikan seluruh instance aplikasi sudah diperbarui.
 Migration mempertahankan buku lama dengan pilihan NULL dan tidak membuat struktur contoh.
 Agent tidak menerapkan migration ini ke Supabase live.

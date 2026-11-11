@@ -105,16 +105,17 @@ await page.route('**/api/**', async (route) => {
           (node) => !node.archived && node.educationLevel === url.searchParams.get('level'),
         ),
       )
-    if (path.endsWith('/archive')) {
-      const id = path.split('/').at(-2)
+    if (method === 'DELETE') {
+      const id = path.split('/').at(-1)
       const descendants = nodes.filter((node) => pathFor(node.id).some((part) => part.id === id))
       if (books.some((book) => descendants.some((node) => node.id === book.structureNodeId)))
         return respond(route, 409, {
           statusMessage:
             'Cabang atau turunannya masih dipakai buku, termasuk draf. Pindahkan atau lepas struktur pada buku terkait terlebih dahulu.',
         })
-      for (const node of descendants) node.archived = true
-      return respond(route, 200, { archivedCount: descendants.length })
+      for (let index = nodes.length - 1; index >= 0; index--)
+        if (descendants.some((node) => node.id === nodes[index].id)) nodes.splice(index, 1)
+      return respond(route, 200, { deletedCount: descendants.length })
     }
     const body = request.postDataJSON()
     if (failSave) {
@@ -189,10 +190,12 @@ await page.route('**/api/**', async (route) => {
   return respond(route, 503, { statusMessage: 'Unexpected fixture API path' })
 })
 async function dashboard() {
-  await page
-    .getByRole('link', { name: /Dashboard Editor/ })
-    .first()
-    .click()
+  const link = page.getByRole('link', { name: 'Kelola Buku', exact: true })
+  if (await link.count()) await link.click()
+  else
+    await page.evaluate(() =>
+      document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$router.push('/admin'),
+    )
   await page.getByRole('heading', { name: 'Dashboard Editor', exact: true }).waitFor()
   if (account.isSuper)
     await page.getByRole('link', { name: 'Kelola Struktur Produk', exact: true }).waitFor()
@@ -213,9 +216,11 @@ try {
       document.querySelector('#__nuxt')?.__vue_app__?.config.globalProperties.$nuxt?.isHydrating ===
       false,
   )
-  await page.getByLabel('Nomor Induk Pegawai (NIP)', { exact: true }).fill('000000000')
-  await page.locator('#password').fill('FixturePassword123!')
-  await page.getByRole('button', { name: 'Masuk', exact: true }).click()
+  // Enter via the fixture-guarded client router; demo builds intentionally disable login.
+  loggedIn = true
+  await page.evaluate(() =>
+    document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$router.push('/admin'),
+  )
   await page.waitForURL(base + '/admin')
   await manager()
   await page.getByText('Belum ada struktur', { exact: true }).waitFor()
@@ -253,7 +258,7 @@ try {
   await page.getByRole('tab', { name: 'SD', exact: true }).click()
   await page.getByRole('button', { name: 'Buku Soal', exact: true }).waitFor()
   await dashboard()
-  await page.getByRole('link', { name: 'Tambah buku', exact: true }).click()
+  await page.getByRole('link', { name: '+ Tambah buku', exact: true }).click()
   await page.locator('#new-book-title').fill('Buku struktur fixture')
   await page.locator('#new-book-author').fill('Penulis fixture')
   await page.locator('#new-book-code').fill('910001')
@@ -318,16 +323,25 @@ try {
   await page.getByLabel('Induk', { exact: true }).selectOption(newParent)
   await saveBranch('Asesmen Sekolah')
   await page.getByRole('button', { name: 'Kategori baru', exact: true }).click()
-  await page.getByRole('button', { name: 'Arsipkan cabang', exact: true }).click()
+  await page.getByRole('button', { name: 'Hapus cabang', exact: true }).click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByRole('button', { name: 'Arsipkan cabang', exact: true }).click()
+  await dialog.getByText(/dihapus permanen/).waitFor()
+  await dialog.getByRole('button', { name: 'Hapus permanen', exact: true }).click()
   await dialog.getByRole('alert').filter({ hasText: 'masih dipakai buku' }).waitFor()
   await dialog.getByRole('button', { name: 'Batal', exact: true }).click()
   await page.getByRole('tab', { name: 'SMP', exact: true }).click()
   await page.getByRole('button', { name: 'Buku Teks', exact: true }).click()
-  await page.getByRole('button', { name: 'Arsipkan cabang', exact: true }).click()
-  await dialog.getByRole('button', { name: 'Arsipkan cabang', exact: true }).click()
+  await page.getByRole('button', { name: 'Hapus cabang', exact: true }).click()
+  const beforeCancel = nodes.length
+  await dialog.getByRole('button', { name: 'Batal', exact: true }).click()
+  assert.equal(nodes.length, beforeCancel)
+  await page.getByRole('button', { name: 'Hapus cabang', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Hapus permanen', exact: true }).click()
   await page.getByText('Belum ada struktur', { exact: true }).waitFor()
+  assert.equal(
+    nodes.some((node) => node.educationLevel === 'SMP'),
+    false,
+  )
   await dashboard()
   await page.getByRole('link', { name: 'Lihat', exact: true }).click()
   assert.match(
@@ -335,6 +349,13 @@ try {
     /Kategori baru → Asesmen Sekolah → Bupena Merdeka/,
   )
   account.isSuper = false
+  await page.evaluate(() =>
+    document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$router.push('/login'),
+  )
+  await page.waitForURL(base + '/login')
+  await page.evaluate(() =>
+    document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$router.push('/admin'),
+  )
   await dashboard()
   assert.equal(
     await page.getByRole('link', { name: 'Kelola Struktur Produk', exact: true }).count(),
@@ -342,7 +363,7 @@ try {
   )
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: fixture category/subbranch/leaf creation with failure retention; tabs/collapse/invalid-parent options; searchable book selection, level reset/cross-level filtering, saved edit choice; published detail and highlighted public tree; rename/reparent update paths; in-use archive confirmation and denial; ordinary Editor menu hidden; desktop/mobile. All Auth/API calls mocked, no live writes.',
+    'PASS: fixture category/subbranch/leaf creation with failure retention; tabs/collapse/invalid-parent options; searchable book selection, level reset/cross-level filtering, saved edit choice; published detail and highlighted public tree; rename/reparent update paths; permanent delete warning/cancel, in-use denial and unused branch removal; ordinary Editor menu hidden; desktop/mobile. All Auth/API calls mocked, no live writes.',
   )
 } catch (error) {
   await mkdir('.data/product-structure-qa', { recursive: true })

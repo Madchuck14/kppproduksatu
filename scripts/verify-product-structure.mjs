@@ -235,6 +235,125 @@ try {
     db.query('select public.archive_product_structure_node($1)', [ids.other]),
     /permission denied/,
   )
+  await db.exec('reset role')
+  const beforeDeleteMigration = (
+    await db.query('select * from public.product_structure_nodes order by id')
+  ).rows
+  const booksBeforeDeleteMigration = (await db.query('select * from public.products order by id'))
+    .rows
+  await db.exec(
+    await readFile('supabase/migrations/202611110001_delete_product_structure.sql', 'utf8'),
+  )
+  assert.deepEqual(
+    (await db.query('select * from public.product_structure_nodes order by id')).rows,
+    beforeDeleteMigration,
+  )
+  assert.deepEqual(
+    (await db.query('select * from public.products order by id')).rows,
+    booksBeforeDeleteMigration,
+  )
+  const deletionFixture = structureFixture.map((node) => ({
+    ...node,
+    id: node.id.replace(/^a/, 'c'),
+    parentId: node.parentId?.replace(/^a/, 'c') ?? null,
+  }))
+  const deleteRoot = deletionFixture[0].id
+  const deleteChild = deletionFixture[1].id
+  const deleteLeaf = deletionFixture[2].id
+  await role(superId)
+  for (const node of deletionFixture) await addNode(node)
+  for (const id of [editorId, salesId]) {
+    await role(id)
+    await assert.rejects(
+      db.query('select public.delete_product_structure_node($1)', [deleteRoot]),
+      /structure_forbidden/,
+    )
+    await assert.rejects(
+      db.query('delete from public.product_structure_nodes where id=$1', [deleteRoot]),
+      /permission denied/,
+    )
+  }
+  await db.exec('reset role;set role anon')
+  await assert.rejects(
+    db.query('select public.delete_product_structure_node($1)', [deleteRoot]),
+    /permission denied/,
+  )
+  await role(superId)
+  await assert.rejects(
+    db.query('delete from public.product_structure_nodes where id=$1', [deleteRoot]),
+    /permission denied/,
+  )
+  await db.query(
+    "update public.products set structure_node_id=$1 where book_code in ('910001','910000')",
+    [deleteLeaf],
+  )
+  const subtreeBefore = (await db.query('select * from public.product_structure_nodes order by id'))
+    .rows
+  await assert.rejects(
+    db.query('select public.delete_product_structure_node($1)', [deleteRoot]),
+    /structure_in_use/,
+  )
+  assert.deepEqual(
+    (await db.query('select * from public.product_structure_nodes order by id')).rows,
+    subtreeBefore,
+  )
+  await db.exec("update public.products set structure_node_id=null where book_code='910001'")
+  await assert.rejects(
+    db.query('select public.delete_product_structure_node($1)', [deleteRoot]),
+    /structure_in_use/,
+    'Draft alone blocks deletion',
+  )
+  await db.exec("update public.products set structure_node_id=null where book_code='910000'")
+  await db.query('select public.archive_product_structure_node($1)', [deleteLeaf])
+  const booksBeforeDelete = (await db.query('select * from public.products order by id')).rows
+  assert.equal(
+    (await db.query('select public.delete_product_structure_node($1) as count', [deleteRoot]))
+      .rows[0].count,
+    3,
+  )
+  assert.equal(
+    (
+      await db.query('select id from public.product_structure_nodes where id=any($1::uuid[])', [
+        [deleteRoot, deleteChild, deleteLeaf],
+      ])
+    ).rows.length,
+    0,
+  )
+  assert.deepEqual(
+    (await db.query('select * from public.products order by id')).rows,
+    booksBeforeDelete,
+  )
+  assert.equal(
+    (
+      await db.query('select id from public.product_structure_nodes where id=$1', [
+        deletionFixture[3].id,
+      ])
+    ).rows.length,
+    1,
+  )
+  await assert.rejects(
+    db.query('select public.delete_product_structure_node($1)', [deleteRoot]),
+    /structure_missing/,
+    'Retry is an explicit missing-target error',
+  )
+  assert.equal(
+    (await db.query('select id from public.product_structure_nodes where archived')).rows.length,
+    4,
+    'Existing archives preserved',
+  )
+  await db.exec('reset role;drop function public.delete_product_structure_node(uuid)')
+  await db.exec(
+    await readFile('supabase/migrations/202611110001_delete_product_structure.sql', 'utf8'),
+  )
+  await role(superId)
+  assert.equal(
+    (
+      await db.query('select public.delete_product_structure_node($1) as count', [
+        deletionFixture[3].id,
+      ])
+    ).rows[0].count,
+    1,
+  )
 } finally {
   await db.close()
 }
@@ -259,6 +378,34 @@ async function moduleAt(path, dependencies, globals = {}) {
 }
 let allow = false
 let writes = 0
+const remove = (
+  await moduleAt(
+    'server/api/admin/product-structure/[id].delete.ts',
+    {
+      zod: { z },
+      '../../../utils/require-editor': {
+        requireSuperEditor: async () => {
+          if (!allow) throw Object.assign(new Error('Forbidden'), { statusCode: 403 })
+        },
+      },
+      '../../../repositories/product-structure': {
+        deleteStructureNode: async () => {
+          writes++
+          return { deletedCount: 3 }
+        },
+      },
+    },
+    { getRouterParam: (event) => event.id },
+  )
+).default
+await assert.rejects(remove({ id: ids.root }), (error) => error.statusCode === 403)
+assert.equal(writes, 0)
+allow = true
+await assert.rejects(remove({ id: 'invalid' }), (error) => error.statusCode === 400)
+assert.equal(writes, 0)
+assert.deepEqual(await remove({ id: ids.root }), { deletedCount: 3 })
+writes = 0
+allow = false
 const post = (
   await moduleAt('server/api/admin/product-structure/index.post.ts', {
     '#shared/schemas/product-structure': { structureInputSchema },
@@ -464,6 +611,9 @@ assert.equal(
   writtenBook.structure_node_id,
   ids.leaf,
   'Actual editor repository persists the branch ID',
+)
+console.log(
+  'PASS: additive deletion migration preserves books/archives; super-only RPC and endpoint guard; direct DELETE denied; published/draft references block atomically; unused subtree including archived descendants is permanently removed; unrelated nodes/books preserved; missing target explicit; function rollback/reapply supported.',
 )
 console.log(
   'PASS: preserved legacy books; category/subbranch/leaf links, rename/reparent paths, null selection, wrong level/cycles/archived-parent rejected; draft/published references block subtree archive; release then archive hides descendants; ordinary Editor/Sales management denied by RLS/RPC and real handler guard; public active-only and draft isolation; private serialization guard runs; server branch validation. Isolated PostgreSQL, no live writes; multi-session contention requires local PostgreSQL.',

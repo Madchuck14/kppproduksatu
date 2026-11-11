@@ -36,7 +36,6 @@ const emit = defineEmits<{ close: [] }>()
             {{ value }}%
           </option>
         </select>
-        <img src="/images/dummy-preview/chevron.svg" alt="" width="6" height="6" />
       </div>
       <button
         type="button"
@@ -125,12 +124,6 @@ const emit = defineEmits<{ close: [] }>()
   background: transparent;
   font-size: 14px;
   cursor: pointer;
-}
-.zoom-select img {
-  position: absolute;
-  right: 4px;
-  top: calc(50% - 3px);
-  pointer-events: none;
 }
 .dummy-download-wrap {
   display: flex;

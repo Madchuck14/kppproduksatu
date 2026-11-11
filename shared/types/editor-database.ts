@@ -67,6 +67,7 @@ export type EditorDatabase = {
     }
     Views: Record<never, never>
     Functions: {
+      delete_product_structure_node: { Args: { target_id: string }; Returns: number }
       archive_product_structure_node: { Args: { target_id: string }; Returns: number }
       editor_storage_usage_bytes: {
         Args: Record<never, never>

@@ -80,14 +80,11 @@ try {
   await page.goto(`${base}/login`)
   await page.waitForFunction(() => document.querySelector('#__nuxt')?.__vue_app__)
   await navigate('/admin')
-  assert.equal(
-    await page.getByRole('button', { name: 'Atur Buku Pilihan', exact: true }).count(),
-    0,
-  )
+  assert.equal(await page.getByRole('link', { name: 'Atur Buku Pilihan', exact: true }).count(), 0)
   account.isSuper = true
   await navigate('/login')
   await navigate('/admin')
-  await page.getByRole('button', { name: 'Atur Buku Pilihan', exact: true }).click()
+  await page.getByRole('link', { name: 'Atur Buku Pilihan', exact: true }).click()
   await page.locator('#hero-heading').waitFor()
   await page.waitForFunction(
     () => document.querySelector('#hero-heading')?.value === 'Heading tersimpan',
@@ -99,8 +96,7 @@ try {
   await page.getByText('Heading hero wajib diisi.', { exact: true }).waitFor()
   assert.equal(writes, 0)
   await page.locator('#hero-heading').fill('Heading dibatalkan')
-  await page.getByRole('button', { name: 'Batal', exact: true }).click()
-  await page.getByRole('button', { name: 'Atur Buku Pilihan', exact: true }).click()
+  await page.getByRole('button', { name: 'Batalkan perubahan', exact: true }).click()
   await page.waitForFunction(
     () => document.querySelector('#hero-heading')?.value === 'Heading tersimpan',
   )
@@ -137,7 +133,7 @@ try {
   }
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: modal loads copy; text-only changes save; cancel and failed save preserve state; validation; landing reflects saved copy; desktop/mobile. Port 3000, all mutations intercepted.',
+    'PASS: page loads copy; text-only changes save; cancel resets and failed save preserves state; validation; landing reflects saved copy; desktop/mobile. Port 3000, all mutations intercepted.',
   )
 } finally {
   await browser.close()

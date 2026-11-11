@@ -3,10 +3,9 @@ import type { Classification, ClassificationInput } from '#shared/schemas/classi
 
 const props = defineProps<{ levels: readonly string[] }>()
 const { data, error, refresh, status } = await useClassifications()
-const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const kind = ref<ClassificationInput['kind']>('curriculum')
 const name = ref('')
-const level = ref('')
+const level = ref(props.levels[0] ?? '')
 const saving = ref(false)
 const message = ref('')
 const failure = ref('')
@@ -24,15 +23,6 @@ watch([kind, level], () => {
   failure.value = ''
   message.value = ''
 })
-function open() {
-  deleteTarget.value = null
-  level.value = props.levels[0] ?? ''
-  failure.value = ''
-  message.value = ''
-  name.value = ''
-  dialog.value?.showModal()
-  void refresh()
-}
 function confirmDelete(item: Classification) {
   deleteTarget.value = item
   failure.value = ''
@@ -91,30 +81,9 @@ async function save() {
 </script>
 
 <template>
-  <UButton
-    type="button"
-    class="classification-manager-button"
-    :disabled="!levels.length"
-    @click="open"
-  >
-    Edit Klasifikasi Buku
-  </UButton>
-  <dialog
-    ref="dialog"
-    aria-labelledby="classification-title"
-    class="classification-dialog"
-    @cancel="saving ? $event.preventDefault() : null"
-  >
+  <section class="classification-page" aria-labelledby="classification-title">
     <div class="dialog-heading">
-      <h2 id="classification-title">Edit Klasifikasi Buku</h2>
-      <button
-        type="button"
-        aria-label="Tutup klasifikasi buku"
-        :disabled="saving"
-        @click="dialog?.close()"
-      >
-        ×
-      </button>
+      <h1 id="classification-title">Edit Klasifikasi Buku</h1>
     </div>
     <p>
       Tambahkan pilihan untuk klasifikasi buku. Mata pelajaran mengikuti jenjang yang Anda kelola.
@@ -192,28 +161,18 @@ async function save() {
         >
       </div>
     </section>
-    <div class="dialog-actions">
-      <UButton variant="outline" :disabled="saving" @click="dialog?.close()">Selesai</UButton>
-    </div>
-  </dialog>
+  </section>
 </template>
 
 <style scoped>
-.classification-dialog {
-  margin: auto;
-  width: calc(100% - 2rem);
-  max-width: 680px;
-  max-height: 90dvh;
-  overflow-y: auto;
+.classification-page {
+  margin-top: 20px;
+  width: 100%;
   padding: 28px;
   border: 1px solid #e6e8e4;
   border-radius: 20px;
-  color: #242b26;
   background: white;
-  box-shadow: 0 20px 60px #0003;
-}
-.classification-dialog::backdrop {
-  background: #0c0a0980;
+  color: #222;
 }
 .dialog-heading,
 .dialog-actions {
@@ -222,14 +181,9 @@ async function save() {
   justify-content: space-between;
   gap: 16px;
 }
-h2 {
+h1 {
   font-size: 24px;
   font-weight: 600;
-}
-.dialog-heading button {
-  padding: 4px 10px;
-  font-size: 28px;
-  cursor: pointer;
 }
 p {
   margin-top: 12px;
@@ -286,8 +240,6 @@ ul {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
   gap: 8px;
-  max-height: 260px;
-  overflow-y: auto;
   margin-top: 12px;
   padding: 4px;
 }
@@ -345,10 +297,10 @@ li {
   ul {
     grid-template-columns: minmax(0, 1fr);
   }
-  .classification-dialog {
+  .classification-page {
     padding: 20px 16px;
   }
-  h2 {
+  h1 {
     font-size: 20px;
   }
 }

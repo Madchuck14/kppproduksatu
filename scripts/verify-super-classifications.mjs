@@ -87,11 +87,11 @@ try {
           const response = await page.goto(`${base}/admin`, { waitUntil: 'domcontentloaded' })
           assert.equal(response.status(), 200)
           await page.waitForFunction(() => Boolean(document.querySelector('#__nuxt')?.__vue_app__))
-          const button = page.getByRole('button', { name: 'Edit Klasifikasi Buku', exact: true })
+          const button = page.getByRole('link', { name: 'Edit Klasifikasi Buku', exact: true })
           assert.equal(await button.count(), canManage ? 1 : 0)
           if (canManage) {
             await button.click()
-            await page.getByRole('dialog', { name: 'Edit Klasifikasi Buku', exact: true }).waitFor()
+            await page.getByRole('region', { name: 'Edit Klasifikasi Buku', exact: true }).waitFor()
           }
         } finally {
           await context.close()

@@ -285,8 +285,8 @@ function clearFilters() {
             >
               <option value="newest">Terbaru</option>
               <option value="title-asc">Judul A–Z</option>
-              <option value="title-desc">Judul Z–A</option></select
-            ><span aria-hidden="true">▾</span></label
+              <option value="title-desc">Judul Z–A</option>
+            </select></label
           >
         </div>
         <div v-if="appliedSearch" class="search-chip">
@@ -373,9 +373,10 @@ function clearFilters() {
           >
             <option :value="15">15</option>
             <option :value="30">30</option>
-            <option :value="60">60</option></select
-          ><img src="/images/catalog/chevron.svg" alt="" width="16" height="16" /></span
-      ></label>
+            <option :value="60">60</option>
+          </select></span
+        ></label
+      >
     </div>
   </section>
 </template>
@@ -588,13 +589,6 @@ legend {
   padding: 0 26px 0 14px;
   background: white;
 }
-.sort-control > span:last-child {
-  position: absolute;
-  right: 10px;
-  top: 6px;
-  pointer-events: none;
-  font: 500 20px/24px var(--font-landing-serif);
-}
 .catalog-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -793,12 +787,6 @@ legend {
 }
 .page-size select:hover {
   border-color: #9dbbaa;
-}
-.page-size img {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  pointer-events: none;
 }
 @media (max-width: 1000px) {
   .catalog-layout {

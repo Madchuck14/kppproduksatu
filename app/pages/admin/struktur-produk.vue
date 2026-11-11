@@ -8,7 +8,7 @@ import {
   type StructureNode,
 } from '#shared/schemas/product-structure'
 
-definePageMeta({ middleware: 'admin' })
+definePageMeta({ middleware: ['admin', 'editor-super'] })
 useSeoMeta({ title: 'Kelola Struktur Produk | Editor', robots: 'noindex, nofollow' })
 const route = useRoute()
 const level = computed(() => educationLevelSchema.safeParse(route.query.level).data ?? 'SD')
@@ -34,8 +34,8 @@ const form = reactive({
 const saving = ref(false)
 const message = ref('')
 const failure = ref('')
-const archiveFailure = ref('')
-const archiveDialog = useTemplateRef<HTMLDialogElement>('archiveDialog')
+const deleteFailure = ref('')
+const deleteDialog = useTemplateRef<HTMLDialogElement>('deleteDialog')
 const selected = computed(() => nodes.value.find((node) => node.id === editingId.value))
 const parents = computed(() =>
   structureOptions(
@@ -107,22 +107,22 @@ async function save() {
     saving.value = false
   }
 }
-function confirmArchive() {
-  archiveFailure.value = ''
-  archiveDialog.value?.showModal()
+function confirmDelete() {
+  deleteFailure.value = ''
+  deleteDialog.value?.showModal()
 }
-async function archive() {
+async function remove() {
   if (!editingId.value || saving.value) return
   saving.value = true
-  archiveFailure.value = ''
+  deleteFailure.value = ''
   try {
-    await $fetch(`/api/admin/product-structure/${editingId.value}/archive`, { method: 'POST' })
-    archiveDialog.value?.close()
+    await $fetch(`/api/admin/product-structure/${editingId.value}`, { method: 'DELETE' })
+    deleteDialog.value?.close()
     create()
     await refresh()
-    message.value = 'Cabang dan turunannya berhasil diarsipkan.'
+    message.value = 'Cabang dan turunannya berhasil dihapus.'
   } catch (error) {
-    archiveFailure.value = requestError(error)
+    deleteFailure.value = requestError(error)
   } finally {
     saving.value = false
   }
@@ -133,7 +133,6 @@ async function archive() {
   <section class="structure-manager">
     <header class="manager-heading">
       <div>
-        <NuxtLink to="/admin">← Dashboard Editor</NuxtLink>
         <h1>Kelola Struktur Produk</h1>
         <p>Susun kategori dan posisi produk untuk setiap jenjang.</p>
       </div>
@@ -216,7 +215,7 @@ async function archive() {
               placeholder="Contoh: Eksisting atau Produk 2026"
             />
             <p class="help">
-              Status ini tampil di bagan. Pengarsipan cabang dikelola melalui aksi terpisah.
+              Status ini tampil di bagan. Penghapusan cabang dikelola melalui aksi terpisah.
             </p>
           </fieldset>
           <p v-if="failure" role="alert" class="failure">{{ failure }}</p>
@@ -230,29 +229,31 @@ async function archive() {
               color="error"
               variant="outline"
               :disabled="saving"
-              @click="confirmArchive"
-              >Arsipkan cabang</UButton
+              @click="confirmDelete"
+              >Hapus cabang</UButton
             >
           </div>
         </form>
       </section>
     </div>
     <dialog
-      ref="archiveDialog"
-      aria-labelledby="structure-archive-title"
-      class="archive-dialog"
+      ref="deleteDialog"
+      aria-labelledby="structure-delete-title"
+      aria-describedby="structure-delete-description"
+      class="delete-dialog"
       @cancel="saving ? $event.preventDefault() : null"
     >
-      <h2 id="structure-archive-title">Arsipkan cabang {{ selected?.name }}?</h2>
-      <p>
-        Cabang beserta turunannya akan disembunyikan. Jika masih dipakai buku, termasuk draf,
-        pindahkan atau lepas buku dari cabang terlebih dahulu.
+      <h2 id="structure-delete-title">Hapus cabang {{ selected?.name }}?</h2>
+      <p id="structure-delete-description">
+        Cabang beserta seluruh turunannya akan dihapus permanen. Tindakan ini tidak dapat
+        dibatalkan. Jika masih dipakai buku, termasuk draf, pindahkan atau lepas buku dari cabang
+        terlebih dahulu.
       </p>
-      <p v-if="archiveFailure" role="alert" class="failure">{{ archiveFailure }}</p>
+      <p v-if="deleteFailure" role="alert" class="failure">{{ deleteFailure }}</p>
       <div class="panel-actions">
-        <UButton variant="outline" :disabled="saving" @click="archiveDialog?.close()">Batal</UButton
-        ><UButton color="error" :loading="saving" :disabled="saving" @click="archive"
-          >Arsipkan cabang</UButton
+        <UButton variant="outline" :disabled="saving" @click="deleteDialog?.close()">Batal</UButton
+        ><UButton color="error" :loading="saving" :disabled="saving" @click="remove"
+          >Hapus permanen</UButton
         >
       </div>
     </dialog>
@@ -273,12 +274,7 @@ async function archive() {
   justify-content: space-between;
   gap: 14px;
 }
-.manager-heading a {
-  color: #1f5c3f;
-  font-size: 13px;
-}
 h1 {
-  margin-top: 10px;
   font-size: 32px;
   font-weight: 600;
 }
@@ -370,7 +366,7 @@ select {
   margin-top: 16px;
   font-size: 14px;
 }
-.archive-dialog {
+.delete-dialog {
   margin: auto;
   width: min(520px, calc(100% - 32px));
   padding: 24px;
@@ -379,10 +375,10 @@ select {
   color: #222;
   background: white;
 }
-.archive-dialog::backdrop {
+.delete-dialog::backdrop {
   background: rgb(0 0 0 / 40%);
 }
-.archive-dialog p {
+.delete-dialog p {
   margin-top: 14px;
   line-height: 1.6;
   font-size: 14px;

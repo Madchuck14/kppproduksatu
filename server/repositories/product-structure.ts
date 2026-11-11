@@ -137,3 +137,10 @@ export async function archiveStructureNode(event: H3Event, id: string) {
   structureError(error)
   return { archivedCount: z.number().int().positive().parse(data) }
 }
+
+export async function deleteStructureNode(event: H3Event, id: string) {
+  const client = await serverSupabaseClient<EditorDatabase>(event)
+  const { data, error } = await client.rpc('delete_product_structure_node', { target_id: id })
+  structureError(error)
+  return { deletedCount: z.number().int().positive().parse(data) }
+}

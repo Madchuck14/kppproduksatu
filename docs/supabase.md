@@ -1,16 +1,24 @@
 ## Struktur Produk
 
+Fitur **Hapus cabang** memerlukan migration
+`supabase/migrations/202611110001_delete_product_structure.sql` sesudah migration struktur,
+sebelum deploy aplikasi baru. Penghapusan subtree bersifat permanen, menolak referensi buku
+draf/published, dan hanya tersedia untuk Editor super melalui RPC. Arsip lama tidak dibersihkan
+otomatis; endpoint arsip lama tetap tersedia untuk kompatibilitas. Database baru memakai
+bundle 45 migration. Lihat [rollout dan rollback hapus](product-structure.md#migration-dan-rollback).
+Migration belum dijalankan ke Supabase live oleh agent.
+
 Terapkan `supabase/migrations/202611100005_product_structure.sql` setelah migration
 sebelumnya dan sebelum deploy. Migration menambahkan hierarki terpisah, foreign key
 nullable pada produk, RLS Editor super, dan guard transaksi privat. Buku, UUID, kode,
 referensi, dan izin lama dipertahankan; tidak ada data produksi contoh yang diisi.
-Database baru memakai bundle 44 migration. Ikuti [rollout, rollback, RLS, dan uji
+Database baru memakai bundle 45 migration. Ikuti [rollout, rollback, RLS, dan uji
 penyimpanan bersamaan](product-structure.md). Migration ini tidak diterapkan ke live oleh agent.
 
 ## Area Sales yang diisi pengguna
 
 Terapkan `supabase/migrations/202611100004_sales_areas.sql` setelah migration sebelumnya
-dan sebelum deploy aplikasi baru. Database baru memakai bundle 44 migration. Kolom
+dan sebelum deploy aplikasi baru. Database baru memakai bundle 45 migration. Kolom
 `account_memberships.sales_areas` berupa array teks, default kosong untuk akun lama.
 Migration tidak mengubah NIP, role, status super, scope Editor, password, atau Favorit.
 Seluruh pemeriksaan sesi kini membaca kolom ini, sehingga migration diperlukan sebelum
@@ -51,7 +59,7 @@ uji browser diintersep menjadi fixture; pengujian ini tidak mengubah akun/area l
 
 Terapkan `supabase/migrations/202611100002_contact_page.sql` pada database existing
 setelah migration sebelumnya, sebelum deploy aplikasi baru. Jangan menjalankan ulang
-`setup.sql`. Database baru memakai bundle 44 migration. Migration membuat satu row
+`setup.sql`. Database baru memakai bundle 45 migration. Migration membuat satu row
 `contact_page` dengan isi Kontak yang sebelumnya statis, tanpa mengubah akun atau katalog.
 Mengulang migration tidak menimpa konten yang sudah diedit.
 
@@ -108,13 +116,13 @@ awal saat pendaftaran. `admin_memberships` dipensiunkan melalui migration
 Deploy aplikasi/provisioning baru dahulu, lalu terapkan migration setelah instance lama
 berhenti. Jangan menjalankan ulang setup pada database existing. Ikuti
 [rollout, pemeriksaan, dan rollback](nip-auth.md#sumber-hak-akses-aktif-10-november-2026).
-Database baru memakai bundle 44 migration. Bagian akun admin legacy di bawah adalah riwayat.
+Database baru memakai bundle 45 migration. Bagian akun admin legacy di bawah adalah riwayat.
 
 ## Autentikasi NIP (10 November 2026)
 
 Daftar/login sekarang memakai NIP + kata sandi tanpa email. Terapkan migration
 `202611060001_employee_nip_auth.sql`, isi registry kosong, dan petakan akun lama sebelum
-deploy. Database baru memakai bundle 44 migration. Ikuti [panduan NIP](nip-auth.md)
+deploy. Database baru memakai bundle 45 migration. Ikuti [panduan NIP](nip-auth.md)
 untuk pengisian tabel, konfigurasi server, penutupan public signup, reset password, dan rollback.
 Ketentuan email dan pilihan hak Editor bebas pada catatan historis berikut sudah digantikan.
 

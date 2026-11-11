@@ -1,5 +1,11 @@
 # KPP Produk Satu
 
+**Hapus cabang Struktur Produk:** terapkan
+`202611110001_delete_product_structure.sql` sebelum deploy versi ini. Aksi hapus permanen
+menggantikan arsip pada UI, mencakup seluruh turunan, dan menolak cabang yang masih dipakai
+buku draf/published. Tidak membersihkan arsip lama otomatis. Lihat [rollout dan rollback](docs/product-structure.md#migration-dan-rollback).
+Migration belum diterapkan ke Supabase live oleh agent.
+
 Hak akses aktif memakai `account_memberships` dan `editor_scopes`; `employee_registry`
 menyimpan NIP dan ketentuan pendaftaran. Deploy aplikasi baru dahulu, lalu terapkan
 `202611100001_retire_admin_memberships.sql` untuk mengarsipkan tabel admin lama secara
@@ -19,7 +25,7 @@ Fondasi katalog produk dengan Nuxt 4, Vue 3, TypeScript, Tailwind CSS, Nuxt UI, 
 ## Mulai di Windows
 
 Untuk menyiapkan database Supabase baru lewat satu file, gunakan
-[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 44 migrasi
+[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 45 migrasi
 dengan komentar section dan penjelasan singkat. Ikuti [panduan file gabungan](docs/supabase.md#setup-satu-file-untuk-database-baru).
 Database yang sudah terpasang tetap memakai migrasi incremental; jangan jalankan ulang file setup.
 
@@ -44,10 +50,11 @@ Docker, dan pemeriksaan interaksi browser belum diverifikasi untuk dashboard ini
 ## Yang tersedia
 
 **Kelola Struktur Produk** tersedia untuk Editor super pada `/admin`. Hierarki per
-jenjang mendukung kategori/subcabang, urutan, status produk opsional, serta arsip subtree
+jenjang mendukung kategori/subcabang, urutan, status produk opsional, serta hapus permanen subtree
 yang ditolak bila masih dipakai buku termasuk draf. Form buku menyediakan pilihan jalur
 yang bisa dicari; detail published menghubungkan ke struktur publik dengan cabang disorot.
-Terapkan `202611100005_product_structure.sql` sebelum deploy. Produksi mulai tanpa seed;
+Terapkan `202611100005_product_structure.sql` dan `202611110001_delete_product_structure.sql`
+sebelum deploy. Produksi mulai tanpa seed;
 lihat [model, rollout, dan pengujian Struktur Produk](docs/product-structure.md).
 
 Sales mengisi satu atau beberapa area setelah login NIP berhasil, sebelum melanjutkan
@@ -83,7 +90,7 @@ tanpa spasi/tanda hubung agar nol di depan tidak hilang. Ikuti [rollout metadata
   Judul boleh sama untuk edisi atau tahun terbit berbeda. Terapkan migration
   `202610150002_allow_duplicate_book_titles.sql` sebelum deploy.
 - Carousel sampul buku pilihan di hero beranda, berganti setiap 5 detik; hanya Editor super mengelolanya
-  hanya lewat modal dashboard, maksimal 8 buku, dan dapat digeser pada carousel. Terapkan migration
+  lewat halaman `/admin/buku-pilihan`, maksimal 8 buku, dan dapat digeser pada carousel. Terapkan migration
   `202610150001_featured_books_limit.sql` sebelum mengelola pilihan buku di Supabase.
 - API `GET /api/products` dan `GET /api/products/:identifier`, dengan validasi Zod.
 - Pilihan data fixture atau Supabase; kegagalan Supabase tidak diam-diam diganti fixture.

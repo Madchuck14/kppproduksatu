@@ -1,5 +1,30 @@
 # Model akses saat ini: publik, Sales, dan Editor
 
+**Panel pilihan dropdown:** tema Nuxt UI di `app/app.config.ts` memberi radius 12 px
+tanpa border/ring pada Select, SelectMenu, dan InputMenu. Panel beranda serta pilihan
+Struktur Produk pada form buku memakai `sideOffset: 0`. Select HTML di seluruh halaman
+memakai `::picker(select)` dan `appearance: base-select` melalui feature query pada CSS
+global: panel membulat, tanpa border, dan berjarak nol dari pemicu, dengan penempatan
+otomatis ke atas bila ruang di bawah tidak cukup. Nilai native, validasi form, opsi
+nonaktif, dan event select tetap dipakai. Browser tanpa dukungan customizable select
+mempertahankan picker bawaan; fokus opsi tetap ditandai dengan latar hijau.
+
+**Navigasi pengelolaan Editor, 11 November 2026:** sidebar bersama di layout
+menautkan `/admin` (koleksi buku), `/admin/klasifikasi`, `/admin/kontak`,
+`/admin/struktur-produk`, dan `/admin/buku-pilihan`. Pengaturan tampil sebagai halaman,
+bukan modal; sidebar tetap tampil saat berpindah halaman, termasuk form Tambah/Edit Buku.
+Menu aktif mengikuti URL. Klasifikasi, kontak, struktur, dan buku pilihan dibatasi pada
+Editor super melalui middleware halaman; autentikasi dan otorisasi endpoint tetap berlaku.
+Form dan validasi memakai implementasi yang sama, tanpa perubahan schema atau API.
+Konfirmasi hapus buku dan hapus permanen cabang tetap memakai dialog. Penghapusan cabang
+memerlukan migration `202611110001_delete_product_structure.sql`; RPC khusus Editor super
+menghapus subtree atomik setelah menolak seluruh referensi buku draf/published. Pengunci
+struktur dan FK tetap aktif. Arsip lama serta endpoint arsip dipertahankan untuk kompatibilitas;
+tidak ada pembersihan otomatis. Lihat [rollout dan rollback](product-structure.md#migration-dan-rollback).
+`node scripts/verify-dashboard-browser.mjs` dengan `PLAYWRIGHT_MODULE_PATH` menguji
+navigasi, menu aktif, responsivitas, dan penyimpanan memakai fixture browser; bukan bukti
+persistensi atau RLS Supabase live.
+
 **Struktur Produk:** hierarki `product_structure_nodes` terpisah dari klasifikasi buku.
 Editor super mengelola `/admin/struktur-produk`; cabang aktif dibaca publik. Satu posisi
 buku disimpan melalui `products.structure_node_id` nullable. Jalur dihitung dari hierarki

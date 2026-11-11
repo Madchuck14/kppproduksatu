@@ -522,6 +522,7 @@ async function save() {
               <USelectMenu
                 id="new-book-structure"
                 v-model="structureChoice"
+                :content="{ sideOffset: 0 }"
                 :items="structureItems"
                 value-key="id"
                 label-key="label"

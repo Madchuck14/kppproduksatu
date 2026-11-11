@@ -222,6 +222,11 @@ const sections = [
     'Struktur Produk per jenjang',
     'Membuat hierarki aktif/arsip, referensi buku opsional, RLS Editor super, dan penguncian perubahan struktur serta posisi buku.',
   ],
+  [
+    '202611110001_delete_product_structure.sql',
+    'Hapus permanen cabang struktur',
+    'Menambahkan RPC hapus subtree khusus Editor super, menolak rujukan buku draf/published, dan mempertahankan arsip lama serta kompatibilitas klien.',
+  ],
 ]
 const directory = new URL('../supabase/migrations/', import.meta.url)
 const output = new URL('../supabase/setup.sql', import.meta.url)
@@ -233,7 +238,7 @@ if (JSON.stringify(filenames) !== JSON.stringify(sections.map(([name]) => name))
 }
 const parts = [
   '-- KPP PRODUK SATU - SETUP SUPABASE LENGKAP',
-  `-- Gabungan ${sections.length} migrasi berurutan, sampai versi 202611100005.`,
+  `-- Gabungan ${sections.length} migrasi berurutan, sampai versi 202611110001.`,
   '-- Untuk database Supabase BARU yang belum memiliki tabel aplikasi ini.',
   '-- Jalankan seluruh file sebagai database owner melalui SQL Editor.',
   '-- Jangan jalankan pada database existing atau hanya memilih section tertentu.',
