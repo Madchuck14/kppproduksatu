@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
-import { saveSalesAreasSchema } from '../shared/schemas/sales-areas.ts'
 
 // Use the already running port 3000. Auth mutations are browser fixtures, never live calls.
 const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE_PATH).href)
@@ -28,7 +27,6 @@ const account = {
   salesAreas: [],
 }
 let areaSaves = 0
-let failAreaSave = true
 const user = {
   id,
   aud: 'authenticated',
@@ -45,6 +43,12 @@ const respond = (route, status, body) =>
   route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
 await page.route('**/api/auth/register', (route) => {
   registered = route.request().postDataJSON()
+  if (registered.nip === '999999')
+    return respond(route, 400, {
+      statusCode: 400,
+      statusMessage: 'NIP tidak cocok dengan data pegawai perusahaan.',
+      data: { code: 'NIP_NOT_FOUND' },
+    })
   return respond(route, 200, {
     message: 'Pendaftaran berhasil. Silakan masuk dengan NIP dan kata sandi Anda.',
   })
@@ -59,14 +63,8 @@ await page.route('**/api/auth/session', (route) =>
   respond(route, loggedIn ? 200 : 401, loggedIn ? account : { statusCode: 401 }),
 )
 await page.route('**/api/auth/sales-areas', (route) => {
-  if (!loggedIn) return respond(route, 401, { statusCode: 401 })
-  if (account.role !== 'sales') return respond(route, 403, { statusCode: 403 })
   areaSaves++
-  if (failAreaSave)
-    return respond(route, 503, { statusMessage: 'Fixture: area belum dapat disimpan.' })
-  const parsed = saveSalesAreasSchema.parse(route.request().postDataJSON())
-  account.salesAreas = parsed.areas
-  return respond(route, 200, { areas: parsed.areas })
+  return respond(route, 500, { statusMessage: 'Area collection is no longer part of login.' })
 })
 await page.route('**/auth/v1/**', (route) => {
   if (route.request().url().includes('/logout')) {
@@ -143,6 +141,15 @@ try {
     await page.getByRole('alert').filter({ hasText: 'Konfirmasi kata sandi tidak cocok' }).waitFor()
     assert.equal(registered, undefined)
     await page.locator('#confirm-password').fill(password)
+    await page.locator('#register-nip').fill('999999')
+    await page.getByRole('button', { name: 'Daftar sebagai Sales', exact: true }).click()
+    await page
+      .getByRole('alert')
+      .filter({
+        hasText: 'NIP tidak cocok dengan data pegawai perusahaan.',
+      })
+      .waitFor()
+    await page.locator('#register-nip').fill('000123')
     await page.getByRole('radio', { name: /Editor/ }).check()
     await page.locator('#editor-education-level').selectOption('SMP')
     await page.setViewportSize({ width: 390, height: 844 })
@@ -164,47 +171,11 @@ try {
     await page.screenshot({ path: 'artifacts/nip-auth/login-mobile.png', fullPage: true })
     failLogin = false
     await page.getByRole('button', { name: 'Masuk', exact: true }).click()
-    await page.getByRole('heading', { name: 'Area Sales Anda', exact: true }).waitFor()
-    assert.equal(
-      new URL(page.url()).pathname,
-      '/login',
-      'Sales fills profile before following returnTo',
-    )
-    assert.equal(
-      await page.getByRole('button', { name: 'Hapus area 1', exact: true }).isDisabled(),
-      true,
-    )
-    await page.getByLabel('Area 1', { exact: true }).fill(' Jakarta Timur ')
-    await page.getByRole('button', { name: '+ Tambah area', exact: true }).click()
-    await page.getByLabel('Area 2', { exact: true }).fill('jakarta timur')
-    await page.getByRole('button', { name: 'Simpan area dan lanjutkan' }).click()
-    await page.getByRole('alert').filter({ hasText: 'Area tidak boleh duplikat.' }).waitFor()
-    assert.equal(areaSaves, 0)
-    await page.getByLabel('Area 2', { exact: true }).fill('Bekasi')
-    await page.getByRole('button', { name: '+ Tambah area', exact: true }).click()
-    await page.getByRole('button', { name: 'Hapus area 3', exact: true }).click()
-    await page.getByRole('button', { name: 'Simpan area dan lanjutkan' }).click()
-    await page
-      .getByRole('alert')
-      .filter({ hasText: 'Fixture: area belum dapat disimpan.' })
-      .waitFor()
-    assert.equal(await page.getByLabel('Area 2', { exact: true }).inputValue(), 'Bekasi')
-    await page.screenshot({ path: 'artifacts/nip-auth/sales-areas-mobile.png', fullPage: true })
-    failAreaSave = false
-    await page.getByRole('button', { name: 'Simpan area dan lanjutkan' }).click()
     await page.waitForURL(base + '/favorites')
     await page.getByRole('heading', { name: 'Buku Favorit', exact: true }).waitFor()
-    assert.deepEqual(account.salesAreas, ['Jakarta Timur', 'Bekasi'])
-    assert.match(await page.locator('.sales-area-summary').innerText(), /Jakarta Timur/)
-    await page.getByRole('link', { name: 'Ubah area', exact: true }).click()
-    await page.getByLabel('Area 2', { exact: true }).waitFor()
-    assert.equal(await page.getByLabel('Area 1', { exact: true }).inputValue(), 'Jakarta Timur')
-    await page.getByLabel('Area 2', { exact: true }).fill('Depok')
-    await page.setViewportSize({ width: 1440, height: 1000 })
-    await page.screenshot({ path: 'artifacts/nip-auth/sales-areas-desktop.png', fullPage: true })
-    await page.getByRole('button', { name: 'Simpan area dan lanjutkan' }).click()
-    await page.waitForURL(base + '/favorites')
-    assert.match(await page.locator('.sales-area-summary').innerText(), /Depok/)
+    assert.equal(areaSaves, 0, 'Sales goes directly to returnTo without saving areas')
+    assert.equal(await page.locator('.sales-area-summary').count(), 0)
+    assert.equal(await page.getByRole('link', { name: 'Ubah area', exact: true }).count(), 0)
     assert.equal(await page.getByRole('link', { name: 'Dashboard Editor', exact: true }).count(), 0)
     await page.getByRole('button', { name: 'Keluar', exact: true }).click()
     await page.waitForURL(base + '/')

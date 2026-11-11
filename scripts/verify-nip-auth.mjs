@@ -168,7 +168,14 @@ let authError = null
 let authUser = { id: sales, email: 'legacy@example.com' }
 let loginUserId = sales
 let credentials
+let records = 0
+let failRecord = false
+let revoked = 0
 const dependencies = {
+  recordSalesLogin: async () => {
+    records++
+    if (failRecord) throw Object.assign(new Error('Record failed'), { statusCode: 503 })
+  },
   findEmployee: async () => employee,
   getEmployeeAdmin: () => ({
     auth: {
@@ -183,6 +190,10 @@ const dependencies = {
   }),
   getCatalogClient: () => ({
     auth: {
+      signOut: async () => {
+        revoked++
+        return { error: null }
+      },
       signInWithPassword: async (input) => {
         credentials = input
         return {
@@ -240,6 +251,14 @@ assert.equal(credentials.email, 'legacy@example.com', 'Legacy Auth identity pres
 authUser = { id: sales, email: '000123@nip.invalid' }
 await login({ body: { nip: '000123', password } })
 assert.equal(credentials.email, '000123@nip.invalid')
+assert.equal(records, 2)
+failRecord = true
+await assert.rejects(
+  login({ body: { nip: '000123', password } }),
+  (error) => error.statusCode === 503,
+)
+assert.equal(revoked, 1)
+failRecord = false
 loginUserId = editor
 await assert.rejects(
   login({ body: { nip: '000123', password } }),
@@ -258,7 +277,13 @@ await assert.rejects(
 )
 authError = null
 employee = null
+await assert.rejects(
+  register({ body: { nip: '999', password } }),
+  (error) => error.data.code === 'NIP_NOT_FOUND' && /NIP tidak cocok/.test(error.message),
+)
+const recordedBeforeFailure = records
 await assert.rejects(login({ body: { nip: '999', password } }), (error) => error.statusCode === 401)
+assert.equal(records, recordedBeforeFailure)
 console.log(
   'PASS: empty registry, legacy preservation, atomic/duplicate claims, trusted role/scope, RLS isolation, metadata tampering, retry/rollback; actual register/login handlers with local Auth boundaries, NIP validation, legacy identity, wrong password/user and 429.',
 )

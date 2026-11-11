@@ -118,7 +118,7 @@ function resetPdfDialog() {
   pdfViewerBusy.value = false
 }
 watch(
-  () => user.value?.id,
+  () => user.value?.sub ?? user.value?.id,
   () => {
     closePdfDialog()
   },
@@ -217,7 +217,7 @@ useSeoMeta({
 
     <section class="detail-resources" aria-labelledby="resources-title">
       <h2 id="resources-title">Materi Promosi</h2>
-      <p class="resources-intro">Flyer, PPT Produk, dan Dummy Buku dapat dibuka tanpa login.</p>
+      <p class="resources-intro">Login untuk melihat dan mengunduh materi promosi buku.</p>
       <p v-if="resourceError" role="alert" class="resources-error">
         Status materi belum dapat dimuat. Muat ulang halaman.
       </p>
@@ -230,25 +230,28 @@ useSeoMeta({
           class="resource-card"
         >
           <div class="resource-preview" aria-hidden="true">
-            <span class="resource-format">{{ resourceFormat(resource.id) }}</span>
-            <div v-if="resource.id === 'flyer'" class="flyer-preview">
-              <img src="/images/book-detail/flyer-front.png" alt="" width="140" height="187" />
-              <img src="/images/book-detail/flyer-back.png" alt="" width="137" height="186" />
-            </div>
-            <div v-else-if="resource.id === 'product-knowledge'" class="presentation-preview">
-              <div class="presentation-slide">
-                <div class="slide-cover" />
-                <div class="slide-lines"><span /><span /><span /></div>
+            <UIcon v-if="!user" name="i-lucide-lock-keyhole" class="resource-lock" />
+            <template v-else>
+              <span class="resource-format">{{ resourceFormat(resource.id) }}</span>
+              <div v-if="resource.id === 'flyer'" class="flyer-preview">
+                <img src="/images/book-detail/flyer-front.png" alt="" width="140" height="187" />
+                <img src="/images/book-detail/flyer-back.png" alt="" width="137" height="186" />
               </div>
-            </div>
-            <img
-              v-else
-              :src="product.imageUrl"
-              alt=""
-              width="133"
-              height="199"
-              class="dummy-preview"
-            />
+              <div v-else-if="resource.id === 'product-knowledge'" class="presentation-preview">
+                <div class="presentation-slide">
+                  <div class="slide-cover" />
+                  <div class="slide-lines"><span /><span /><span /></div>
+                </div>
+              </div>
+              <img
+                v-else
+                :src="product.imageUrl"
+                alt=""
+                width="133"
+                height="199"
+                class="dummy-preview"
+              />
+            </template>
           </div>
           <div class="resource-body">
             <h3>{{ resource.title }}</h3>
@@ -262,7 +265,18 @@ useSeoMeta({
               }}
             </p>
             <p class="resource-description">{{ resource.description }}</p>
-            <p v-if="resourceError" class="resource-state">Status berkas belum tersedia</p>
+            <div v-if="!user" class="resource-actions">
+              <NuxtLink
+                :to="{
+                  path: '/login',
+                  query: { returnTo: `${getProductPath(product)}#${resource.id}` },
+                }"
+                class="resource-download"
+                :aria-label="`Login untuk melihat materi promosi: ${resource.title}`"
+                >Login untuk melihat materi promosi</NuxtLink
+              >
+            </div>
+            <p v-else-if="resourceError" class="resource-state">Status berkas belum tersedia</p>
             <p v-else-if="!resourceStatus" class="resource-state" role="status">
               Memeriksa berkas...
             </p>
@@ -795,6 +809,10 @@ useSeoMeta({
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 16px;
+}
+.resource-lock {
+  color: #1f5c3f;
+  font-size: 40px;
 }
 .resource-actions a,
 .resource-actions button {

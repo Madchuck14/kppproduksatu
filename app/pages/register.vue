@@ -59,12 +59,15 @@ async function register() {
     confirmPassword.value = ''
   } catch (error) {
     const status = (error as { statusCode?: number }).statusCode
+    const code = (error as { data?: { data?: { code?: string } } }).data?.data?.code
     message.value =
       status === 429
         ? 'Terlalu banyak percobaan. Coba lagi nanti.'
-        : status === 400
-          ? 'Pendaftaran tidak tersedia. Periksa NIP, jenis akun, dan jenjang, atau hubungi pengelola.'
-          : 'Pendaftaran belum dapat diproses. Coba lagi nanti.'
+        : code === 'NIP_NOT_FOUND'
+          ? 'NIP tidak cocok dengan data pegawai perusahaan.'
+          : status === 400
+            ? 'Pendaftaran tidak tersedia. Periksa NIP, jenis akun, dan jenjang, atau hubungi pengelola.'
+            : 'Pendaftaran belum dapat diproses. Coba lagi nanti.'
   } finally {
     loading.value = false
   }

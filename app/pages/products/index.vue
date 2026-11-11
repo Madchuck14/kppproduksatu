@@ -581,12 +581,17 @@ legend {
   color: #222;
 }
 .sort-control select {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   appearance: none;
   height: 38px;
-  width: 110px;
+  width: 140px;
   border: 1px solid #e6e8e4;
   border-radius: 10px;
-  padding: 0 26px 0 14px;
+  padding: 0 32px;
+  text-align: center;
+  text-align-last: center;
   background: white;
 }
 .catalog-grid {

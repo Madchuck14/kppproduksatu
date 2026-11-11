@@ -2,6 +2,7 @@ import { serverSupabaseServiceRole } from '#supabase/server'
 import type { H3Event } from 'h3'
 import { z } from 'zod'
 import { educationLevelSchema, nipSchema } from '#shared/schemas/auth'
+import type { AccountDatabase } from '#shared/types/account-database'
 
 const employeeSchema = z.object({
   nip: nipSchema,
@@ -14,7 +15,7 @@ export function getEmployeeAdmin(event: H3Event) {
   const config = useRuntimeConfig(event)
   if (!config.supabase.secretKey && !config.supabase.serviceKey)
     throw createError({ statusCode: 503, statusMessage: 'Layanan akun belum dikonfigurasi.' })
-  return serverSupabaseServiceRole(event)
+  return serverSupabaseServiceRole<AccountDatabase>(event)
 }
 
 export async function findEmployee(event: H3Event, nip: string) {

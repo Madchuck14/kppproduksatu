@@ -1,7 +1,7 @@
 # Pendaftaran dan login dengan NIP
 
 Pengguna mendaftar dan masuk memakai NIP serta kata sandi, tanpa email. NIP berupa teks
-1–32 digit; nol awal dipertahankan. Katalog dan materi published tetap publik. Dokumen ini
+1–32 digit; nol awal dipertahankan. Katalog tetap publik; materi promosi memerlukan login. Dokumen ini
 menggantikan ketentuan pendaftaran email dan pemilihan hak Editor secara bebas.
 
 ## Sumber hak akses aktif (10 November 2026)
@@ -40,7 +40,7 @@ izin aktif pada membership/scope tetap dipertahankan. Arsip mencerminkan members
 admin sebelum migration, sehingga pengelola perlu meninjau ulang hak legacy sebelum
 mengaktifkan versi lama. Jangan mengubah arsip selama aplikasi baru berjalan.
 
-Database baru memakai `supabase/setup.sql` berisi 44 migration. Verifikasi terisolasi:
+Database baru memakai `supabase/setup.sql` berisi 48 migration. Verifikasi terisolasi:
 `PGLITE_MODULE_PATH` menunjuk `dist/index.js` PGlite, lalu jalankan
 `node scripts/verify-account-access.mjs` dan `node scripts/verify-supabase-setup.mjs`.
 Uji ini memeriksa pemeliharaan data, penolakan eskalasi izin, isolasi arsip, retry,
@@ -50,7 +50,7 @@ dan rollback; tidak membuktikan kondisi Auth/RLS Supabase live.
 
 Database existing: cadangkan data lalu terapkan migration berurutan sampai
 `supabase/migrations/202611060001_employee_nip_auth.sql`. Jangan menjalankan ulang `setup.sql`.
-Database baru: gunakan `supabase/setup.sql`, yang menggabungkan 44 migration.
+Database baru: gunakan `supabase/setup.sql`, yang menggabungkan 48 migration.
 
 Migration NIP membuat tabel **kosong**, tanpa pegawai atau akun otomatis:
 
@@ -60,6 +60,8 @@ Migration NIP membuat tabel **kosong**, tanpa pegawai atau akun otomatis:
 | `role`            | `sales` (default) atau `editor`.                                         |
 | `education_level` | NULL untuk Sales; wajib SD/SMP/SMA/SMK untuk Editor.                     |
 | `user_id`         | ID Auth unik, NULL sebelum daftar; bisa diisi pengelola untuk akun lama. |
+| `name`            | Nama resmi pegawai; ditambahkan migration login Sales.                   |
+| `work_area`       | Daerah kerja tetap dari data resmi perusahaan.                           |
 | `created_at`      | Waktu pencatatan pegawai.                                                |
 
 Pengelola mengisi NIP nyata melalui SQL Editor/database owner atau tooling server tepercaya.
@@ -77,12 +79,16 @@ melalui RLS, tanpa role/jenjang registry atau pegawai lain. Penulisan hanya untu
 
 ## Alur akun
 
-Setelah migration `202611100004_sales_areas.sql`, Sales mengisi area pada langkah kedua
-halaman login. Kredensial tetap hanya NIP/password; area disimpan melalui endpoint profil
-terautentikasi setelah login, bukan metadata role dari klien. Area lama dimuat ulang dan
-tujuan awal tetap dipertahankan. Editor langsung menuju tujuannya seperti sebelumnya.
-Area merupakan label mandiri sampai sumber resmi tim IT tersedia; bukan pembatas izin.
-Ikuti [rollout, keamanan kolom, dan rollback area Sales](supabase.md#area-sales-yang-diisi-pengguna).
+Registry kini juga menyediakan `name` dan `work_area` resmi. NIP asing ditolak dengan
+pesan **NIP tidak cocok dengan data pegawai perusahaan.** Login Sales berhasil wajib
+tercatat per sesi pada `sales_login_events` sebelum token dikembalikan. Terapkan
+migration `202611110002_sales_login_events.sql` sebelum deploy. Lihat
+[rollout, dashboard penggunaan, dan rollback](sales-dashboard.md).
+
+Sales dan Editor langsung menuju tujuan awal setelah login NIP/password berhasil.
+Pendaftaran dan login tidak meminta area Sales; ringkasan serta pengubahan area tidak
+lagi ditampilkan pada header. Data area lama dan endpoint profil tetap dipertahankan
+untuk kompatibilitas, tanpa perubahan hak akses atau penghapusan data akun.
 
 `POST /api/auth/register` menerima `nip`, `password`, `role`, serta `educationLevel` untuk
 Editor. Zod memvalidasi input. Server mencocokkan role/jenjang dengan registry. NIP asing,

@@ -2,6 +2,7 @@
 import { pathToFileURL } from 'node:url'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { mkdir } from 'node:fs/promises'
 
 if (!process.env.PLAYWRIGHT_MODULE_PATH) throw new Error('PLAYWRIGHT_MODULE_PATH belum ditentukan.')
 const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE_PATH).href)
@@ -62,6 +63,37 @@ try {
   await page.route('**/__viewer-test__/material.pdf', (route) =>
     route.fulfill({ contentType: 'application/pdf', body: Buffer.from(pdf) }),
   )
+  const userId = '22222222-2222-4222-8222-222222222222'
+  const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url')
+  const token = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ sub: userId, role: 'authenticated', aud: 'authenticated', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600 })}.fixture`
+  const user = {
+    id: userId,
+    aud: 'authenticated',
+    role: 'authenticated',
+    email: 'fixture@nip.invalid',
+    app_metadata: { provider: 'email' },
+    user_metadata: {},
+    identities: [],
+    created_at: new Date().toISOString(),
+  }
+  const account = {
+    id: userId,
+    nip: '000123',
+    role: 'sales',
+    isSuper: false,
+    educationLevels: [],
+    salesAreas: [],
+  }
+  await page.route('**/auth/v1/**', (route) => route.fulfill({ json: user }))
+  await page.route('**/api/auth/login', (route) =>
+    route.fulfill({ json: { access_token: token, refresh_token: 'fixture-refresh' } }),
+  )
+  await page.route('**/api/auth/session', (route) => route.fulfill({ json: account }))
+  await page.route('**/api/favorites**', (route) =>
+    route.fulfill({
+      json: { ownerId: userId, ids: [], products: [], total: 0, page: 1, pageSize: 24 },
+    }),
+  )
   await page.goto(`${base}/login`, { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => Boolean(document.querySelector('#__nuxt')?.__vue_app__))
   await page.evaluate(
@@ -70,6 +102,40 @@ try {
         .querySelector('#__nuxt')
         .__vue_app__.config.globalProperties.$router.push(`/products/${identifier}`),
     book.bookCode || book.slug,
+  )
+  const cards = page.locator('.resource-card')
+  await cards.first().waitFor()
+  assert.equal(
+    await page.getByRole('link', { name: /Login untuk melihat materi promosi:/ }).count(),
+    3,
+  )
+  assert.equal(await page.getByRole('button', { name: /^Lihat:/ }).count(), 0)
+  assert.equal(await page.locator('.resource-card a[href*="download=1"]').count(), 0)
+  await mkdir('.data/materials-qa', { recursive: true })
+  await page.locator('.detail-resources').screenshot({ path: '.data/materials-qa/locked.png' })
+  for (const kind of ['dummy', 'product-knowledge', 'flyer']) {
+    const link = page
+      .locator(`#${kind}`)
+      .getByRole('link', { name: /Login untuk melihat materi promosi:/ })
+    const destination = new URL(await link.getAttribute('href'), base)
+    assert.equal(destination.pathname, '/login')
+    assert.equal(
+      destination.searchParams.get('returnTo'),
+      `/products/${book.bookCode || book.slug}#${kind}`,
+    )
+  }
+  await page
+    .locator('#dummy')
+    .getByRole('link', { name: /Login untuk melihat materi promosi:/ })
+    .click()
+  await page.locator('#nip').fill('000123')
+  await page.locator('#password').fill('FixturePassword123!')
+  await page.getByRole('button', { name: 'Masuk', exact: true }).click()
+  await page.waitForURL(`${base}/products/${book.bookCode || book.slug}#dummy`)
+  await page.getByRole('button', { name: 'Lihat: File Dummy Buku', exact: true }).waitFor()
+  assert.equal(
+    await page.getByRole('link', { name: /Login untuk melihat materi promosi:/ }).count(),
+    0,
   )
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
@@ -154,9 +220,27 @@ try {
   )
   await dummy.getByRole('button', { name: 'Tutup pratinjau File Dummy Buku', exact: true }).click()
   await dummy.waitFor({ state: 'hidden' })
+  await page.getByRole('button', { name: 'Keluar', exact: true }).click()
+  await page.waitForURL(base + '/')
+  await page.evaluate(
+    (identifier) =>
+      document
+        .querySelector('#__nuxt')
+        .__vue_app__.config.globalProperties.$router.push(`/products/${identifier}`),
+    book.bookCode || book.slug,
+  )
+  await page
+    .getByRole('link', { name: /Login untuk melihat materi promosi:/ })
+    .first()
+    .waitFor()
+  assert.equal(
+    await page.getByRole('link', { name: /Login untuk melihat materi promosi:/ }).count(),
+    3,
+  )
+  assert.equal(await page.getByRole('button', { name: /^Lihat:/ }).count(), 0)
   assert.deepEqual(errors, [])
   console.log(
-    'PASS: shared header, filename, zoom 50â€“200%, download/close/Escape, Flyer/PPT scroll on desktop/mobile, anonymous Dummy flipbook/zoom/page turn. Fixture PDFs; no live catalog writes.',
+    'PASS: shared header, filename, zoom 50â€“200%, download/close/Escape, Flyer/PPT scroll on desktop/mobile, authenticated Dummy flipbook/zoom/page turn; three anonymous login buttons and preserved material destination. Fixture PDFs; no live catalog writes.',
   )
 } finally {
   await browser.close()

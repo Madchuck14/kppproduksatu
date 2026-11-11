@@ -227,6 +227,21 @@ const sections = [
     'Hapus permanen cabang struktur',
     'Menambahkan RPC hapus subtree khusus Editor super, menolak rujukan buku draf/published, dan mempertahankan arsip lama serta kompatibilitas klien.',
   ],
+  [
+    '202611110002_sales_login_events.sql',
+    'Data pegawai dan catatan login Sales',
+    'Menambah nama/daerah kerja resmi, catatan login per sesi Auth, dan dashboard agregat khusus Editor super tanpa mengubah akun lama.',
+  ],
+  [
+    '202611110003_sales_login_periods.sql',
+    'Statistik login harian dan mingguan',
+    'Menambahkan total login dan daerah teratas per hari/minggu kalender WIB, mempertahankan event dan kontrak sebelumnya.',
+  ],
+  [
+    '202611110004_authenticated_book_materials.sql',
+    'Materi promosi wajib login',
+    'Menutup akses anonim ke Dummy, PPT Produk, preview PDF, dan Flyer sambil mempertahankan katalog publik serta scope Editor.',
+  ],
 ]
 const directory = new URL('../supabase/migrations/', import.meta.url)
 const output = new URL('../supabase/setup.sql', import.meta.url)
@@ -238,7 +253,7 @@ if (JSON.stringify(filenames) !== JSON.stringify(sections.map(([name]) => name))
 }
 const parts = [
   '-- KPP PRODUK SATU - SETUP SUPABASE LENGKAP',
-  `-- Gabungan ${sections.length} migrasi berurutan, sampai versi 202611110001.`,
+  `-- Gabungan ${sections.length} migrasi berurutan, sampai versi 202611110004.`,
   '-- Untuk database Supabase BARU yang belum memiliki tabel aplikasi ini.',
   '-- Jalankan seluruh file sebagai database owner melalui SQL Editor.',
   '-- Jangan jalankan pada database existing atau hanya memilih section tertentu.',

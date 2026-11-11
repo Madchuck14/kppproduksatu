@@ -1,6 +1,23 @@
 # Model akses saat ini: publik, Sales, dan Editor
 
+**Periksa Daerah Penjualan:** registry pegawai menyimpan NIP, nama, dan daerah kerja
+resmi. Login Sales berhasil dicatat pada `sales_login_events`, satu event per sesi Auth,
+sebelum token dikirim ke browser. Dashboard `/admin/daerah-penjualan` serta API/RPC
+khusus Editor super menampilkan login terakhir, total login hari/minggu kalender WIB,
+serta daerah teratas dan jumlah login pada kedua periode. Minggu dimulai Senin;
+semua daerah seri ditampilkan. Pembacaan memakai sesi pengguna; RPC dan RLS memeriksa role.
+Pencatatan hanya server dengan key admin. Migration `202611110002_sales_login_events.sql`
+dan `202611110003_sales_login_periods.sql` wajib sebelum deploy.
+Tidak ada backfill atau pengisian area mandiri.
+Lihat [model, rollout, dan batas metrik](sales-dashboard.md).
+
 **Panel pilihan dropdown:** tema Nuxt UI di `app/app.config.ts` memberi radius 12 px
+tanpa border/ring. Form Tambah/Edit Buku memakai Select Nuxt UI untuk jenjang, kelas,
+mata pelajaran, kurikulum, dan divisi, serta SelectMenu untuk Struktur Produk.
+Pemicu dan panel form buku memakai warna terang eksplisit, termasuk saat browser
+memilih tema gelap; panel memakai `sideOffset: 0`. Opsi kosong kurikulum/divisi tetap
+tersedia untuk menghapus metadata opsional. Validasi wajib dan reset lintas jenjang
+tetap berlaku. Pada halaman lainnya, tema Nuxt UI memberi radius 12 px
 tanpa border/ring pada Select, SelectMenu, dan InputMenu. Panel beranda serta pilihan
 Struktur Produk pada form buku memakai `sideOffset: 0`. Select HTML di seluruh halaman
 memakai `::picker(select)` dan `appearance: base-select` melalui feature query pada CSS
@@ -34,14 +51,9 @@ Editor per jenjang. Trigger dan pengunci transaksi bersama mencegah siklus, pili
 jenjang/arsip, dan arsip subtree yang masih dirujuk buku draf/published. Lihat
 [arsitektur dan batas verifikasi Struktur Produk](product-structure.md).
 
-**Area Sales, 10 November 2026:** setelah kredensial NIP terverifikasi, Sales mengisi
-1–10 area bebas sebelum melanjutkan dari halaman login. `account_memberships.sales_areas`
-menyimpan label profil; `/api/auth/session` mengembalikannya sebagai `salesAreas` dan
-`PUT /api/auth/sales-areas` hanya mengizinkan Sales memperbarui areanya sendiri. RLS serta
-privilege kolom melindungi role/status super dan akun lain. Area ditampilkan sebagai teks
-pada navigasi, dapat diubah ulang, dan tidak dipakai sebagai syarat akses. Editor tidak
-mengikuti langkah area. Data saat ini diisi pengguna; integrasi sumber resmi tim IT belum
-dibuat. Terapkan `202611100004_sales_areas.sql` sebelum deploy. Lihat [rollout area](supabase.md#area-sales-yang-diisi-pengguna).
+Pendataan area Sales sudah dihapus dari alur akun. Sales langsung melanjutkan ke
+tujuan awal setelah login; header tidak lagi menampilkan area atau tautan Ubah area.
+Data area lama dan API profil dipertahankan untuk kompatibilitas tanpa penghapusan data.
 
 **Sumber izin aktif, 10 November 2026:** `account_memberships` menetapkan role/status
 super dan `editor_scopes` menetapkan jenjang Editor. `employee_registry` menetapkan NIP
@@ -68,7 +80,7 @@ atomik. Client tidak memiliki hak tulis membership/scope. Field metadata super a
 jenjang tambahan tidak dipakai; perubahan metadata setelah signup tidak mengubah hak akses.
 Provisioning server tetap tersedia untuk Editor super dan perubahan hak oleh pengelola.
 
-Sales dan Editor dapat memakai Favorit pribadi. Katalog serta materi published tetap publik.
+Sales dan Editor dapat memakai Favorit pribadi. Katalog tetap publik; materi promosi memerlukan login.
 Login tanpa tujuan mengarah ke katalog untuk Sales dan dashboard untuk Editor. Tujuan buku
 atau Favorit yang tervalidasi dipertahankan melalui tautan daftar/login. Registrasi memakai
 public key di server, tidak mengganti session aktif dan tidak mengembalikan token.
@@ -78,13 +90,16 @@ Tabel pengajuan dan migration persetujuan lama hanya riwayat; aplikasi tidak mem
 RPC review dicabut. Akun/scope lama tidak diubah otomatis. Lihat [rollout pendaftaran langsung](supabase.md#pendaftaran-editor-langsung-per-jenjang-4-november-2026).
 Catatan historis tentang persetujuan, signup ditutup, atau Editor-only di bawah sudah digantikan.
 
-## Akses Dummy Buku publik
+## Materi promosi wajib login
 
-Setelah migration `202610160001_public_dummy_books.sql`, seluruh materi buku published
-(Flyer, PPT Produk, dan Dummy Buku) dapat dilihat dan diunduh tanpa login melalui endpoint
-yang sama. Repository memakai client anonim dengan filter published dan RLS Storage.
-Bucket tetap privat; draf dan objek yang tidak direferensikan buku published tetap terlindungi.
-Ketentuan Dummy login pada catatan historis di bawah sudah digantikan.
+Dummy Buku, PPT Produk (pratinjau PDF dan unduhan PowerPoint), serta Flyer memerlukan
+sesi Auth terverifikasi. Kartu anonim menampilkan ikon kunci dan tombol login dengan
+tujuan kembali ke materi masing-masing. Repository file memakai client sesi dan
+`auth.getUser()`, filter published, serta RLS Storage authenticated. Endpoint memberi
+no-store dan hanya menerbitkan URL 60 detik setelah login. Migration
+`202611110004_authenticated_book_materials.sql` menutup akses anonim; katalog dan
+status boolean/format materi tetap publik. Aturan ini menggantikan seluruh catatan
+historis materi publik di bawah. Lihat [rollout dan batas akses](material-access.md).
 
 # Arsitektur
 
@@ -221,7 +236,7 @@ kurikulum dan ISBN ditampilkan dari metadata opsional; keunggulan memakai daftar
 tersimpan. Form Editor dan halaman detail memakai divisi, sinopsis, serta target pasar dari migration katalog
 terbaru. Detail menampilkan ketiganya bersama identitas buku.
 Bagian Materi Promosi mengikuti ekspor lokal Figma `37:8192` dan ditampilkan kepada semua
-pengunjung. Flyer dan PPT Produk buku published dapat dibuka tanpa login; Dummy Buku memerlukan login.
+pengunjung. Flyer, PPT Produk, dan Dummy Buku memerlukan login.
 Panel hijau berisi kartu Flyer Promosi, Presentasi Buku,
 dan Buku Dummy, dengan pratinjau, status berkas, serta tombol unduh dan Lihat.
 Aset flyer dan ikon unduh disimpan di `public/images/book-detail`; pratinjau dummy memakai
@@ -229,7 +244,7 @@ sampul katalog. PPT Produk (Product Knowledge) memakai PPT/PPTX dengan preview g
 sedangkan Flyer dan Dummy Buku memakai PDF. Label unduhan mengikuti format nyata, termasuk PDF
 Product Knowledge lama yang tetap dapat dibuka.
 Ukuran contoh tidak ditampilkan karena metadata tersebut belum tersedia. Endpoint preview dan
-unduhan Dummy Buku memverifikasi login pada server; seluruh materi membatasi buku published.
+unduhan seluruh materi memverifikasi login pada server; seluruh materi membatasi buku published.
 Pratinjau dummy mengikuti ekspor `figmatocode/previewdummy`: dialog putih beradius 20 px,
 toolbar nama PDF, tombol tutup/unduh, zoom 50–200%, area baca abu-abu, dan navigasi halaman
 mengambang. Isi serta jumlah halaman berasal dari PDF nyata; pembalikan halaman memakai

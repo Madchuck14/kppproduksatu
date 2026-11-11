@@ -61,9 +61,13 @@ memeriksa parser, penundaan subtree/prosa, konflik, pengulangan, serta rollback 
 2. Pilih tab SD/SMP/SMA/SMK. **Tambah kategori** membuat cabang utama; pilih cabang
    lalu **Tambah subcabang** untuk membuat anaknya. Panel kanan mengatur nama, induk,
    urutan, dan status produk. Panel berpindah ke bawah daftar pada layar sempit.
-3. Pada Tambah/Edit Buku, field opsional **Struktur Produk** berada setelah Jenjang.
-   Cari nama/jalur lalu pilih satu posisi. **Lepas pilihan** menyimpan NULL. Mengubah
-   jenjang mengosongkan pilihan sebelumnya. Buku lama tanpa struktur tetap dapat disimpan.
+3. Pada Tambah/Edit Buku, field wajib **Struktur Produk** berada setelah Jenjang dan
+   aktif setelah jenjang dipilih serta data cabang selesai dimuat. Cari nama/jalur lalu
+   pilih satu posisi. **Lepas pilihan** mengosongkan pilihan sementara; form tidak dapat
+   disimpan sebelum struktur dipilih kembali. Mengubah jenjang mengosongkan pilihan
+   sebelumnya. Buku lama tanpa struktur harus dilengkapi sebelum disimpan lewat form.
+   Jika belum ada cabang aktif, hubungi Editor super untuk menambahkannya. Validasi juga
+   berlaku saat membuat draf sebelum unggahan pertama; kontrak API nullable tetap kompatibel.
 4. Detail buku published yang terhubung menampilkan jalur dan **Lihat struktur [jenjang]**.
    Tautan menuju `/struktur-produk?level=SD&node=<UUID>`; jalur leluhur dibuka dan cabang
    disorot. Nama dan induk yang berubah tercermin dari hierarki yang sama.
@@ -127,7 +131,7 @@ struktur dan sebelum deploy aplikasi baru. Migration hanya menambahkan RPC; tida
 data atau memberi privilege DELETE langsung. RPC memakai pengunci transaksi yang sama
 dengan perubahan hierarki dan posisi buku, memeriksa Editor super serta seluruh referensi
 buku, kemudian menghapus subtree dalam satu statement. FK tetap aktif.
-Database baru memakai bundle 45 migration. Agent tidak menerapkan migration ke Supabase live.
+Database baru memakai bundle 48 migration. Agent tidak menerapkan migration ke Supabase live.
 
 Rollback fitur: jalankan aplikasi sebelumnya, lalu bila diperlukan cabut RPC baru dengan
 `DROP FUNCTION public.delete_product_structure_node(uuid);`. Kolom, data, RPC arsip lama,
@@ -137,7 +141,7 @@ Tidak ada pembersihan massal arsip lama.
 
 Terapkan `supabase/migrations/202611100005_product_structure.sql` setelah migration
 sebelumnya, sebelum deploy aplikasi baru. Database baru memakai `supabase/setup.sql`
-berisi 45 migration. Jangan menjalankan ulang setup pada database existing. Sebelum
+berisi 48 migration. Jangan menjalankan ulang setup pada database existing. Sebelum
 pengelola mulai menghubungkan buku, pastikan seluruh instance aplikasi sudah diperbarui.
 Migration mempertahankan buku lama dengan pilihan NULL dan tidak membuat struktur contoh.
 Agent tidak menerapkan migration ini ke Supabase live.

@@ -13,8 +13,13 @@ export default defineEventHandler(async (event) => {
         'Pendaftaran tidak tersedia. Periksa NIP dan jenis akun, atau hubungi pengelola.',
     })
   const employee = await findEmployee(event, nip)
+  if (!employee)
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'NIP tidak cocok dengan data pegawai perusahaan.',
+      data: { code: 'NIP_NOT_FOUND' },
+    })
   if (
-    !employee ||
     employee.user_id ||
     employee.role !== role ||
     employee.education_level !== (educationLevel ?? null)

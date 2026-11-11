@@ -15,6 +15,11 @@ const props = defineProps<{
   account: AccountSession
 }>()
 const savedId = ref(props.book?.id)
+const bookSelectUi = {
+  base: 'w-full h-[46px] rounded-xl bg-white dark:bg-white text-[#222] dark:text-[#222] ring-[#e6e8e4] dark:ring-[#e6e8e4] text-[15px]',
+  content: 'bg-white dark:bg-white text-[#222] dark:text-[#222]',
+  item: 'text-[#222] dark:text-[#222] data-highlighted:before:bg-[#edf5ef] dark:data-highlighted:before:bg-[#edf5ef]',
+}
 let nextAuthorId = 0
 const authors = ref(
   (props.book?.author.split(';') ?? ['']).map((name) => ({
@@ -58,7 +63,8 @@ const materials = [
 ] as const
 const form = reactive({
   bookCode: props.book?.bookCode ?? '',
-  educationLevel: props.book?.educationLevel ?? '',
+  educationLevel: (props.book?.educationLevel ?? '') as
+    '' | (typeof educationLevelSchema.options)[number],
   structureNodeId: props.book?.structureNodeId ?? (null as string | null),
   divisionCode: (props.book?.divisionCode ?? '') as DivisionCode | '',
   grade: props.book?.grade ?? null,
@@ -264,6 +270,11 @@ function parseBookForm() {
 function checkBookForm() {
   const parsed = parseBookForm()
   errors.value = {}
+  if (!form.structureNodeId) {
+    errors.value.structureNodeId = 'Struktur Produk wajib dipilih.'
+    message.value = 'Lengkapi kolom wajib yang ditandai sebelum mengunggah atau menyimpan buku.'
+    return null
+  }
   if (!authors.value[0]?.name.trim()) {
     errors.value.author = 'Penulis pertama wajib diisi.'
     message.value = 'Lengkapi kolom wajib yang ditandai sebelum mengunggah atau menyimpan buku.'
@@ -378,7 +389,9 @@ async function save() {
 <template>
   <form class="create-book-form" :aria-busy="busy" @submit.prevent="save">
     <div class="form-toolbar">
-      <NuxtLink to="/admin">← Kembali ke dashboard</NuxtLink>
+      <UButton to="/admin" variant="outline" class="back-to-dashboard">
+        ← Kembali ke dashboard
+      </UButton>
       <span>Kolom bertanda <span aria-hidden="true">*</span> wajib diisi</span>
     </div>
     <h1>{{ book ? 'Edit buku' : 'Tambah buku' }}</h1>
@@ -506,26 +519,33 @@ async function save() {
           <div class="field-row">
             <div class="form-field">
               <label for="new-book-level">Jenjang pendidikan <span class="required">*</span></label>
-              <select
+              <USelect
                 id="new-book-level"
-                v-model="form.educationLevel"
+                :model-value="form.educationLevel || undefined"
+                :items="levels"
+                placeholder="Pilih jenjang"
+                :content="{ sideOffset: 0 }"
+                :ui="bookSelectUi"
                 required
                 :aria-invalid="!!errors.educationLevel"
-              >
-                <option value="" disabled>Pilih jenjang</option>
-                <option v-for="item in levels" :key="item" :value="item">{{ item }}</option>
-              </select>
+                @update:model-value="form.educationLevel = $event ?? ''"
+              />
               <p v-if="errors.educationLevel" class="field-error">{{ errors.educationLevel }}</p>
             </div>
             <div class="form-field">
-              <label for="new-book-structure">Struktur Produk (opsional)</label>
+              <label for="new-book-structure"
+                >Struktur Produk <span class="required">*</span></label
+              >
               <USelectMenu
                 id="new-book-structure"
                 v-model="structureChoice"
                 :content="{ sideOffset: 0 }"
                 :items="structureItems"
+                :ui="bookSelectUi"
                 value-key="id"
                 label-key="label"
+                required
+                :aria-invalid="!!errors.structureNodeId"
                 :disabled="
                   !form.educationLevel || structureStatus === 'pending' || !!structureError
                 "
@@ -555,27 +575,26 @@ async function save() {
                 "
                 class="field-help"
               >
-                Belum ada cabang aktif untuk jenjang ini. Buku tetap dapat disimpan tanpa struktur.
+                Belum ada cabang aktif untuk jenjang ini. Hubungi Editor super untuk menambahkan
+                struktur sebelum menyimpan buku.
               </p>
               <p v-if="errors.structureNodeId" class="field-error">{{ errors.structureNodeId }}</p>
             </div>
             <div class="form-field">
               <label for="new-book-grade">Kelas <span class="required">*</span></label>
-              <select
+              <USelect
                 id="new-book-grade"
-                v-model="form.grade"
+                :model-value="form.grade ?? undefined"
+                :items="gradeOptions.map((value) => ({ label: `Kelas ${value}`, value }))"
+                :placeholder="form.educationLevel ? 'Pilih kelas' : 'Pilih jenjang dulu'"
+                :content="{ sideOffset: 0 }"
+                :ui="bookSelectUi"
                 required
                 :disabled="!gradeOptions.length"
                 :aria-invalid="!!errors.grade"
                 aria-describedby="new-book-grade-help"
-              >
-                <option :value="null" disabled>
-                  {{ form.educationLevel ? 'Pilih kelas' : 'Pilih jenjang dulu' }}
-                </option>
-                <option v-for="item in gradeOptions" :key="item" :value="item">
-                  Kelas {{ item }}
-                </option>
-              </select>
+                @update:model-value="form.grade = $event ?? null"
+              />
               <p id="new-book-grade-help" class="field-help">
                 Pilih jenjang untuk menampilkan kelas.
               </p>
@@ -585,19 +604,19 @@ async function save() {
           <div class="field-row">
             <div class="form-field">
               <label for="new-book-subject">Mata pelajaran <span class="required">*</span></label>
-              <select
+              <USelect
                 id="new-book-subject"
-                v-model="form.subject"
+                :model-value="form.subject || undefined"
+                :items="subjectOptions"
+                :placeholder="form.educationLevel ? 'Pilih mata pelajaran' : 'Pilih jenjang dulu'"
+                :content="{ sideOffset: 0 }"
+                :ui="bookSelectUi"
                 required
                 :disabled="!subjectOptions.length"
                 :aria-invalid="!!errors.subject"
                 aria-describedby="new-book-subject-help"
-              >
-                <option value="" disabled>
-                  {{ form.educationLevel ? 'Pilih mata pelajaran' : 'Pilih jenjang dulu' }}
-                </option>
-                <option v-for="item in subjectOptions" :key="item" :value="item">{{ item }}</option>
-              </select>
+                @update:model-value="form.subject = $event ?? ''"
+              />
               <p id="new-book-subject-help" class="field-help">
                 Pilih jenjang untuk menampilkan mata pelajaran.
               </p>
@@ -605,16 +624,16 @@ async function save() {
             </div>
             <div class="form-field">
               <label for="new-book-curriculum">Kurikulum</label>
-              <select
+              <USelect
                 id="new-book-curriculum"
-                v-model="form.curriculum"
+                :model-value="form.curriculum || undefined"
+                :items="[{ label: 'Tanpa kurikulum', value: null }, ...curriculumOptions]"
+                placeholder="Pilih kurikulum"
+                :content="{ sideOffset: 0 }"
+                :ui="bookSelectUi"
                 :aria-invalid="!!errors.curriculum"
-              >
-                <option value="">Pilih kurikulum</option>
-                <option v-for="item in curriculumOptions" :key="item" :value="item">
-                  {{ item }}
-                </option>
-              </select>
+                @update:model-value="form.curriculum = $event ?? ''"
+              />
               <p v-if="errors.curriculum" class="field-error">{{ errors.curriculum }}</p>
               <p v-if="classificationError" role="alert" class="field-error">
                 Klasifikasi gagal dimuat.
@@ -625,16 +644,18 @@ async function save() {
           <div class="field-row">
             <div class="form-field">
               <label for="new-book-division">Divisi</label>
-              <select
+              <USelect
                 id="new-book-division"
-                v-model="form.divisionCode"
+                :model-value="form.divisionCode || undefined"
+                :items="[{ name: 'Tanpa divisi', code: null }, ...divisionOptions]"
+                value-key="code"
+                label-key="name"
+                placeholder="Pilih divisi"
+                :content="{ sideOffset: 0 }"
+                :ui="bookSelectUi"
                 :aria-invalid="!!errors.divisionCode"
-              >
-                <option value="">Pilih divisi</option>
-                <option v-for="item in divisionOptions" :key="item.code" :value="item.code">
-                  {{ item.name }}
-                </option>
-              </select>
+                @update:model-value="form.divisionCode = $event ?? ''"
+              />
               <p v-if="errors.divisionCode" class="field-error">{{ errors.divisionCode }}</p>
             </div>
           </div>
@@ -974,18 +995,26 @@ async function save() {
 }
 .form-toolbar {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding-top: 24px;
   color: #6b6f6b;
   font-size: 13px;
 }
-.form-toolbar a,
+.form-toolbar .back-to-dashboard,
 .add-highlight {
   color: #1f5c3f;
 }
-.form-toolbar a:hover {
-  text-decoration: underline;
+.back-to-dashboard {
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1px solid #1f5c3f;
+  border-radius: 12px;
+  background: white;
+}
+.back-to-dashboard:hover {
+  background: #edf5ef;
 }
 .create-book-form h1 {
   margin-top: 12px;

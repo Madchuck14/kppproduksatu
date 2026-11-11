@@ -7,7 +7,10 @@ import { structureIds } from './fixtures/product-structure.mjs'
 const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE_PATH).href)
 const base = process.env.STRUCTURE_TEST_BASE_URL || 'http://localhost:3000'
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
-const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
+const page = await browser.newPage({
+  viewport: { width: 1440, height: 1000 },
+  colorScheme: 'dark',
+})
 const account = {
   id: '77777777-7777-4777-8777-777777777777',
   nip: '000000000',
@@ -209,6 +212,17 @@ async function saveBranch(name) {
   await page.getByRole('button', { name: 'Simpan cabang', exact: true }).click()
   await page.getByRole('status').filter({ hasText: 'Cabang berhasil disimpan.' }).waitFor()
 }
+async function chooseBookOption(id, name) {
+  await page.locator(id).click()
+  assert.equal(
+    await page
+      .getByRole('listbox')
+      .evaluate((element) => getComputedStyle(element).backgroundColor),
+    'rgb(255, 255, 255)',
+    'Book dropdown stays white with dark browser preference',
+  )
+  await page.getByRole('option', { name, exact: true }).click()
+}
 try {
   await page.goto(base + '/login')
   await page.waitForFunction(
@@ -264,31 +278,42 @@ try {
   await page.locator('#new-book-code').fill('910001')
   await page.locator('#new-book-year').fill('2026')
   await page.locator('#new-book-price').fill('100000')
-  await page.locator('#new-book-level').selectOption('SD')
+  await chooseBookOption('#new-book-level', 'SD')
   await page.locator('#new-book-structure').click()
   await page.getByPlaceholder('Cari nama atau jalur cabang...').fill('Bupena')
   await page
     .getByRole('option', { name: 'Buku Soal → Asesmen Formatif → Bupena Merdeka', exact: true })
     .click()
-  await page.locator('#new-book-level').selectOption('SMP')
+  await chooseBookOption('#new-book-level', 'SMP')
   await page
     .getByRole('button', { name: 'Lepas pilihan', exact: true })
     .waitFor({ state: 'hidden' })
   await page.locator('#new-book-structure').click()
   assert.equal(await page.getByRole('option', { name: /Bupena/ }).count(), 0)
   await page.keyboard.press('Escape')
-  await page.locator('#new-book-level').selectOption('SD')
+  await chooseBookOption('#new-book-level', 'SD')
   await page.locator('#new-book-structure').click()
   await page
     .getByRole('option', { name: 'Buku Soal → Asesmen Formatif → Bupena Merdeka', exact: true })
     .click()
-  await page.locator('#new-book-grade').selectOption('1')
-  await page.locator('#new-book-subject').selectOption('Matematika')
+  await chooseBookOption('#new-book-grade', 'Kelas 1')
+  await chooseBookOption('#new-book-subject', 'Matematika')
+  await page.getByRole('button', { name: 'Lepas pilihan', exact: true }).click()
+  await page.getByRole('button', { name: 'Simpan buku', exact: true }).click()
+  assert.equal(savedBook, undefined, 'New book without structure must not be saved')
+  assert.equal(new URL(page.url()).pathname, '/admin/books/new')
+  await page.locator('#new-book-structure').click()
+  await page.getByRole('option', { name: /Bupena Merdeka/, exact: false }).click()
   await page.getByRole('checkbox', { name: /Publikasikan buku/ }).check()
   await page.getByRole('button', { name: 'Simpan buku', exact: true }).click()
   await page.waitForURL(base + '/admin?notice=saved')
   assert.equal(savedBook.structureNodeId, structureIds.leaf)
   await page.getByRole('link', { name: 'Edit', exact: true }).click()
+  await page.getByRole('button', { name: 'Lepas pilihan', exact: true }).click()
+  await page.getByRole('button', { name: /Simpan/ }).click()
+  assert.match(new URL(page.url()).pathname, /\/admin\/books\//)
+  await page.locator('#new-book-structure').click()
+  await page.getByRole('option', { name: /Bupena Merdeka/, exact: false }).click()
   await page
     .getByText('Buku Soal → Asesmen Formatif → Bupena Merdeka', { exact: false })
     .first()

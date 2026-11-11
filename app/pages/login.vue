@@ -2,13 +2,11 @@
 import { loginReturnToSchema } from '#shared/schemas/navigation'
 import { loginSchema } from '#shared/schemas/auth'
 import type { AccountSession } from '#shared/types/account'
-import { maxSalesAreas, saveSalesAreasSchema } from '#shared/schemas/sales-areas'
 
 const config = useRuntimeConfig()
 useSeoMeta({ title: `Login | ${config.public.siteName}`, robots: 'noindex, nofollow' })
 const route = useRoute()
 const account = ref<AccountSession | null>(null)
-const areas = ref<string[]>([''])
 const returnTo = computed(() => {
   const result = loginReturnToSchema.safeParse(route.query.returnTo)
   return result.success ? result.data : account.value?.role === 'editor' ? '/admin' : '/products'
@@ -23,7 +21,6 @@ const showPassword = ref(false)
 const requestFetch = useRequestFetch()
 async function loadAccount() {
   account.value = await requestFetch<AccountSession>('/api/auth/session')
-  areas.value = account.value.salesAreas?.length ? [...account.value.salesAreas] : ['']
 }
 if (user.value) {
   try {
@@ -55,7 +52,7 @@ async function login() {
     if (error) throw error
     await loadAccount()
     password.value = ''
-    if (account.value?.role !== 'sales') await navigateTo(returnTo.value)
+    await navigateTo(returnTo.value)
   } catch (error) {
     await client.auth.signOut({ scope: 'local' })
     account.value = null
@@ -68,35 +65,6 @@ async function login() {
           : status === 403
             ? 'NIP atau hak akses akun belum terdaftar. Hubungi pengelola.'
             : 'Login belum dapat diproses. Coba lagi nanti.'
-  } finally {
-    loading.value = false
-  }
-}
-async function addArea() {
-  if (loading.value || areas.value.length >= maxSalesAreas) return
-  areas.value.push('')
-  await nextTick()
-  document.getElementById(`sales-area-${areas.value.length - 1}`)?.focus()
-}
-async function saveAreas() {
-  if (loading.value || account.value?.role !== 'sales') return
-  message.value = ''
-  const parsed = saveSalesAreasSchema.safeParse({ areas: areas.value })
-  if (!parsed.success) {
-    message.value = parsed.error.issues[0]?.message ?? 'Periksa area Sales Anda.'
-    return
-  }
-  loading.value = true
-  try {
-    const saved = await $fetch('/api/auth/sales-areas', { method: 'PUT', body: parsed.data })
-    areas.value = saved.areas
-    account.value = { ...account.value, salesAreas: saved.areas }
-    await refreshNuxtData('navigation-account')
-    await navigateTo(returnTo.value)
-  } catch (error) {
-    message.value =
-      (error as { data?: { statusMessage?: string } }).data?.statusMessage ??
-      'Area belum dapat disimpan. Isian Anda tetap tersedia. Silakan coba lagi.'
   } finally {
     loading.value = false
   }
@@ -147,57 +115,8 @@ async function logout() {
       </p>
       <p v-if="message" id="login-message" role="alert" class="login-alert">{{ message }}</p>
       <div v-if="user" class="login-account">
-        <form
-          v-if="account?.role === 'sales'"
-          class="sales-area-form"
-          :aria-busy="loading"
-          @submit.prevent="saveAreas"
-        >
-          <h2>Area Sales Anda</h2>
-          <p>Masukkan satu atau beberapa area yang Anda tangani. Area ini diisi oleh Anda.</p>
-          <div v-for="(_area, index) in areas" :key="index" class="sales-area-row">
-            <div class="login-field">
-              <label :for="`sales-area-${index}`">Area {{ index + 1 }}</label>
-              <input
-                :id="`sales-area-${index}`"
-                v-model="areas[index]"
-                type="text"
-                maxlength="100"
-                placeholder="Contoh: Jakarta Timur"
-                required
-                :disabled="loading"
-              />
-            </div>
-            <UButton
-              type="button"
-              color="error"
-              variant="ghost"
-              :aria-label="`Hapus area ${index + 1}`"
-              :disabled="loading || areas.length === 1"
-              @click="areas.splice(index, 1)"
-              >Hapus</UButton
-            >
-          </div>
-          <UButton
-            type="button"
-            color="neutral"
-            variant="outline"
-            :disabled="loading || areas.length >= maxSalesAreas"
-            @click="addArea"
-            >+ Tambah area</UButton
-          >
-          <UButton type="submit" class="login-primary" :loading="loading" :disabled="loading"
-            >Simpan area dan lanjutkan</UButton
-          >
-        </form>
-        <p v-else>
-          Anda sudah masuk. Lanjutkan ke tujuan Anda atau keluar untuk memakai akun lain.
-        </p>
-        <UButton
-          v-if="account && account.role !== 'sales'"
-          :to="returnTo"
-          class="login-primary"
-          :disabled="loading"
+        <p>Anda sudah masuk. Lanjutkan ke tujuan Anda atau keluar untuk memakai akun lain.</p>
+        <UButton v-if="account" :to="returnTo" class="login-primary" :disabled="loading"
           >Lanjutkan</UButton
         >
         <UButton variant="outline" class="login-secondary" :loading="loading" @click="logout"
@@ -437,27 +356,6 @@ async function logout() {
   font-size: 14px;
   line-height: 22px;
   color: #6b6f6b;
-}
-.sales-area-form {
-  display: grid;
-  gap: 16px;
-}
-.sales-area-form h2 {
-  color: #222;
-  font-size: 20px;
-  font-weight: 600;
-}
-.sales-area-row {
-  display: flex;
-  align-items: end;
-  gap: 8px;
-}
-.sales-area-row .login-field {
-  flex: 1;
-  min-width: 0;
-}
-.sales-area-row .login-field input {
-  width: 100%;
 }
 .login-notice,
 .login-alert {

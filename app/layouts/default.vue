@@ -2,7 +2,6 @@
 import EditorWorkspace from '~/components/EditorWorkspace.vue'
 import type { FavoriteIds } from '#shared/types/favorite'
 import { educationLevelSchema } from '#shared/schemas/auth'
-import { loginReturnToSchema } from '#shared/schemas/navigation'
 const config = useRuntimeConfig()
 const route = useRoute()
 const isLanding = computed(() => route.path === '/')
@@ -49,10 +48,6 @@ const { data: navigationAccount } = await useAsyncData(
   { watch: [() => user.value?.sub], default: () => null },
 )
 const account = useAccount()
-const salesAreaReturnTo = computed(() => {
-  const parsed = loginReturnToSchema.safeParse(route.fullPath)
-  return parsed.success ? parsed.data : '/products'
-})
 const favorites = useFavorites()
 await useAsyncData<FavoriteIds>(
   'favorite-ids',
@@ -181,50 +176,16 @@ async function logout() {
           <button
             v-if="user"
             type="button"
-            class="header-icon-button"
+            class="editor-dashboard-link logout-button"
             :disabled="loggingOut"
             :aria-busy="loggingOut"
             :aria-label="loggingOut ? 'Sedang keluar' : 'Keluar'"
             :title="loggingOut ? 'Sedang keluar' : 'Keluar'"
             @click="logout"
           >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.75"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <path d="m16 17 5-5-5-5M21 12H9" />
-            </svg>
+            {{ loggingOut ? 'Sedang keluar...' : 'Keluar' }}
           </button>
-          <NuxtLink
-            v-else
-            to="/login"
-            class="header-icon-button"
-            aria-label="Login Sales / Editor"
-            title="Login Sales / Editor"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              width="20"
-              height="20"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="8" r="3.5" />
-              <path d="M5 20c.7-3.2 3.2-5 7-5s6.3 1.8 7 5" />
-            </svg>
-          </NuxtLink>
+          <NuxtLink v-else to="/login" class="editor-dashboard-link"> Masuk/Daftar </NuxtLink>
           <NuxtLink
             v-if="isShowcase && account"
             to="/favorites"
@@ -288,16 +249,6 @@ async function logout() {
       <p v-if="logoutMessage" role="alert" class="mx-auto max-w-6xl px-6 pb-4 text-sm text-red-700">
         {{ logoutMessage }}
       </p>
-      <div v-if="account?.role === 'sales' && !isAuthPage" class="sales-area-summary">
-        <span class="sales-area-title">Area Sales:</span>
-        <span v-for="area in account.salesAreas ?? []" :key="area" class="sales-area-tag">{{
-          area
-        }}</span>
-        <span v-if="!account.salesAreas?.length">Belum diisi</span>
-        <NuxtLink :to="{ path: '/login', query: { returnTo: salesAreaReturnTo } }"
-          >Ubah area</NuxtLink
-        >
-      </div>
     </header>
     <main
       id="main-content"
@@ -406,32 +357,6 @@ async function logout() {
 </template>
 
 <style scoped>
-.sales-area-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  max-width: 1280px;
-  margin: auto;
-  padding: 8px 20px 12px;
-  color: #1f5c3f;
-  font-size: 13px;
-}
-.sales-area-title {
-  font-weight: 600;
-}
-.sales-area-tag {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  padding: 4px 10px;
-  border-radius: 8px;
-  background: #f4f8f5;
-}
-.sales-area-summary a {
-  margin-left: auto;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
 .login-main {
   padding: 80px 24px 82px;
 }
@@ -635,6 +560,18 @@ async function logout() {
   opacity: 0.6;
   cursor: wait;
 }
+.editor-dashboard-link:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.account-nav .logout-button {
+  border-color: #b3261e;
+  background: #b3261e;
+  color: white;
+}
+.account-nav .logout-button:focus-visible {
+  outline-color: #b3261e;
+}
 .editor-dashboard-link {
   display: inline-flex;
   align-items: center;
@@ -679,6 +616,11 @@ async function logout() {
     background-color: #24543e;
     color: white;
     box-shadow: 0 4px 10px rgb(47 107 79 / 18%);
+  }
+  .account-nav .logout-button:not(:disabled):hover {
+    border-color: #8c1d18;
+    background: #8c1d18;
+    box-shadow: 0 4px 10px rgb(179 38 30 / 18%);
   }
 }
 @media (prefers-reduced-motion: reduce) {

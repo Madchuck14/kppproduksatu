@@ -1,3 +1,31 @@
+## Materi promosi wajib login
+
+Terapkan `202611110004_authenticated_book_materials.sql` setelah migration sebelumnya
+untuk mengunci Dummy, Flyer, unduhan PPT/PPTX, dan preview PDF. Bucket tetap privat;
+anon tidak dapat membaca file atau memanggil helper akses, sementara authenticated
+hanya dapat membaca materi published dan Editor tetap dibatasi scope draf.
+Deploy aplikasi dengan client sesi server pada window yang sama. Ketentuan materi
+publik pada catatan historis di bawah sudah digantikan bagian ini. Lihat
+[rollout/rollback dan verifikasi](material-access.md). Migration belum diterapkan live.
+
+## Statistik login hari dan minggu WIB
+
+Terapkan `202611110003_sales_login_periods.sql` setelah migration login Sales sebelum
+menjalankan dashboard terbaru. RPC menambah total login harian/mingguan dan daerah teratas,
+mempertahankan event serta field kumulatif sebelumnya. Minggu dimulai Senin 00.00 WIB;
+seluruh daerah seri ditampilkan. Tidak ada mutasi event atau backfill.
+Lihat [definisi metrik dan rollout](sales-dashboard.md). Migration belum diterapkan live.
+
+## Data pegawai dan login Sales
+
+Terapkan `supabase/migrations/202611110002_sales_login_events.sql` sebelum deploy login
+baru. Migration menambah `employee_registry.name`, `employee_registry.work_area`, tabel
+login per sesi Auth, serta RPC/RLS khusus Editor super. Lengkapi nama/daerah resmi dari
+data perusahaan; tidak ada pemindahan label area mandiri otomatis atau backfill login.
+Kegagalan pencatatan menolak login Sales baru dengan 503. Akun, NIP, scope, dan data lama
+tetap utuh. Database baru memakai bundle 48 migration. Lihat [rollout/rollback](sales-dashboard.md).
+Migration belum diterapkan ke Supabase live oleh agent.
+
 ## Struktur Produk
 
 Fitur **Hapus cabang** memerlukan migration
@@ -5,20 +33,20 @@ Fitur **Hapus cabang** memerlukan migration
 sebelum deploy aplikasi baru. Penghapusan subtree bersifat permanen, menolak referensi buku
 draf/published, dan hanya tersedia untuk Editor super melalui RPC. Arsip lama tidak dibersihkan
 otomatis; endpoint arsip lama tetap tersedia untuk kompatibilitas. Database baru memakai
-bundle 45 migration. Lihat [rollout dan rollback hapus](product-structure.md#migration-dan-rollback).
+bundle 48 migration. Lihat [rollout dan rollback hapus](product-structure.md#migration-dan-rollback).
 Migration belum dijalankan ke Supabase live oleh agent.
 
 Terapkan `supabase/migrations/202611100005_product_structure.sql` setelah migration
 sebelumnya dan sebelum deploy. Migration menambahkan hierarki terpisah, foreign key
 nullable pada produk, RLS Editor super, dan guard transaksi privat. Buku, UUID, kode,
 referensi, dan izin lama dipertahankan; tidak ada data produksi contoh yang diisi.
-Database baru memakai bundle 45 migration. Ikuti [rollout, rollback, RLS, dan uji
+Database baru memakai bundle 48 migration. Ikuti [rollout, rollback, RLS, dan uji
 penyimpanan bersamaan](product-structure.md). Migration ini tidak diterapkan ke live oleh agent.
 
 ## Area Sales yang diisi pengguna
 
 Terapkan `supabase/migrations/202611100004_sales_areas.sql` setelah migration sebelumnya
-dan sebelum deploy aplikasi baru. Database baru memakai bundle 45 migration. Kolom
+dan sebelum deploy aplikasi baru. Database baru memakai bundle 48 migration. Kolom
 `account_memberships.sales_areas` berupa array teks, default kosong untuk akun lama.
 Migration tidak mengubah NIP, role, status super, scope Editor, password, atau Favorit.
 Seluruh pemeriksaan sesi kini membaca kolom ini, sehingga migration diperlukan sebelum
@@ -59,7 +87,7 @@ uji browser diintersep menjadi fixture; pengujian ini tidak mengubah akun/area l
 
 Terapkan `supabase/migrations/202611100002_contact_page.sql` pada database existing
 setelah migration sebelumnya, sebelum deploy aplikasi baru. Jangan menjalankan ulang
-`setup.sql`. Database baru memakai bundle 45 migration. Migration membuat satu row
+`setup.sql`. Database baru memakai bundle 48 migration. Migration membuat satu row
 `contact_page` dengan isi Kontak yang sebelumnya statis, tanpa mengubah akun atau katalog.
 Mengulang migration tidak menimpa konten yang sudah diedit.
 
@@ -116,13 +144,13 @@ awal saat pendaftaran. `admin_memberships` dipensiunkan melalui migration
 Deploy aplikasi/provisioning baru dahulu, lalu terapkan migration setelah instance lama
 berhenti. Jangan menjalankan ulang setup pada database existing. Ikuti
 [rollout, pemeriksaan, dan rollback](nip-auth.md#sumber-hak-akses-aktif-10-november-2026).
-Database baru memakai bundle 45 migration. Bagian akun admin legacy di bawah adalah riwayat.
+Database baru memakai bundle 48 migration. Bagian akun admin legacy di bawah adalah riwayat.
 
 ## Autentikasi NIP (10 November 2026)
 
 Daftar/login sekarang memakai NIP + kata sandi tanpa email. Terapkan migration
 `202611060001_employee_nip_auth.sql`, isi registry kosong, dan petakan akun lama sebelum
-deploy. Database baru memakai bundle 45 migration. Ikuti [panduan NIP](nip-auth.md)
+deploy. Database baru memakai bundle 48 migration. Ikuti [panduan NIP](nip-auth.md)
 untuk pengisian tabel, konfigurasi server, penutupan public signup, reset password, dan rollback.
 Ketentuan email dan pilihan hak Editor bebas pada catatan historis berikut sudah digantikan.
 
@@ -170,7 +198,9 @@ lewat metadata, login Editor langsung, penolakan CRUD lintas jenjang, dan rollba
 PostgreSQL/Auth/REST lokal; tidak mengirim email atau membuktikan perilaku Supabase live.
 Catatan historis pendaftaran khusus Sales/persetujuan di bawah sudah digantikan bagian ini.
 
-## Dummy Buku publik (16 Oktober 2026)
+## Dummy Buku publik (riwayat 16 Oktober 2026)
+
+Aturan akses bagian ini telah digantikan [materi wajib login](material-access.md).
 
 Terapkan migration incremental `202610160001_public_dummy_books.sql` setelah seluruh
 migration sebelumnya, sebelum deploy aplikasi terbaru. Dummy Buku published dapat
@@ -474,9 +504,11 @@ sementara: preservation, default NULL, retry, constraint, RPC, dan scope. Browse
 dengan API fixture; verifikasi ini tidak menggantikan persistensi/Auth/RLS Supabase live.
 Migration belum diterapkan ke database live oleh agent.
 
-## Flyer PPT publik dan preview gambar
+## Flyer PPT publik dan preview gambar (riwayat)
 
-Persyaratan terbaru: Flyer dan PPT Produk milik buku published dapat dibuka tanpa login.
+Aturan akses bagian ini telah digantikan [materi wajib login](material-access.md).
+
+Persyaratan pada versi historis ini: Flyer dan PPT Produk milik buku published dapat dibuka tanpa login.
 Hanya Dummy Buku yang memerlukan sesi terverifikasi. Terapkan migration sebelumnya, lalu
 `supabase/migrations/202610140002_public_promotional_materials.sql` sebelum deploy aplikasi ini.
 Jangan mengubah bucket `book-materials` menjadi public: policy SELECT anon/authenticated
@@ -1097,7 +1129,7 @@ seluruh migration lama. Rollback ini membuka kembali pengelolaan untuk Editor bi
 
 ## Transisi akun hanya Editor (16 Oktober 2026)
 
-Katalog dan materi published terbuka untuk publik tanpa akun. Hanya Editor yang dikenali
+Katalog terbuka tanpa akun; materi promosi kini memerlukan login. Hanya Editor yang dikenali
 oleh session aplikasi, dashboard, dan Favorit. Login akun non-Editor ditolak dan sesi login
 baru yang ditolak dibersihkan. Tidak ada pendaftaran mandiri atau pilihan role publik;
 `/register` lama mengalihkan ke login Editor sambil mempertahankan tujuan yang tervalidasi.
@@ -1131,7 +1163,7 @@ sebelum migration diterapkan. Catatan historis tentang akun umum di atas diganti
 Bagian ini menggantikan ketentuan Editor-only dan signup ditutup pada catatan historis di bawah.
 Sales dan Editor dapat login serta menggunakan Favorit pribadi. Registrasi mandiri hanya
 menyediakan Sales biasa; Editor tetap dibuat pengelola melalui script provisioning yang ada.
-Katalog, Flyer, PPT Produk, dan Dummy published tetap publik tanpa akun.
+Katalog tetap publik; Flyer, PPT Produk, dan Dummy memerlukan login.
 
 Urutan rollout untuk database existing:
 

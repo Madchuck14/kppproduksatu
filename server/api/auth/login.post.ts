@@ -1,6 +1,7 @@
 import { loginSchema } from '#shared/schemas/auth'
 import { getCatalogClient } from '../../utils/catalog-client'
 import { findEmployee, getEmployeeAdmin } from '../../utils/employee-registry'
+import { recordSalesLogin } from '../../repositories/sales-login-events'
 
 export default defineEventHandler(async (event) => {
   const parsed = loginSchema.strict().safeParse(await readBody(event))
@@ -17,7 +18,8 @@ export default defineEventHandler(async (event) => {
     email = data.user.email
   }
   // Unknown NIPs also pass through Auth's password throttling.
-  const { data, error } = await getCatalogClient(event).auth.signInWithPassword({
+  const authClient = getCatalogClient(event)
+  const { data, error } = await authClient.auth.signInWithPassword({
     email,
     password: parsed.data.password,
   })
@@ -28,5 +30,12 @@ export default defineEventHandler(async (event) => {
     })
   if (error || !data.session || !employee?.user_id || data.user?.id !== employee.user_id)
     throw invalid()
+  try {
+    await recordSalesLogin(event, data.user.id, data.session.access_token)
+  } catch (error) {
+    // Do not issue a session to the browser when required login recording fails.
+    await authClient.auth.signOut({ scope: 'local' }).catch(() => undefined)
+    throw error
+  }
   return { access_token: data.session.access_token, refresh_token: data.session.refresh_token }
 })

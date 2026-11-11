@@ -1,5 +1,16 @@
 # KPP Produk Satu
 
+**Materi promosi wajib login:** terapkan `202611110004_authenticated_book_materials.sql`
+dan deploy versi ini untuk mengunci Dummy, PPT Produk, dan Flyer pada API/Storage.
+Pengunjung anonim mendapat tombol login pada setiap materi. Migration belum diterapkan
+live oleh agent. Lihat [rollout dan pengujian](docs/material-access.md).
+
+**Login Sales dan data pegawai:** terapkan `202611110002_sales_login_events.sql`
+dan `202611110003_sales_login_periods.sql`
+sebelum deploy, lalu lengkapi nama serta daerah kerja resmi pada `employee_registry`.
+Login Sales baru wajib tercatat sebelum sesi diberikan. Migration belum diterapkan
+ke Supabase live oleh agent. Lihat [rollout dan rollback](docs/sales-dashboard.md).
+
 **Hapus cabang Struktur Produk:** terapkan
 `202611110001_delete_product_structure.sql` sebelum deploy versi ini. Aksi hapus permanen
 menggantikan arsip pada UI, mencakup seluruh turunan, dan menolak cabang yang masih dipakai
@@ -25,7 +36,7 @@ Fondasi katalog produk dengan Nuxt 4, Vue 3, TypeScript, Tailwind CSS, Nuxt UI, 
 ## Mulai di Windows
 
 Untuk menyiapkan database Supabase baru lewat satu file, gunakan
-[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 45 migrasi
+[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 48 migrasi
 dengan komentar section dan penjelasan singkat. Ikuti [panduan file gabungan](docs/supabase.md#setup-satu-file-untuk-database-baru).
 Database yang sudah terpasang tetap memakai migrasi incremental; jangan jalankan ulang file setup.
 
@@ -49,6 +60,13 @@ Docker, dan pemeriksaan interaksi browser belum diverifikasi untuk dashboard ini
 
 ## Yang tersedia
 
+Editor super dapat membuka **Periksa Daerah Penjualan** untuk melihat nama/daerah resmi,
+login terakhir, total login hari/minggu ini, dan daerah dengan login terbanyak beserta
+jumlahnya pada kedua periode. Hari/minggu memakai WIB dan minggu dimulai Senin.
+Terapkan `202611110002_sales_login_events.sql` dan `202611110003_sales_login_periods.sql` sebelum deploy, lalu lengkapi nama/daerah
+pada registry pegawai. Pencatatan dimulai saat versi baru aktif, tanpa backfill.
+Lihat [sumber data, akses, dan rollout](docs/sales-dashboard.md).
+
 **Kelola Struktur Produk** tersedia untuk Editor super pada `/admin`. Hierarki per
 jenjang mendukung kategori/subcabang, urutan, status produk opsional, serta hapus permanen subtree
 yang ditolak bila masih dipakai buku termasuk draf. Form buku menyediakan pilihan jalur
@@ -57,10 +75,9 @@ Terapkan `202611100005_product_structure.sql` dan `202611110001_delete_product_s
 sebelum deploy. Produksi mulai tanpa seed;
 lihat [model, rollout, dan pengujian Struktur Produk](docs/product-structure.md).
 
-Sales mengisi satu atau beberapa area setelah login NIP berhasil, sebelum melanjutkan
-ke tujuan awal. Area tersimpan pada akun, tampil di bagian atas halaman, dan dapat diubah
-melalui **Ubah area**. Ini label yang diisi pengguna, bukan scope izin atau data resmi IT.
-Terapkan `202611100004_sales_areas.sql` sebelum deploy. Lihat [rollout area Sales](docs/supabase.md#area-sales-yang-diisi-pengguna).
+Pendataan area Sales sudah dihapus dari alur akun. Sales langsung melanjutkan ke
+tujuan awal setelah login; header tidak lagi menampilkan area atau tautan Ubah area.
+Data area lama dan API profil dipertahankan untuk kompatibilitas tanpa penghapusan data.
 
 Editor super dapat membuka **Atur Halaman Kontak** dari dashboard untuk mengubah
 judul/deskripsi, alamat, saluran kontak, peta Google Maps, dan dua jadwal operasional.
@@ -104,7 +121,7 @@ tanpa spasi/tanda hubung agar nol di depan tidak hilang. Ikuti [rollout metadata
 - Endpoint `/healthz` untuk liveness aplikasi (bukan pemeriksaan database).
 - Konfigurasi Cloudflare Workers, Dockerfile, dan Compose untuk aplikasi Node.
 
-Katalog dan seluruh materi buku published terbuka tanpa akun. Sales dan Editor dapat memakai
+Katalog tetap publik; Dummy, PPT Produk, dan Flyer memerlukan login. Sales dan Editor dapat memakai
 Favorit pribadi setelah login NIP. Pendaftaran tidak membutuhkan email dan hanya menerima
 NIP yang belum diklaim dalam registry. Role serta jenjang ditetapkan dari data pegawai;
 pendaftaran tidak memberikan hak super. Data akun serta Favorit lama tetap dipertahankan.
@@ -115,13 +132,10 @@ banner CMS, sitemap, dan structured data belum diimplementasikan.
 Editor mengunggah dua berkas untuk PPT Produk: PDF untuk tombol **Tampilkan** dan PPT/PPTX asli
 untuk tombol **Unduh PowerPoint**. Keduanya disimpan langsung di Supabase tanpa converter atau
 server tambahan. Flyer dan Dummy Buku tetap PDF.
-Setelah migration `202610140002_public_promotional_materials.sql`, Flyer dan PPT Produk buku
-published dapat dibuka tanpa login. Migration `202610160001_public_dummy_books.sql` juga
-membuka Dummy Buku published tanpa login; terapkan sebelum menjalankan aplikasi terbaru. Bucket `book-materials`
-tetap privat dan RLS melindungi draft serta akses Editor per jenjang. Terapkan migration sebelumnya
-terlebih dahulu, lalu migration `202610140005_manual_product_knowledge_pdf.sql` dan
-[rollout PDF tampilan](docs/supabase.md#pdf-tampilan-dan-powerpoint-unduhan).
-Migration ini belum diterapkan ke Supabase live oleh agent.
+Materi disimpan pada bucket privat `book-materials`. Semua preview dan unduhan
+memerlukan sesi terverifikasi, termasuk untuk buku published. Kebijakan akses anonim
+pada migration historis telah digantikan `202611110004_authenticated_book_materials.sql`.
+Lihat [aturan akses dan rollout](docs/material-access.md).
 
 ## Perintah
 

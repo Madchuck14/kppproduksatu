@@ -385,6 +385,58 @@ try {
   console.log(
     'PASS: public Dummy migration, anonymous reads, draft/unreferenced/bucket denial, unpublish, retries and data preservation.',
   )
+  const lockSql = await readFile(
+    'supabase/migrations/202611110004_authenticated_book_materials.sql',
+    'utf8',
+  )
+  await db.query('update public.products set published = true where id = $1', [publicId])
+  const beforeLock = (await db.query('select * from public.products order by id')).rows
+  await db.exec(lockSql)
+  await db.exec(lockSql)
+  assert.deepEqual((await db.query('select * from public.products order by id')).rows, beforeLock)
+  await db.exec('set role anon')
+  assert.deepEqual(await visible(), [], 'Anonymous cannot read any promotional files')
+  await assert.rejects(
+    db.query('select public.can_access_public_book_material($1)', [
+      materialPath(publicId, 'flyer'),
+    ]),
+    /permission denied/,
+  )
+  await db.exec('reset role')
+  await db.query("select set_config('request.jwt.claim.sub', '', false)")
+  await db.exec('set role authenticated')
+  assert.deepEqual(await visible(), [], 'Missing authenticated identity cannot read materials')
+  await db.exec('reset role')
+  await db.query("select set_config('request.jwt.claim.sub', $1, false)", [salesId])
+  await db.exec('set role authenticated')
+  assert.deepEqual(
+    await visible(),
+    [
+      materialPath(publicId, 'dummy'),
+      materialPath(publicId, 'flyer'),
+      materialPath(publicId, 'product-knowledge'),
+      previewPath,
+    ].sort(),
+  )
+  await db.exec('reset role')
+  await db.query("select set_config('request.jwt.claim.sub', $1, false)", [editorId])
+  await db.exec('set role authenticated')
+  assert.ok(
+    (await visible()).includes(materialPath(draftId, 'dummy')),
+    'Scoped Editor draft access retained',
+  )
+  assert.equal(
+    (await visible()).some((name) => name.includes(outsideId)),
+    false,
+  )
+  await db.exec('reset role')
+  await db.query('update public.products set published = false where id = $1', [publicId])
+  await db.query("select set_config('request.jwt.claim.sub', $1, false)", [salesId])
+  await db.exec('set role authenticated')
+  assert.deepEqual(await visible(), [], 'Sales cannot read unpublished material')
+  console.log(
+    'PASS: final authenticated-only material migration; anon/missing identity denied, all four published file kinds available after login, draft scope retained, no data changes and idempotent retry.',
+  )
   console.log('Isolated PostgreSQL with simulated Auth/Storage; live Supabase remains unverified.')
 } finally {
   await db.close()

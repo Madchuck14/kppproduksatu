@@ -1,7 +1,8 @@
 import type { H3Event } from 'h3'
+import { serverSupabaseClient } from '#supabase/server'
+import type { EditorDatabase } from '#shared/types/editor-database'
 import type { BookResourceKind } from '../utils/book-resource'
 import { bookResourceColumns, bookResourceExtensionSchema } from '../utils/book-resource'
-import { getCatalogClient } from '../utils/catalog-client'
 import { getProduct } from './products'
 
 export async function getBookResource(
@@ -10,6 +11,10 @@ export async function getBookResource(
   kind: BookResourceKind,
   preview = false,
 ) {
+  const client = await serverSupabaseClient<EditorDatabase>(event)
+  const { data: auth, error: authError } = await client.auth.getUser()
+  if (authError || !auth.user)
+    throw createError({ statusCode: 401, statusMessage: 'Login untuk melihat materi promosi.' })
   const source = useRuntimeConfig(event).catalogSource
   const product = await getProduct(event, identifier)
   if (source === 'demo') {
@@ -17,7 +22,6 @@ export async function getBookResource(
   }
   if (source !== 'supabase')
     throw createError({ statusCode: 503, statusMessage: 'Sumber katalog tidak valid' })
-  const client = getCatalogClient(event)
   const { data, error } = await client
     .from('products')
     .select('flyer_path,dummy_book_path,product_knowledge_path,product_knowledge_preview_path')

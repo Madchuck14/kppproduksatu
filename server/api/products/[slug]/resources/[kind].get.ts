@@ -3,6 +3,7 @@ import { bookResourceKindSchema } from '../../../../utils/book-resource'
 import { getBookResource } from '../../../../repositories/book-resources'
 
 export default defineEventHandler(async (event) => {
+  setHeader(event, 'Cache-Control', 'private, no-store')
   const identifier = productIdentifierSchema.safeParse(getRouterParam(event, 'slug'))
   const kind = bookResourceKindSchema.safeParse(getRouterParam(event, 'kind'))
   if (!identifier.success || !kind.success)
