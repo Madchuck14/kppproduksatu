@@ -24,6 +24,37 @@ import { validateBookClassifications } from './classifications'
 import { getProductImageUrl } from '../utils/storage'
 import type { LandingHero } from '#shared/schemas/landing-hero'
 import { validateBookStructure, structureError } from './product-structure'
+import { bookTitleSimilarity } from '#shared/utils/book-title-similarity'
+
+export async function searchBookDescriptions(
+  event: H3Event,
+  account: AccountSession,
+  search: string,
+) {
+  const client = await serverSupabaseClient<EditorDatabase>(event)
+  const candidates: { id: string; title: string; bookCode: string | null; score: number }[] = []
+  for (let offset = 0; ; offset += 500) {
+    let query = client
+      .from('products')
+      .select('id,title,book_code')
+      .order('id')
+      .range(offset, offset + 499)
+    if (!account.isSuper) query = query.in('education_level', account.educationLevels)
+    const { data, error } = await query
+    fail(error)
+    for (const row of data ?? []) {
+      const score = bookTitleSimilarity(row.title, search)
+      if (score >= 0.25)
+        candidates.push({ id: row.id, title: row.title, bookCode: row.book_code, score })
+    }
+    candidates.sort(
+      (a, b) => b.score - a.score || a.title.localeCompare(b.title) || a.id.localeCompare(b.id),
+    )
+    candidates.splice(8)
+    if (!data || data.length < 500) break
+  }
+  return candidates
+}
 
 const columns =
   'id,book_code,education_level,structure_node_id,division_code,grade,subject,title,slug,author,curriculum,isbn,synopsis,target_market,highlights,price,publication_year,featured,published,image_path,flyer_path,dummy_book_path,product_knowledge_path,product_knowledge_preview_path,updated_at'

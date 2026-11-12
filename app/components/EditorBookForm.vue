@@ -662,6 +662,21 @@ async function save() {
         </section>
         <section class="form-card description-card" aria-labelledby="details-heading">
           <h2 id="details-heading">Deskripsi Buku</h2>
+          <BookDescriptionAutofill
+            :current-id="savedId"
+            :has-description="
+              !!form.synopsis.trim() ||
+              form.highlights.some((item) => item.trim()) ||
+              form.targetMarket.some((item) => item.trim())
+            "
+            @fill="
+              (book) => {
+                form.synopsis = book.synopsis ?? ''
+                form.highlights = book.highlights.length ? [...book.highlights] : ['', '']
+                form.targetMarket = book.targetMarket.length ? [...book.targetMarket] : ['']
+              }
+            "
+          />
           <div class="form-field">
             <label for="new-book-synopsis">Sinopsis buku</label>
             <textarea

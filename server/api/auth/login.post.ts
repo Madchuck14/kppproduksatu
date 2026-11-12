@@ -6,18 +6,18 @@ import { recordSalesLogin } from '../../repositories/sales-login-events'
 export default defineEventHandler(async (event) => {
   const parsed = loginSchema.strict().safeParse(await readBody(event))
   if (!parsed.success)
-    throw createError({ statusCode: 400, statusMessage: 'Periksa NIP dan kata sandi Anda.' })
+    throw createError({ statusCode: 400, statusMessage: 'Periksa NIK dan kata sandi Anda.' })
   const invalid = () =>
-    createError({ statusCode: 401, statusMessage: 'Login gagal. Periksa NIP dan kata sandi Anda.' })
+    createError({ statusCode: 401, statusMessage: 'Login gagal. Periksa NIK dan kata sandi Anda.' })
   const employee = await findEmployee(event, parsed.data.nip)
-  let email = `${parsed.data.nip}@nip.invalid`
+  let email = `${parsed.data.nip.toLowerCase()}@nip.invalid`
   if (employee?.user_id) {
     const { data, error } = await getEmployeeAdmin(event).auth.admin.getUserById(employee.user_id)
     if (error || !data.user?.email)
       throw createError({ statusCode: 503, statusMessage: 'Akun belum dapat diperiksa.' })
     email = data.user.email
   }
-  // Unknown NIPs also pass through Auth's password throttling.
+  // Unknown employee numbers also pass through Auth's password throttling.
   const authClient = getCatalogClient(event)
   const { data, error } = await authClient.auth.signInWithPassword({
     email,

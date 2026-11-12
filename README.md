@@ -1,5 +1,12 @@
 # KPP Produk Satu
 
+**Nomor Induk Karyawan (NIK):** login/daftar menerima huruf dan angka, maksimal 32 karakter.
+Terapkan `202611120001_employee_nik_alphanumeric.sql` sebelum deploy dan sebelum mengisi
+registry alfanumerik. Nomor numerik serta seluruh identitas/hak akun master Sales dan Editor
+lama tetap dipertahankan. Pengguna mengonfirmasi migration sudah diterapkan;
+agent belum memverifikasi Auth/RLS live.
+Lihat [rollout NIK dan kompatibilitas akun master](docs/nip-auth.md#nik-alfanumerik-12-november-2026).
+
 **Materi promosi wajib login:** terapkan `202611110004_authenticated_book_materials.sql`
 dan deploy versi ini untuk mengunci Dummy, PPT Produk, dan Flyer pada API/Storage.
 Pengunjung anonim mendapat tombol login pada setiap materi. Migration belum diterapkan
@@ -18,13 +25,13 @@ buku draf/published. Tidak membersihkan arsip lama otomatis. Lihat [rollout dan 
 Migration belum diterapkan ke Supabase live oleh agent.
 
 Hak akses aktif memakai `account_memberships` dan `editor_scopes`; `employee_registry`
-menyimpan NIP dan ketentuan pendaftaran. Deploy aplikasi baru dahulu, lalu terapkan
+menyimpan NIK dan ketentuan pendaftaran. Deploy aplikasi baru dahulu, lalu terapkan
 `202611100001_retire_admin_memberships.sql` untuk mengarsipkan tabel admin lama secara
 privat tanpa mengubah izin atau data akun. Ikuti [rollout dan rollback akses](docs/nip-auth.md#sumber-hak-akses-aktif-10-november-2026).
 
-Login dan daftar memakai **NIP + kata sandi, tanpa email**. Terapkan migration
+Login dan daftar memakai **NIK + kata sandi, tanpa email**. Terapkan migration
 `202611060001_employee_nip_auth.sql`, isi tabel kosong `employee_registry`, dan kaitkan akun
-lama dengan NIP sebelum deploy. Ikuti [setup, rollout, dan rollback NIP](docs/nip-auth.md).
+lama dengan NIK sebelum deploy. Ikuti [setup, rollout, dan rollback NIK](docs/nip-auth.md).
 
 Cleanup schema produk tersedia melalui migration `202610140001_remove_legacy_product_columns.sql`.
 Kolom `description` dan `flyer_slide_paths` diarsipkan privat lalu dihapus; aplikasi memakai
@@ -36,7 +43,7 @@ Fondasi katalog produk dengan Nuxt 4, Vue 3, TypeScript, Tailwind CSS, Nuxt UI, 
 ## Mulai di Windows
 
 Untuk menyiapkan database Supabase baru lewat satu file, gunakan
-[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 48 migrasi
+[`supabase/setup.sql`](supabase/setup.sql). File ini menggabungkan seluruh 49 migrasi
 dengan komentar section dan penjelasan singkat. Ikuti [panduan file gabungan](docs/supabase.md#setup-satu-file-untuk-database-baru).
 Database yang sudah terpasang tetap memakai migrasi incremental; jangan jalankan ulang file setup.
 
@@ -111,10 +118,10 @@ tanpa spasi/tanda hubung agar nol di depan tidak hilang. Ikuti [rollout metadata
   `202610150001_featured_books_limit.sql` sebelum mengelola pilihan buku di Supabase.
 - API `GET /api/products` dan `GET /api/products/:identifier`, dengan validasi Zod.
 - Pilihan data fixture atau Supabase; kegagalan Supabase tidak diam-diam diganti fixture.
-- Login NIP/password dan dashboard Editor `/admin`: ringkasan, pencarian, filter jenjang/status,
+- Login NIK/password dan dashboard Editor `/admin`: ringkasan, pencarian, filter jenjang/status,
   tambah/edit/hapus buku, publikasi, unggah sampul, dan pengelolaan buku pilihan. Akses dibatasi
   di server dan RLS.
-- Login Sales/Editor dan pendaftaran keduanya di `/register`; NIP, role, dan jenjang harus cocok dengan data pegawai yang disiapkan pengelola.
+- Login Sales/Editor dan pendaftaran keduanya di `/register`; NIK, role, dan jenjang harus cocok dengan data pegawai yang disiapkan pengelola.
 - Provisioning Editor super dan Editor per jenjang melalui script lokal; akun Editor biasa juga dapat dibuat melalui pendaftaran per jenjang.
 - Migration produk/admin membership, RLS, bucket gambar, dan seed demo. Tabel kategori lama tidak
   lagi dipakai aplikasi.
@@ -122,10 +129,10 @@ tanpa spasi/tanda hubung agar nol di depan tidak hilang. Ikuti [rollout metadata
 - Konfigurasi Cloudflare Workers, Dockerfile, dan Compose untuk aplikasi Node.
 
 Katalog tetap publik; Dummy, PPT Produk, dan Flyer memerlukan login. Sales dan Editor dapat memakai
-Favorit pribadi setelah login NIP. Pendaftaran tidak membutuhkan email dan hanya menerima
-NIP yang belum diklaim dalam registry. Role serta jenjang ditetapkan dari data pegawai;
+Favorit pribadi setelah login NIK. Pendaftaran tidak membutuhkan email dan hanya menerima
+NIK yang belum diklaim dalam registry. Role serta jenjang ditetapkan dari data pegawai;
 pendaftaran tidak memberikan hak super. Data akun serta Favorit lama tetap dipertahankan.
-Lihat [rollout NIP](docs/nip-auth.md), termasuk konfigurasi key server dan penutupan signup publik Auth.
+Lihat [rollout NIK](docs/nip-auth.md), termasuk konfigurasi key server dan penutupan signup publik Auth.
 
 Pagination tersedia pada dashboard Editor dan katalog publik. Cart, checkout, Midtrans, blog,
 banner CMS, sitemap, dan structured data belum diimplementasikan.

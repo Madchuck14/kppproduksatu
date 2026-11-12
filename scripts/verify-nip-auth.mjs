@@ -18,7 +18,7 @@ async function user(id, nip, role = 'sales', level, trusted = true) {
     'insert into auth.users (id,email,raw_user_meta_data,raw_app_meta_data) values ($1,$2,$3,$4)',
     [
       id,
-      `${nip}@nip.invalid`,
+      `${nip.toLowerCase()}@nip.invalid`,
       {
         nip,
         registration_role: role,
@@ -140,6 +140,85 @@ try {
       .user_id,
     legacy,
   )
+  // Four existing master identities cover Sales/Editor, super/non-super.
+  for (const [index, role, isSuper] of [
+    [0, 'editor', true],
+    [1, 'sales', true],
+    [2, 'editor', false],
+    [3, 'sales', false],
+  ]) {
+    const id = `55555555-5555-4555-8555-${String(index).padStart(12, '0')}`
+    await db.query(
+      `insert into auth.users (id,email,raw_app_meta_data) values ($1,$2,'{"employee_provisioning":true}')`,
+      [id, `master${index}@example.com`],
+    )
+    await db.query(
+      'insert into public.account_memberships (user_id,role,is_super) values ($1,$2,$3)',
+      [id, role, isSuper],
+    )
+    if (role === 'editor')
+      await db.query(
+        "insert into public.editor_scopes (user_id,education_level) values ($1,'SD')",
+        [id],
+      )
+    await db.query(
+      'insert into public.employee_registry (nip,user_id,role,education_level) values ($1,$2,$3,$4)',
+      [String(index).padStart(9, '0'), id, role, role === 'editor' ? 'SD' : null],
+    )
+  }
+  const mastersBefore = await snapshot()
+  const authBefore = (await db.query('select * from auth.users order by id')).rows
+  const expandedSql = await readFile(
+    'supabase/migrations/202611120001_employee_nik_alphanumeric.sql',
+    'utf8',
+  )
+  await db.exec(expandedSql)
+  assert.deepEqual(
+    await snapshot(),
+    mastersBefore,
+    'All master numbers, IDs, roles, and scopes remain unchanged',
+  )
+  assert.deepEqual(
+    (await db.query('select * from auth.users order by id')).rows,
+    authBefore,
+    'No Auth identity or metadata is rewritten',
+  )
+  for (const nip of ['abc123', 'AB-123', 'AB 123', '', 'A'.repeat(33)])
+    await assert.rejects(
+      db.query('insert into public.employee_registry (nip) values ($1)', [nip]),
+      /check constraint/,
+    )
+  await db.exec(
+    "insert into public.employee_registry (nip,role,education_level) values ('KRY0007','sales',null),('ED0008','editor','SMA')",
+  )
+  const alphaSales = '66666666-6666-4666-8666-666666666666'
+  const alphaEditor = '77777777-7777-4777-8777-777777777777'
+  await user(alphaSales, 'KRY0007')
+  await user(alphaEditor, 'ED0008', 'editor', 'SMA')
+  assert.equal(
+    (await db.query('select user_id from public.employee_registry where nip=$1', ['KRY0007']))
+      .rows[0].user_id,
+    alphaSales,
+  )
+  assert.deepEqual(
+    (
+      await db.query('select role,is_super from public.account_memberships where user_id=$1', [
+        alphaEditor,
+      ])
+    ).rows[0],
+    { role: 'editor', is_super: false },
+  )
+  await assert.rejects(
+    user('88888888-8888-4888-8888-888888888888', 'KRY0007'),
+    /employee_registration_unavailable/,
+  )
+  const expandedState = await snapshot()
+  await db.exec(expandedSql)
+  assert.deepEqual(
+    await snapshot(),
+    expandedState,
+    'Retry preserves numeric masters and alphanumeric accounts',
+  )
 } finally {
   await db.close()
 }
@@ -210,7 +289,7 @@ const dependencies = {
 const register = await endpoint('server/api/auth/register.post.ts', dependencies)
 const login = await endpoint('server/api/auth/login.post.ts', dependencies)
 for (const body of [
-  { nip: 'bad', password },
+  { nip: 'bad-123', password },
   { nip: '123', password: 'short' },
   { nip: '123', password, role: 'editor' },
   { nip: '123', password, role: 'sales', educationLevel: 'SD' },
@@ -279,11 +358,32 @@ authError = null
 employee = null
 await assert.rejects(
   register({ body: { nip: '999', password } }),
-  (error) => error.data.code === 'NIP_NOT_FOUND' && /NIP tidak cocok/.test(error.message),
+  (error) => error.data.code === 'NIP_NOT_FOUND' && /NIK tidak cocok/.test(error.message),
 )
 const recordedBeforeFailure = records
 await assert.rejects(login({ body: { nip: '999', password } }), (error) => error.statusCode === 401)
 assert.equal(records, recordedBeforeFailure)
+employee = { nip: 'KRY001A', role: 'sales', education_level: null, user_id: null }
+let searchedNip
+dependencies.findEmployee = async (_event, nip) => {
+  searchedNip = nip
+  return employee
+}
+await register({ body: { nip: ' kry001a ', password } })
+assert.equal(searchedNip, 'KRY001A')
+assert.equal(created.email, 'kry001a@nip.invalid')
+assert.equal(created.user_metadata.nip, 'KRY001A')
+employee.user_id = sales
+authUser = { id: sales, email: 'kry001a@nip.invalid' }
+await login({ body: { nip: 'kRy001a', password } })
+assert.equal(searchedNip, 'KRY001A')
+assert.equal(credentials.email, 'kry001a@nip.invalid')
+for (const nip of ['000000000', '000000001', '000000002', '000000003', '000000004', '000000005'])
+  assert.equal(
+    loginSchema.parse({ nip, password }).nip,
+    nip,
+    'Master identifier and leading zeroes remain unchanged',
+  )
 console.log(
   'PASS: empty registry, legacy preservation, atomic/duplicate claims, trusted role/scope, RLS isolation, metadata tampering, retry/rollback; actual register/login handlers with local Auth boundaries, NIP validation, legacy identity, wrong password/user and 429.',
 )

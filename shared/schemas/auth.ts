@@ -3,7 +3,8 @@ import { z } from 'zod'
 export const nipSchema = z
   .string()
   .trim()
-  .regex(/^\d{1,32}$/, 'NIP harus berisi 1–32 digit angka.')
+  .regex(/^[A-Za-z0-9]{1,32}$/, 'NIK harus berisi 1–32 karakter huruf atau angka.')
+  .toUpperCase()
 
 export const loginSchema = z.object({
   nip: nipSchema,

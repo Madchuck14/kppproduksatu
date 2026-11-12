@@ -41,7 +41,7 @@ async function login() {
   message.value = ''
   const result = loginSchema.safeParse({ nip: nip.value, password: password.value })
   if (!result.success) {
-    message.value = result.error.issues[0]?.message ?? 'Periksa NIP dan kata sandi Anda.'
+    message.value = result.error.issues[0]?.message ?? 'Periksa NIK dan kata sandi Anda.'
     return
   }
   loading.value = true
@@ -59,11 +59,11 @@ async function login() {
     const status = (error as { statusCode?: number }).statusCode
     message.value =
       status === 401
-        ? 'Login gagal. Periksa NIP dan kata sandi Anda.'
+        ? 'Login gagal. Periksa NIK dan kata sandi Anda.'
         : status === 429
           ? 'Terlalu banyak percobaan. Coba lagi nanti.'
           : status === 403
-            ? 'NIP atau hak akses akun belum terdaftar. Hubungi pengelola.'
+            ? 'NIK atau hak akses akun belum terdaftar. Hubungi pengelola.'
             : 'Login belum dapat diproses. Coba lagi nanti.'
   } finally {
     loading.value = false
@@ -104,7 +104,7 @@ async function logout() {
     </div>
     <div class="login-panel">
       <h1 id="login-title">Masuk akun</h1>
-      <p class="login-intro">Gunakan NIP dan kata sandi akun Sales atau Editor Anda.</p>
+      <p class="login-intro">Gunakan NIK dan kata sandi akun Sales atau Editor Anda.</p>
       <p v-if="returnTo !== '/' && returnTo !== '/products'" class="login-notice">
         Setelah login, Anda akan kembali ke konten yang dipilih. Akses mengikuti hak akun dan
         ketersediaan berkas.
@@ -131,17 +131,17 @@ async function logout() {
         @submit.prevent="login"
       >
         <div class="login-field">
-          <label for="nip">Nomor Induk Pegawai (NIP)</label>
+          <label for="nip">Nomor Induk Karyawan (NIK)</label>
           <input
             id="nip"
             v-model="nip"
             required
             type="text"
-            inputmode="numeric"
-            pattern="[0-9]{1,32}"
+            inputmode="text"
+            pattern="[A-Za-z0-9]{1,32}"
             autocomplete="username"
             maxlength="32"
-            placeholder="Masukkan NIP Anda"
+            placeholder="Masukkan NIK Anda"
             autocapitalize="none"
             :spellcheck="false"
             :disabled="!configured || loading"
@@ -188,7 +188,7 @@ async function logout() {
         >
       </div>
       <p class="registration-note">
-        NIP harus terdaftar pada data pegawai. Akses Editor mengikuti jenjang yang ditetapkan
+        NIK harus terdaftar pada data karyawan. Akses Editor mengikuti jenjang yang ditetapkan
         pengelola.
         <NuxtLink to="/contact">Hubungi pengelola</NuxtLink> jika memerlukan bantuan.
       </p>

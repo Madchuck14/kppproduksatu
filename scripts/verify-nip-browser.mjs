@@ -46,11 +46,11 @@ await page.route('**/api/auth/register', (route) => {
   if (registered.nip === '999999')
     return respond(route, 400, {
       statusCode: 400,
-      statusMessage: 'NIP tidak cocok dengan data pegawai perusahaan.',
+      statusMessage: 'NIK tidak cocok dengan data karyawan perusahaan.',
       data: { code: 'NIP_NOT_FOUND' },
     })
   return respond(route, 200, {
-    message: 'Pendaftaran berhasil. Silakan masuk dengan NIP dan kata sandi Anda.',
+    message: 'Pendaftaran berhasil. Silakan masuk dengan NIK dan kata sandi Anda.',
   })
 })
 await page.route('**/api/auth/login', (route) => {
@@ -112,7 +112,7 @@ try {
   assert.equal((await fetch(base + '/api/auth/session')).status, 401)
   for (const body of [
     { email: 'old@example.com', password },
-    { nip: 'abc', password },
+    { nip: 'abc-123', password },
     { nip: '123', password, isSuper: true },
   ])
     assert.equal(
@@ -128,13 +128,13 @@ try {
   await mkdir('artifacts/nip-auth', { recursive: true })
   await open('/login?returnTo=/favorites')
   assert.equal(await page.locator('input[type="email"]').count(), 0)
-  await page.getByLabel('Nomor Induk Pegawai (NIP)', { exact: true }).waitFor()
+  await page.getByLabel('Nomor Induk Karyawan (NIK)', { exact: true }).waitFor()
   await page.getByRole('link', { name: 'Daftar akun', exact: true }).click()
   assert.equal(new URL(page.url()).searchParams.get('returnTo'), '/favorites')
   assert.equal(await page.locator('input[type="email"]').count(), 0)
   const enabled = await page.locator('#register-nip').isEnabled()
   if (enabled) {
-    await page.locator('#register-nip').fill('000123')
+    await page.locator('#register-nip').fill('kry001a')
     await page.locator('#register-password').fill(password)
     await page.locator('#confirm-password').fill('wrong-password')
     await page.getByRole('button', { name: 'Daftar sebagai Sales', exact: true }).click()
@@ -146,10 +146,10 @@ try {
     await page
       .getByRole('alert')
       .filter({
-        hasText: 'NIP tidak cocok dengan data pegawai perusahaan.',
+        hasText: 'NIK tidak cocok dengan data karyawan perusahaan.',
       })
       .waitFor()
-    await page.locator('#register-nip').fill('000123')
+    await page.locator('#register-nip').fill('kry001a')
     await page.getByRole('radio', { name: /Editor/ }).check()
     await page.locator('#editor-education-level').selectOption('SMP')
     await page.setViewportSize({ width: 390, height: 844 })
@@ -160,14 +160,19 @@ try {
     )
     await page.getByRole('button', { name: 'Daftar sebagai Editor', exact: true }).click()
     await page.getByRole('status').filter({ hasText: 'Pendaftaran berhasil' }).waitFor()
-    assert.deepEqual(registered, { nip: '000123', password, role: 'editor', educationLevel: 'SMP' })
+    assert.deepEqual(registered, {
+      nip: 'KRY001A',
+      password,
+      role: 'editor',
+      educationLevel: 'SMP',
+    })
     await page.getByRole('link', { name: 'Login', exact: true }).click()
     assert.equal(new URL(page.url()).searchParams.get('returnTo'), '/favorites')
-    await page.locator('#nip').fill('000123')
+    await page.locator('#nip').fill('kry001a')
     await page.locator('#password').fill(password)
     await page.getByRole('button', { name: 'Masuk', exact: true }).click()
-    await page.getByRole('alert').filter({ hasText: 'Periksa NIP dan kata sandi' }).waitFor()
-    assert.deepEqual(loginBody, { nip: '000123', password })
+    await page.getByRole('alert').filter({ hasText: 'Periksa NIK dan kata sandi' }).waitFor()
+    assert.deepEqual(loginBody, { nip: 'KRY001A', password })
     await page.screenshot({ path: 'artifacts/nip-auth/login-mobile.png', fullPage: true })
     failLogin = false
     await page.getByRole('button', { name: 'Masuk', exact: true }).click()
@@ -200,7 +205,7 @@ try {
   }
   assert.deepEqual(errors, [])
   console.log(
-    `PASS: port 3000 public SSR/API/404, invalid auth input, NIP-only forms and returnTo; ${enabled ? 'fixture registration, password confirmation, Editor level, failed/successful login, Sales navigation, logout, mobile overflow/screenshots' : 'demo disables auth (interactive checks unavailable)'}. No live Auth mutations.`,
+    `PASS: port 3000 public SSR/API/404, invalid auth input, NIK-only forms and returnTo; ${enabled ? 'fixture registration, password confirmation, Editor level, failed/successful login, Sales navigation, logout, mobile overflow/screenshots' : 'demo disables auth (interactive checks unavailable)'}. No live Auth mutations.`,
   )
 } finally {
   await browser.close()

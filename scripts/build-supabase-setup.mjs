@@ -242,6 +242,11 @@ const sections = [
     'Materi promosi wajib login',
     'Menutup akses anonim ke Dummy, PPT Produk, preview PDF, dan Flyer sambil mempertahankan katalog publik serta scope Editor.',
   ],
+  [
+    '202611120001_employee_nik_alphanumeric.sql',
+    'Nomor Induk Karyawan alfanumerik',
+    'Memperluas nomor karyawan ke huruf kapital dan angka tanpa mengubah identitas, password, membership, atau scope akun lama.',
+  ],
 ]
 const directory = new URL('../supabase/migrations/', import.meta.url)
 const output = new URL('../supabase/setup.sql', import.meta.url)
@@ -253,7 +258,7 @@ if (JSON.stringify(filenames) !== JSON.stringify(sections.map(([name]) => name))
 }
 const parts = [
   '-- KPP PRODUK SATU - SETUP SUPABASE LENGKAP',
-  `-- Gabungan ${sections.length} migrasi berurutan, sampai versi 202611110004.`,
+  `-- Gabungan ${sections.length} migrasi berurutan, sampai versi 202611120001.`,
   '-- Untuk database Supabase BARU yang belum memiliki tabel aplikasi ini.',
   '-- Jalankan seluruh file sebagai database owner melalui SQL Editor.',
   '-- Jangan jalankan pada database existing atau hanya memilih section tertentu.',

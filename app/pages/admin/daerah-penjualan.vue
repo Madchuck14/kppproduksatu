@@ -82,7 +82,7 @@ function formatLogin(value: string | null) {
           </caption>
           <thead>
             <tr>
-              <th scope="col">NIP</th>
+              <th scope="col">NIK</th>
               <th scope="col">Nama Sales</th>
               <th scope="col">Posisi penempatan</th>
               <th scope="col">Login terakhir (WIB)</th>
@@ -91,7 +91,7 @@ function formatLogin(value: string | null) {
           </thead>
           <tbody>
             <tr v-for="sales in data.sales" :key="sales.id">
-              <td>{{ sales.nip ?? 'NIP belum terhubung' }}</td>
+              <td>{{ sales.nip ?? 'NIK belum terhubung' }}</td>
               <td>{{ sales.name ?? 'Belum diisi pengelola' }}</td>
               <td>{{ sales.placement ?? 'Belum diisi pengelola' }}</td>
               <td>

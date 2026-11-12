@@ -1,6 +1,13 @@
 # Model akses saat ini: publik, Sales, dan Editor
 
-**Periksa Daerah Penjualan:** registry pegawai menyimpan NIP, nama, dan daerah kerja
+**Nomor Induk Karyawan (NIK):** login/daftar menerima 1?32 huruf ASCII atau angka,
+menormalisasi huruf ke kapital, dan mempertahankan nol awal. Nama field/kolom `nip`
+tetap untuk kompatibilitas. Migration `202611120001_employee_nik_alphanumeric.sql`
+memperluas validasi database serta menyelaraskan alias Auth huruf kecil tanpa mengubah
+nomor, UUID, password, role, scope, dan Favorit akun master Sales/Editor lama.
+Lihat [rollout dan rollback NIK](nip-auth.md#nik-alfanumerik-12-november-2026).
+
+**Periksa Daerah Penjualan:** registry pegawai menyimpan NIK, nama, dan daerah kerja
 resmi. Login Sales berhasil dicatat pada `sales_login_events`, satu event per sesi Auth,
 sebelum token dikirim ke browser. Dashboard `/admin/daerah-penjualan` serta API/RPC
 khusus Editor super menampilkan login terakhir, total login hari/minggu kalender WIB,
@@ -56,18 +63,18 @@ tujuan awal setelah login; header tidak lagi menampilkan area atau tautan Ubah a
 Data area lama dan API profil dipertahankan untuk kompatibilitas tanpa penghapusan data.
 
 **Sumber izin aktif, 10 November 2026:** `account_memberships` menetapkan role/status
-super dan `editor_scopes` menetapkan jenjang Editor. `employee_registry` menetapkan NIP
+super dan `editor_scopes` menetapkan jenjang Editor. `employee_registry` menetapkan NIK
 serta role/jenjang awal saat registrasi. Endpoint admin kompatibilitas kini memeriksa
 Editor super dari membership, tanpa tabel admin terpisah. Migration
 `202611100001_retire_admin_memberships.sql` memindahkan tabel admin lama ke schema arsip
 privat; tidak mempromosikan akun atau mengubah izin existing. Ikuti [rollout akses](nip-auth.md#sumber-hak-akses-aktif-10-november-2026).
 
-**Pembaruan NIP, 10 November 2026:** daftar/login menggunakan NIP + kata sandi tanpa email.
-Server mencocokkan NIP, role, dan jenjang pada registry pegawai yang diisi pengelola.
+**Pembaruan NIK, 10 November 2026:** daftar/login menggunakan NIK + kata sandi tanpa email.
+Server mencocokkan NIK, role, dan jenjang pada registry pegawai yang diisi pengelola.
 Trigger mengikat akun dan membership/scope secara atomik; Editor tidak dapat memilih hak
 di luar registry. Runtime Auth admin memakai key server saja. Akun lama dipetakan melalui
-user ID, tanpa menghapus Favorit atau mengganti password. Lihat [arsitektur dan rollout NIP](nip-auth.md).
-Paragraf pendaftaran email berikut adalah riwayat sebelum migration NIP.
+user ID, tanpa menghapus Favorit atau mengganti password. Lihat [arsitektur dan rollout NIK](nip-auth.md).
+Paragraf pendaftaran email berikut adalah riwayat sebelum migration NIK.
 
 Pendaftaran menyediakan Sales atau Editor. Editor memilih satu jenjang SD, SMP, SMA,
 atau SMK dan langsung memperoleh membership Editor biasa serta scope tersebut saat signup.
@@ -459,6 +466,26 @@ pergantian akun tidak menampilkan koleksi akun sebelumnya. Halaman katalog dan f
 Deployment memerlukan migration `202610070001_product_favorites.sql`; lihat panduan Supabase.
 
 ## Tampilan tambah buku
+
+Bagian Deskripsi Buku pada tambah/edit menyediakan pencarian judul dan tombol **Autofill
+deskripsi** untuk menyalin sinopsis, keunggulan, serta target pasar dari buku yang sudah ada.
+`GET /api/admin/book-description-suggestions?q=...` menerima judul 2–200 karakter,
+memverifikasi Editor, dan membaca hanya ID, judul, serta kode buku dalam scope jenjang
+Editor (termasuk draf). Editor super dapat mencari seluruh jenjang. Respons tidak disimpan
+cache. Pencarian membaca metadata bertahap 500 baris dan mengembalikan maksimal delapan
+judul menurut kemiripan pasangan karakter, dengan prioritas judul identik dan substring.
+Ini mendukung salah ketik sederhana; bukan pencarian semantik. Katalog sangat besar akan
+memerlukan optimasi pencarian database karena metadata judul dipindai setiap pencarian.
+
+Setelah sumber dipilih, form membaca detail terbaru melalui endpoint Editor yang sudah
+memeriksa scope. Ketiga kolom diganti bersama, termasuk nilai kosong pada sumber parsial;
+sumber yang seluruh deskripsinya kosong ditolak. Penggantian deskripsi terisi memerlukan
+konfirmasi. Hasil tetap dapat diedit dan belum tersimpan sampai pengguna menyimpan buku
+atau menjalankan alur pembuatan draf yang sudah tersedia untuk unggahan pertama.
+Identitas, klasifikasi, sampul, materi, dan publikasi tidak disalin. Tidak ada migration atau
+layanan AI baru. `node scripts/verify-description-autofill.mjs` memeriksa ranking,
+pembacaan lebih dari satu halaman, scope dengan fixture, dan perilaku komponen saat
+berhasil, dibatalkan, sumber kosong, atau gagal; bukan bukti RLS Supabase live.
 
 Halaman `/admin/books/new` mengikuti Figma `97:5388`, dengan kartu Identitas buku,
 Klasifikasi, Deskripsi buku, Sampul buku, Materi privat, dan Publikasi. Desktop memakai

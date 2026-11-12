@@ -64,9 +64,9 @@ async function register() {
       status === 429
         ? 'Terlalu banyak percobaan. Coba lagi nanti.'
         : code === 'NIP_NOT_FOUND'
-          ? 'NIP tidak cocok dengan data pegawai perusahaan.'
+          ? 'NIK tidak cocok dengan data karyawan perusahaan.'
           : status === 400
-            ? 'Pendaftaran tidak tersedia. Periksa NIP, jenis akun, dan jenjang, atau hubungi pengelola.'
+            ? 'Pendaftaran tidak tersedia. Periksa NIK, jenis akun, dan jenjang, atau hubungi pengelola.'
             : 'Pendaftaran belum dapat diproses. Coba lagi nanti.'
   } finally {
     loading.value = false
@@ -87,7 +87,7 @@ async function register() {
     </div>
     <div class="login-panel">
       <h1 id="register-title">Daftar akun</h1>
-      <p class="login-intro">Gunakan NIP yang terdaftar dan buat kata sandi untuk akun Anda.</p>
+      <p class="login-intro">Gunakan NIK yang terdaftar dan buat kata sandi untuk akun Anda.</p>
       <p v-if="loginDestination.query.returnTo" class="login-notice">
         Tujuan buku Anda tetap tersimpan saat melanjutkan ke login.
       </p>
@@ -95,7 +95,7 @@ async function register() {
         Login dan pendaftaran belum tersedia pada demo ini.
       </p>
       <p role="status" class="login-notice">
-        NIP, jenis akun, dan jenjang Editor harus sesuai data pegawai yang disiapkan pengelola.
+        NIK, jenis akun, dan jenjang Editor harus sesuai data karyawan yang disiapkan pengelola.
         Setelah mendaftar, Anda dapat langsung masuk tanpa verifikasi email.
       </p>
       <p
@@ -149,21 +149,21 @@ async function register() {
             </option>
           </select>
           <p id="editor-access-help" class="field-help">
-            Pilih jenjang sesuai hak akses NIP yang ditetapkan pengelola.
+            Pilih jenjang sesuai hak akses NIK yang ditetapkan pengelola.
           </p>
         </div>
         <div class="login-field">
-          <label for="register-nip">Nomor Induk Pegawai (NIP)</label>
+          <label for="register-nip">Nomor Induk Karyawan (NIK)</label>
           <input
             id="register-nip"
             v-model="nip"
             required
             type="text"
-            inputmode="numeric"
-            pattern="[0-9]{1,32}"
+            inputmode="text"
+            pattern="[A-Za-z0-9]{1,32}"
             autocomplete="username"
             maxlength="32"
-            placeholder="Masukkan NIP Anda"
+            placeholder="Masukkan NIK Anda"
             autocapitalize="none"
             :spellcheck="false"
             :disabled="!configured || loading"
