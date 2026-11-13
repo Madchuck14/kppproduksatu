@@ -84,13 +84,13 @@ try {
   await page.goto(base + '/login')
   await page.waitForFunction(() => Boolean(document.querySelector('#__nuxt')?.__vue_app__))
   await navigate('/admin/daerah-penjualan')
-  await page.getByRole('heading', { name: 'Periksa Daerah Penjualan', exact: true }).waitFor()
+  await page.getByRole('heading', { name: 'Catatan Login', exact: true }).waitFor()
   const menu = page.getByRole('navigation', { name: 'Menu pengelolaan' })
-  assert.equal(await menu.locator('[aria-current="page"]').innerText(), 'Periksa Daerah Penjualan')
+  assert.equal(await menu.locator('[aria-current="page"]').innerText(), 'Catatan Login')
   await page.getByRole('cell', { name: '000123', exact: true }).waitFor()
   await page.getByRole('cell', { name: 'Sales Resmi', exact: true }).waitFor()
   assert.equal(await page.getByRole('cell', { name: 'Jakarta Timur', exact: true }).count(), 1)
-  const summary = page.getByLabel('Ringkasan penggunaan Sales')
+  const summary = page.getByLabel('Ringkasan aktivitas login')
   assert.deepEqual(
     (await summary.locator('strong').allTextContents()).map((value) => value.trim()),
     ['14', '30', '7', '20'],
@@ -111,11 +111,13 @@ try {
   await page.screenshot({ path: '.data/sales-dashboard-qa/mobile.png', fullPage: true })
   fail = true
   await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
-  await page.getByRole('alert').filter({ hasText: 'Data Sales belum dapat dimuat' }).waitFor()
+  await page.getByRole('alert').filter({ hasText: 'Catatan login belum dapat dimuat' }).waitFor()
   fail = false
   empty = true
   await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
-  await page.getByText('Belum ada akun Sales terdaftar.', { exact: true }).waitFor()
+  await page
+    .getByText('Belum ada akun Sales untuk ditampilkan dalam catatan login.', { exact: true })
+    .waitFor()
   assert.deepEqual(await summary.locator('strong').allTextContents(), ['0', '0', '0', '0'])
   await navigate('/login')
   account.isSuper = false
@@ -123,10 +125,7 @@ try {
     navigate('/admin/daerah-penjualan'),
     /Halaman ini hanya dapat diakses oleh Editor super/,
   )
-  assert.equal(
-    await menu.getByRole('link', { name: 'Periksa Daerah Penjualan', exact: true }).count(),
-    0,
-  )
+  assert.equal(await menu.getByRole('link', { name: 'Catatan Login', exact: true }).count(), 0)
   assert.deepEqual(errors, [])
   console.log(
     'PASS: super menu/page, active navigation, WIB timestamp, directory notice, pagination, never-logged-in, retry/empty state, mobile overflow, ordinary Editor denial. Browser fixtures only.',

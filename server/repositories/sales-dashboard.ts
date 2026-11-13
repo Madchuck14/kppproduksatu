@@ -11,7 +11,7 @@ export async function getSalesDashboard(event: H3Event, page: number): Promise<S
     throw createError({
       statusCode: 503,
       statusMessage:
-        'Data Sales belum dapat dimuat. Pastikan migration login Sales sudah diterapkan.',
+        'Catatan login belum dapat dimuat. Pastikan migration login Sales sudah diterapkan.',
     })
   return parsed.data
 }

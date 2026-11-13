@@ -2,7 +2,7 @@
 import type { SalesDashboard } from '#shared/schemas/sales-dashboard'
 
 definePageMeta({ middleware: ['admin', 'editor-super'] })
-useSeoMeta({ title: 'Periksa Daerah Penjualan | Editor', robots: 'noindex, nofollow' })
+useSeoMeta({ title: 'Catatan Login | Editor', robots: 'noindex, nofollow' })
 const route = useRoute()
 const page = computed(() => {
   const value = Number(route.query.page ?? 1)
@@ -28,19 +28,19 @@ function formatLogin(value: string | null) {
   <section class="sales-dashboard" aria-labelledby="sales-dashboard-title">
     <div class="dashboard-heading">
       <div>
-        <h1 id="sales-dashboard-title">Periksa Daerah Penjualan</h1>
-        <p>Data akun Sales dan waktu login terakhir dalam WIB.</p>
+        <h1 id="sales-dashboard-title">Catatan Login</h1>
+        <p>Catatan aktivitas login akun Sales dalam WIB.</p>
       </div>
       <UButton variant="outline" :loading="status === 'pending'" @click="refresh()">
         Muat ulang
       </UButton>
     </div>
     <p v-if="error" role="alert" class="dashboard-error">
-      Data Sales belum dapat dimuat. Gunakan Muat ulang untuk mencoba lagi.
+      Catatan login belum dapat dimuat. Gunakan Muat ulang untuk mencoba lagi.
     </p>
-    <p v-else-if="status === 'pending'" role="status">Memuat data Sales...</p>
+    <p v-else-if="status === 'pending'" role="status">Memuat catatan login...</p>
     <template v-else-if="data">
-      <div class="usage-summary" aria-label="Ringkasan penggunaan Sales">
+      <div class="usage-summary" aria-label="Ringkasan aktivitas login">
         <div>
           <strong>{{ data.periods.today.loginEvents }}</strong
           ><span>Total login hari ini</span>
@@ -51,40 +51,41 @@ function formatLogin(value: string | null) {
         </div>
         <div>
           <strong>{{ data.periods.today.topAreas[0]?.loginEvents ?? 0 }}</strong>
-          <span>Login daerah teratas hari ini</span>
+          <span>Login terbanyak per wilayah hari ini</span>
           <p>
             {{
               data.periods.today.topAreas.map((item) => item.area).join(', ') ||
-              'Belum ada daerah tercatat'
+              'Belum ada wilayah login tercatat'
             }}
           </p>
         </div>
         <div>
           <strong>{{ data.periods.week.topAreas[0]?.loginEvents ?? 0 }}</strong>
-          <span>Login daerah teratas minggu ini</span>
+          <span>Login terbanyak per wilayah minggu ini</span>
           <p>
             {{
               data.periods.week.topAreas.map((item) => item.area).join(', ') ||
-              'Belum ada daerah tercatat'
+              'Belum ada wilayah login tercatat'
             }}
           </p>
         </div>
       </div>
       <p class="directory-notice">
         Hari dimulai pukul 00.00 WIB; minggu dimulai Senin pukul 00.00 WIB. Angka menghitung login
-        berhasil sampai pembaruan terakhir. Jika jumlahnya sama, seluruh daerah teratas ditampilkan.
+        berhasil sampai pembaruan terakhir. Jika jumlahnya sama, seluruh wilayah dengan login
+        terbanyak ditampilkan.
       </p>
-      <p class="sales-count">{{ data.total }} akun Sales terdaftar</p>
+      <p class="sales-count">{{ data.total }} akun Sales dalam catatan login</p>
       <div v-if="data.sales.length" class="table-container">
         <table>
           <caption class="sr-only">
-            Nama, penempatan, dan waktu login terakhir akun Sales
+            Catatan login akun Sales: nama, wilayah kerja, waktu, dan jumlah login
           </caption>
           <thead>
             <tr>
               <th scope="col">NIK</th>
               <th scope="col">Nama Sales</th>
-              <th scope="col">Posisi penempatan</th>
+              <th scope="col">Wilayah kerja akun</th>
               <th scope="col">Login terakhir (WIB)</th>
               <th scope="col">Jumlah login</th>
             </tr>
@@ -105,8 +106,8 @@ function formatLogin(value: string | null) {
           </tbody>
         </table>
       </div>
-      <p v-else class="empty-sales">Belum ada akun Sales terdaftar.</p>
-      <nav v-if="data.total > data.pageSize" class="pagination" aria-label="Halaman data Sales">
+      <p v-else class="empty-sales">Belum ada akun Sales untuk ditampilkan dalam catatan login.</p>
+      <nav v-if="data.total > data.pageSize" class="pagination" aria-label="Halaman catatan login">
         <UButton
           v-if="data.page > 1"
           :to="{ path: route.path, query: { page: data.page - 1 } }"

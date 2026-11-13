@@ -67,7 +67,7 @@ Docker, dan pemeriksaan interaksi browser belum diverifikasi untuk dashboard ini
 
 ## Yang tersedia
 
-Editor super dapat membuka **Periksa Daerah Penjualan** untuk melihat nama/daerah resmi,
+Editor super dapat membuka **Catatan Login** untuk melihat nama/daerah resmi,
 login terakhir, total login hari/minggu ini, dan daerah dengan login terbanyak beserta
 jumlahnya pada kedua periode. Hari/minggu memakai WIB dan minggu dimulai Senin.
 Terapkan `202611110002_sales_login_events.sql` dan `202611110003_sales_login_periods.sql` sebelum deploy, lalu lengkapi nama/daerah

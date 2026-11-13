@@ -49,7 +49,7 @@ khusus melalui RPC dashboard yang memeriksa ulang Editor super.
 
 ## Dashboard
 
-Menu **Periksa Daerah Penjualan** membuka `/admin/daerah-penjualan`. Halaman, API, dan
+Menu **Catatan Login** membuka `/admin/daerah-penjualan`. Halaman, API, dan
 RPC database hanya untuk Editor super; Sales super dan Editor biasa ditolak.
 `GET /api/admin/sales-dashboard?page=1` memakai sesi terverifikasi dan RPC
 `get_sales_dashboard`, tanpa client admin untuk membaca dashboard.

@@ -9,7 +9,7 @@ const managementLinks = [
   { to: '/admin/kontak', label: 'Atur Halaman Kontak' },
   { to: '/admin/struktur-produk', label: 'Kelola Struktur Produk' },
   { to: '/admin/buku-pilihan', label: 'Atur Buku Pilihan' },
-  { to: '/admin/daerah-penjualan', label: 'Periksa Daerah Penjualan' },
+  { to: '/admin/daerah-penjualan', label: 'Catatan Login' },
 ]
 const bookPage = computed(() => route.path === '/admin' || route.path.startsWith('/admin/books/'))
 </script>

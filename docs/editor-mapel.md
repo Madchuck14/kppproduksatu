@@ -16,8 +16,8 @@ Tidak ada perubahan akun, scope, data buku, atau opsi yang sudah tersimpan.
 
 Rollback: deploy aplikasi sebelumnya dan jalankan
 `drop policy if exists classifications_scoped_subject_insert on public.book_classifications;`.
-Mapel yang sudah ditambahkan tetap disimpan. Migration belum dijalankan pada Supabase live
-oleh agent.
+Mapel yang sudah ditambahkan tetap disimpan. Pengguna mengonfirmasi kedua migration mapel
+sudah dijalankan; agent belum memverifikasi izin dan persistensi Supabase live.
 
 Untuk membatalkan izin hapus saja, deploy aplikasi sebelumnya lalu pulihkan hanya definisi
 fungsi `delete_book_classification` beserta REVOKE/GRANT dari migration

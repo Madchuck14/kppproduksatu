@@ -4,9 +4,9 @@ import { requireSuperEditor } from '../../utils/require-editor'
 
 export default defineEventHandler(async (event) => {
   setHeader(event, 'Cache-Control', 'private, no-store')
-  await requireSuperEditor(event, 'Data penjualan hanya dapat diperiksa oleh Editor super.')
+  await requireSuperEditor(event, 'Catatan login hanya dapat diperiksa oleh Editor super.')
   const parsed = salesDashboardQuerySchema.strict().safeParse(getQuery(event))
   if (!parsed.success)
-    throw createError({ statusCode: 400, statusMessage: 'Halaman data Sales tidak valid.' })
+    throw createError({ statusCode: 400, statusMessage: 'Halaman catatan login tidak valid.' })
   return getSalesDashboard(event, parsed.data.page)
 })

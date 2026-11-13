@@ -7,7 +7,7 @@ memperluas validasi database serta menyelaraskan alias Auth huruf kecil tanpa me
 nomor, UUID, password, role, scope, dan Favorit akun master Sales/Editor lama.
 Lihat [rollout dan rollback NIK](nip-auth.md#nik-alfanumerik-12-november-2026).
 
-**Periksa Daerah Penjualan:** registry pegawai menyimpan NIK, nama, dan daerah kerja
+**Catatan Login:** registry pegawai menyimpan NIK, nama, dan daerah kerja
 resmi. Login Sales berhasil dicatat pada `sales_login_events`, satu event per sesi Auth,
 sebelum token dikirim ke browser. Dashboard `/admin/daerah-penjualan` serta API/RPC
 khusus Editor super menampilkan login terakhir, total login hari/minggu kalender WIB,
