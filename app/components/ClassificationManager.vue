@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { Classification, ClassificationInput } from '#shared/schemas/classifications'
 
-const props = defineProps<{ levels: readonly string[] }>()
+const props = defineProps<{ levels: readonly string[]; subjectsOnly?: boolean }>()
 const { data, error, refresh, status } = await useClassifications()
-const kind = ref<ClassificationInput['kind']>('curriculum')
+const kind = ref<ClassificationInput['kind']>(props.subjectsOnly ? 'subject' : 'curriculum')
 const name = ref('')
 const level = ref(props.levels[0] ?? '')
 const saving = ref(false)
@@ -83,16 +83,20 @@ async function save() {
 <template>
   <section class="classification-page" aria-labelledby="classification-title">
     <div class="dialog-heading">
-      <h1 id="classification-title">Edit Klasifikasi Buku</h1>
+      <h1 id="classification-title">
+        {{ subjectsOnly ? 'Tambah Mapel' : 'Edit Klasifikasi Buku' }}
+      </h1>
     </div>
     <p>
       Tambahkan pilihan untuk klasifikasi buku. Mata pelajaran mengikuti jenjang yang Anda kelola.
     </p>
     <form @submit.prevent="save">
-      <label for="classification-kind">Jenis klasifikasi</label>
-      <select id="classification-kind" v-model="kind" :disabled="saving">
-        <option v-for="(label, value) in labels" :key="value" :value="value">{{ label }}</option>
-      </select>
+      <template v-if="!subjectsOnly">
+        <label for="classification-kind">Jenis klasifikasi</label>
+        <select id="classification-kind" v-model="kind" :disabled="saving">
+          <option v-for="(label, value) in labels" :key="value" :value="value">{{ label }}</option>
+        </select>
+      </template>
       <template v-if="kind === 'subject'">
         <label for="classification-level">Jenjang</label>
         <select id="classification-level" v-model="level" required :disabled="saving">

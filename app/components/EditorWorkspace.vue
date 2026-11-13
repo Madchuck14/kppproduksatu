@@ -19,6 +19,12 @@ const bookPage = computed(() => route.path === '/admin' || route.path.startsWith
     <aside class="dashboard-sidebar" aria-label="Pengelolaan editorial">
       <nav class="dashboard-management" aria-label="Menu pengelolaan">
         <NuxtLink to="/admin" :aria-current="bookPage ? 'page' : undefined">Kelola Buku</NuxtLink>
+        <NuxtLink
+          v-if="account && !account.isSuper"
+          to="/admin/mapel"
+          :aria-current="route.path === '/admin/mapel' ? 'page' : undefined"
+          >Tambah Mapel</NuxtLink
+        >
         <template v-if="account?.isSuper">
           <NuxtLink
             v-for="item in managementLinks"

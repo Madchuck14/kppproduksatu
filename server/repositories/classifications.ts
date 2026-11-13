@@ -11,7 +11,7 @@ import type { AccountSession } from '#shared/types/account'
 import type { BookInput } from '#shared/schemas/editor'
 import type { EditorDatabase } from '#shared/types/editor-database'
 import { getCatalogClient } from '../utils/catalog-client'
-import { assertSuperEditor } from '../utils/require-editor'
+import { assertBookScope, assertSuperEditor } from '../utils/require-editor'
 
 export async function listClassifications(event: H3Event) {
   const source = useRuntimeConfig(event).catalogSource
@@ -46,7 +46,11 @@ export async function addClassification(
   account: AccountSession,
   input: ClassificationInput,
 ) {
-  assertSuperEditor(account)
+  if (input.kind === 'subject' && account.role === 'editor') {
+    assertBookScope(account, input.educationLevel)
+  } else {
+    assertSuperEditor(account)
+  }
   const code =
     input.kind === 'division'
       ? input.name
@@ -106,7 +110,11 @@ export async function deleteClassification(
   account: AccountSession,
   input: ClassificationDelete,
 ) {
-  assertSuperEditor(account)
+  if (input.kind === 'subject' && account.role === 'editor') {
+    assertBookScope(account, input.educationLevel)
+  } else {
+    assertSuperEditor(account)
+  }
   const client = await serverSupabaseClient<EditorDatabase>(event)
   const { data, error } = await client.rpc('delete_book_classification', {
     option_kind: input.kind,

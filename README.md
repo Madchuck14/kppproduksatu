@@ -95,7 +95,11 @@ Nomor telepon mendukung tanda pengenal dan tombol **+ Tambah nomor telepon**, hi
 10 nomor. Terapkan `202611100003_contact_phones.sql` sebelum menjalankan versi ini;
 nomor lama tetap tampil sebagai satu entri berlabel Telepon.
 
-Hanya Editor super yang dapat memakai modal **Edit Klasifikasi Buku** untuk menambah kurikulum, divisi,
+Editor biasa memiliki menu **Tambah Mapel** menuju `/admin/mapel`, khusus menambah mapel pada
+jenjang aksesnya tanpa pilihan kurikulum atau divisi. Mapel yang belum dipakai buku dapat
+dihapus setelah konfirmasi. Terapkan `202611130001_editor_add_subjects.sql` dan
+`202611130002_editor_delete_subjects.sql` sebelum memakai fitur ini.
+Editor super tetap memakai **Edit Klasifikasi Buku** untuk menambah kurikulum, divisi,
 dan mata pelajaran per jenjang, serta menghapus opsi tambahan yang belum dipakai buku melalui
 konfirmasi. Seluruh opsi termasuk divisi dan mapel awal dapat dihapus bila tidak dipakai buku.
 Terapkan `202610150004_book_classifications.sql`, `202610150005_delete_book_classifications.sql`,

@@ -350,6 +350,95 @@ try {
   console.log(
     'PASS: full migration chain, preservation, default lists, retry, new options, duplicate rejection, subject scope, anon/Sales denial, immutable registry, database validation, and seven division groups (isolated PostgreSQL).',
   )
+  await db.exec(await readFile('supabase/migrations/202611130001_editor_add_subjects.sql', 'utf8'))
+  await db.exec(await readFile('supabase/migrations/202611130001_editor_add_subjects.sql', 'utf8'))
+  await db.exec(
+    "set role authenticated; set request.jwt.claim.sub = '11111111-1111-4111-8111-111111111111'",
+  )
+  await db.exec(
+    "insert into public.book_classifications (kind, code, name, education_level) values ('subject', 'Mapel Editor', 'Mapel Editor', 'SD')",
+  )
+  for (const [kind, level] of [
+    ['subject', 'SMP'],
+    ['curriculum', ''],
+    ['division', ''],
+  ]) {
+    await assert.rejects(
+      db.query(
+        'insert into public.book_classifications (kind, code, name, education_level) values ($1, $2, $2, $3)',
+        [kind, 'forbidden', level],
+      ),
+      /row-level security/,
+    )
+  }
+  await assert.rejects(remove('subject', 'Mapel Editor', 'SD'), /classification_forbidden/)
+  await db.exec(
+    "reset role; set role authenticated; set request.jwt.claim.sub = '22222222-2222-4222-8222-222222222222'",
+  )
+  await assert.rejects(
+    db.exec(
+      "insert into public.book_classifications (kind, code, name, education_level) values ('subject', 'Sales Mapel', 'Sales Mapel', 'SD')",
+    ),
+    /row-level security/,
+  )
+  await db.exec('reset role; set role anon')
+  await assert.rejects(
+    db.exec(
+      "insert into public.book_classifications (kind, code, name, education_level) values ('subject', 'Anon Mapel', 'Anon Mapel', 'SD')",
+    ),
+    /permission denied/,
+  )
+  await db.exec('reset role')
+  console.log('PASS: Editor adds scoped subjects only; delete, other kinds, Sales and anon denied.')
+  const deleteSubjectsSql = await readFile(
+    'supabase/migrations/202611130002_editor_delete_subjects.sql',
+    'utf8',
+  )
+  await db.exec(`
+    insert into public.book_classifications (kind, code, name, education_level)
+      values ('subject', 'Mapel Terpakai', 'Mapel Terpakai', 'SD');
+    update public.products set education_level = 'SD', subject = 'Mapel Terpakai', published = false;
+  `)
+  const beforeDeleteMigration = (await db.query('select * from public.products order by id')).rows
+  await db.exec(deleteSubjectsSql)
+  await db.exec(deleteSubjectsSql)
+  assert.deepEqual(
+    (await db.query('select * from public.products order by id')).rows,
+    beforeDeleteMigration,
+  )
+  await db.exec(
+    "set role authenticated; set request.jwt.claim.sub = '11111111-1111-4111-8111-111111111111'",
+  )
+  assert.equal((await remove('subject', 'Mapel Editor', 'SD')).rows[0].deleted, true)
+  assert.equal((await remove('subject', 'Mapel Editor', 'SD')).rows[0].deleted, false)
+  await assert.rejects(remove('subject', 'Matematika', 'SMP'), /classification_forbidden/)
+  await assert.rejects(remove('division', 'smk'), /classification_forbidden/)
+  await assert.rejects(remove('curriculum', 'Kurikulum Lama'), /classification_forbidden/)
+  await assert.rejects(remove('subject', 'Mapel Terpakai', 'SD'), /classification_in_use/)
+  await assert.rejects(db.exec('delete from public.book_classifications'), /permission denied/)
+  await db.exec(
+    "reset role; set role authenticated; set request.jwt.claim.sub = '22222222-2222-4222-8222-222222222222'",
+  )
+  await assert.rejects(remove('subject', 'Matematika', 'SD'), /classification_forbidden/)
+  await db.exec('reset role; set role anon')
+  await assert.rejects(remove('subject', 'Matematika', 'SD'), /permission denied/)
+  await db.exec(
+    "reset role; set role authenticated; set request.jwt.claim.sub = '33333333-3333-4333-8333-333333333333'",
+  )
+  for (const [kind, code, level] of [
+    ['division', 'super-delete-check', ''],
+    ['curriculum', 'Super Delete Check', ''],
+    ['subject', 'Super Delete Check', 'SMK'],
+  ]) {
+    await db.query(
+      'insert into public.book_classifications (kind, code, name, education_level) values ($1, $2, $2, $3)',
+      [kind, code, level],
+    )
+    assert.equal((await remove(kind, code, level)).rows[0].deleted, true)
+  }
+  console.log(
+    'PASS: scoped Editor subject deletion; in-use draft protection; cross-level, other kinds, direct DELETE, Sales super and anon denied; super management preserved.',
+  )
 } finally {
   await db.close()
 }

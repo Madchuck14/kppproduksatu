@@ -689,4 +689,10 @@ UI menyembunyikan tombol bagi Editor biasa; guard server, repository, RLS insert
 dan RPC hapus menegakkan syarat yang sama. Sales, termasuk Sales super, tidak mendapat
 akses tulis. Opsi tetap dapat dibaca publik dan dipilih Editor pada formulir buku.
 Scope pengelolaan buku per jenjang dan larangan hapus opsi yang dipakai tetap berlaku.
-Ketentuan historis sebelumnya tentang pengelolaan oleh Editor biasa sudah digantikan.
+Migration `202611130001_editor_add_subjects.sql` membuka penambahan mapel bagi Editor biasa
+sesuai scope jenjang. Sidebar mengarah ke `/admin/mapel` tanpa pilihan kurikulum/divisi.
+Migration `202611130002_editor_delete_subjects.sql` menambahkan izin hapus mapel sesuai
+jenjang melalui RPC yang sama, dengan konfirmasi UI dan penolakan bila dipakai buku termasuk
+draf. Endpoint POST/DELETE memverifikasi Editor, repository memeriksa jenis dan scope,
+serta RLS INSERT dan RPC hapus menerapkan batas yang sama. Pengelolaan kurikulum/divisi
+tetap khusus Editor super.
