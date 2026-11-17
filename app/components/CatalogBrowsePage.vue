@@ -72,6 +72,7 @@ useSeoMeta({
         <span v-if="kind === 'division'" class="division-accent" aria-hidden="true" />
       </NuxtLink>
     </div>
+    <slot />
     <div class="collection-heading">
       <h2>Buku Paling Sering Diakses</h2>
       <NuxtLink v-if="selection" :to="path">Lihat semua {{ title.toLowerCase() }}</NuxtLink>
@@ -391,7 +392,7 @@ h1 {
   margin: 64px 0 32px;
 }
 .collection-heading h2 {
-  font: 500 30px/1.3 var(--font-landing-serif);
+  font: 500 44px/1.2 var(--font-landing-serif);
 }
 .collection-heading a,
 .shelf-heading a {
@@ -450,7 +451,7 @@ a:hover {
     gap: 10px;
   }
   .collection-heading h2 {
-    font-size: 26px;
+    font-size: 36px;
   }
   .book-grid {
     gap: 16px;

@@ -1,3 +1,5 @@
 <template>
-  <CatalogBrowsePage kind="division" />
+  <CatalogBrowsePage kind="division">
+    <DivisionProductStructure />
+  </CatalogBrowsePage>
 </template>

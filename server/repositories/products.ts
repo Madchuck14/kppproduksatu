@@ -81,6 +81,7 @@ export async function listProducts(
     q: string
     featured?: string
     level?: string
+    structure?: string
     division?: string
     grade?: number
     subject?: string | string[]
@@ -95,12 +96,41 @@ export async function listProducts(
   const featured = options.featured === undefined ? undefined : options.featured === 'true'
   const subjects = options.subject ? [options.subject].flat() : []
   const pageSize = options.pageSize ?? 15
+  let structureIds: string[] | undefined
+  if (options.structure) {
+    const nodes = await listProductStructure(event, educationLevelSchema.parse(options.level))
+    const selected = nodes.find((node) => node.id === options.structure && !node.archived)
+    const ids = new Set<string>()
+    if (selected) {
+      ids.add(selected.id)
+      const children = new Map<string, string[]>()
+      for (const node of nodes) {
+        if (!node.archived && node.parentId) {
+          const siblings = children.get(node.parentId) ?? []
+          siblings.push(node.id)
+          children.set(node.parentId, siblings)
+        }
+      }
+      for (const id of ids) {
+        for (const child of children.get(id) ?? []) ids.add(child)
+      }
+    }
+    structureIds = [...ids]
+    if (!structureIds.length) {
+      return {
+        source,
+        products: [],
+        ...(options.page ? { total: 0, page: 1, pageSize, subjectCounts: {} } : {}),
+      }
+    }
+  }
   const searchFilter = `title.ilike.%${search}%,author.ilike.%${search}%,book_code.ilike.%${search}%,subject.ilike.%${search}%`
   if (source === 'demo') {
     const matchingProducts = demoProducts.filter(
       (product) =>
         (featured === undefined || product.featured === featured) &&
         (!options.level || product.educationLevel === options.level) &&
+        (!structureIds || structureIds.includes(product.structureNodeId ?? '')) &&
         (!options.division || product.divisionCode === options.division) &&
         (options.grade === undefined || product.grade === options.grade) &&
         `${product.title} ${product.author} ${product.bookCode ?? ''} ${product.subject ?? ''}`
@@ -142,6 +172,7 @@ export async function listProducts(
     .order('id', { ascending: true })
   if (featured !== undefined) query = query.eq('featured', featured)
   if (options.level) query = query.eq('education_level', options.level)
+  if (structureIds) query = query.in('structure_node_id', structureIds)
   if (options.division) query = query.eq('division_code', options.division)
   if (options.grade !== undefined) query = query.eq('grade', options.grade)
   if (subjects.length) query = query.in('subject', subjects)
@@ -156,32 +187,34 @@ export async function listProducts(
   const total = count ?? 0
   const page = Math.min(options.page, Math.max(1, Math.ceil(total / pageSize)))
   if (page !== options.page) return listProducts(event, { ...options, page })
-  const { data: facetRows, error: aggregateError } = await getCatalogClient(event).rpc(
-    options.division ? 'catalog_division_subject_counts' : 'catalog_subject_counts',
-    {
-      ...(options.division ? { filter_division: options.division } : {}),
-      search_text: search,
-      filter_level: options.level ?? null,
-      filter_grade: options.grade ?? null,
-      filter_featured: featured ?? null,
-    },
-  )
-  if (!aggregateError) {
-    const rows = z
-      .array(z.object({ subject: z.string(), book_count: z.number().int().nonnegative() }))
-      .parse(facetRows)
-    return {
-      source,
-      products,
-      total,
-      page,
-      pageSize,
-      subjectCounts: Object.fromEntries(rows.map((row) => [row.subject, row.book_count])),
+  if (!structureIds) {
+    const { data: facetRows, error: aggregateError } = await getCatalogClient(event).rpc(
+      options.division ? 'catalog_division_subject_counts' : 'catalog_subject_counts',
+      {
+        ...(options.division ? { filter_division: options.division } : {}),
+        search_text: search,
+        filter_level: options.level ?? null,
+        filter_grade: options.grade ?? null,
+        filter_featured: featured ?? null,
+      },
+    )
+    if (!aggregateError) {
+      const rows = z
+        .array(z.object({ subject: z.string(), book_count: z.number().int().nonnegative() }))
+        .parse(facetRows)
+      return {
+        source,
+        products,
+        total,
+        page,
+        pageSize,
+        subjectCounts: Object.fromEntries(rows.map((row) => [row.subject, row.book_count])),
+      }
     }
+    // During rollout only a missing RPC may use the previous database query path.
+    if (aggregateError.code !== 'PGRST202')
+      throw createError({ statusCode: 503, statusMessage: 'Jumlah buku belum tersedia' })
   }
-  // During rollout only a missing RPC may use the previous database query path.
-  if (aggregateError.code !== 'PGRST202')
-    throw createError({ statusCode: 503, statusMessage: 'Jumlah buku belum tersedia' })
   // Read only subject metadata in batches, without the product list's row cap.
   const subjectCounts: Record<string, number> = {}
   for (let offset = 0; ; offset += 1000) {
@@ -192,6 +225,7 @@ export async function listProducts(
       .order('id')
       .range(offset, offset + 999)
     if (options.level) facets = facets.eq('education_level', options.level)
+    if (structureIds) facets = facets.in('structure_node_id', structureIds)
     if (options.division) facets = facets.eq('division_code', options.division)
     if (options.grade !== undefined) facets = facets.eq('grade', options.grade)
     if (featured !== undefined) facets = facets.eq('featured', featured)

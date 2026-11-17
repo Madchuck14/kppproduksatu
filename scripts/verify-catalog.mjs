@@ -644,3 +644,107 @@ console.log(
 console.log(
   'Database behavior uses a query stub; this does not verify live PostgreSQL constraints or RLS.',
 )
+
+const structureRoot = '11111111-1111-4111-8111-111111111111'
+const structureChild = '22222222-2222-4222-8222-222222222222'
+const structureGrandchild = '33333333-3333-4333-8333-333333333333'
+const structureSibling = '44444444-4444-4444-8444-444444444444'
+const structureArchived = '55555555-5555-4555-8555-555555555555'
+assert.equal(catalogQuerySchema.safeParse({ structure: structureRoot }).success, false)
+assert.equal(catalogQuerySchema.safeParse({ level: 'SD', structure: 'invalid' }).success, false)
+assert.equal(catalogQuerySchema.safeParse({ level: 'SD', structure: structureRoot }).success, true)
+source = 'supabase'
+let structureFailure = false
+const structureRows = [
+  [structureRoot, null, false],
+  [structureChild, structureRoot, false],
+  [structureGrandchild, structureChild, false],
+  [structureSibling, null, false],
+  [structureArchived, structureRoot, true],
+].map(([id, parent_id, archived]) => ({
+  id,
+  parent_id,
+  archived,
+  name: String(id),
+  education_level: 'SD',
+  sort_order: 0,
+  product_status: null,
+}))
+const structureBooks = Array.from({ length: 1005 }, (_, index) => ({
+  ...row,
+  id: `99999999-9999-4999-8999-${String(index).padStart(12, '0')}`,
+  structure_node_id: structureGrandchild,
+  subject: index % 2 ? 'Bahasa Indonesia' : 'Matematika',
+  published: true,
+}))
+structureBooks.push(
+  { ...row, structure_node_id: structureRoot, published: true },
+  { ...row, structure_node_id: structureChild, published: true },
+  { ...row, structure_node_id: structureSibling, published: true },
+  { ...row, structure_node_id: structureArchived, published: true },
+  { ...row, structure_node_id: structureGrandchild, published: false },
+  { ...row, education_level: 'SMP', structure_node_id: structureGrandchild, published: true },
+)
+client = {
+  rpc() {
+    throw new Error('Unfiltered facet RPC must not run with structure filters')
+  },
+  from(table) {
+    let rows = table === 'products' ? [...structureBooks] : [...structureRows]
+    let start = 0
+    let end = Infinity
+    const query = {}
+    query.select = () => query
+    query.order = () => query
+    query.eq = (field, value) => {
+      rows = rows.filter((item) => item[field] === value)
+      return query
+    }
+    query.in = (field, values) => {
+      rows = rows.filter((item) => values.includes(item[field]))
+      return query
+    }
+    query.range = (from, to) => {
+      start = from
+      end = to + 1
+      return query
+    }
+    query.limit = (limit) => {
+      end = limit
+      return query
+    }
+    query.then = (resolve) =>
+      resolve({
+        data: rows.slice(start, end),
+        count: rows.length,
+        error: structureFailure && table === 'product_structure_nodes' ? { code: 'XX000' } : null,
+      })
+    return query
+  },
+}
+result = await list({ level: 'SD', structure: structureRoot, page: 1, subject: 'Matematika' })
+assert.equal(
+  result.total,
+  505,
+  'Root matches direct books and descendants, excluding drafts and other branches/levels',
+)
+assert.deepEqual(
+  result.subjectCounts,
+  { Matematika: 505, 'Bahasa Indonesia': 502 },
+  'Facets apply structure, ignore subject selection, and continue beyond 1000 rows',
+)
+assert.equal((await list({ level: 'SD', structure: structureChild, page: 1 })).total, 1006)
+assert.equal((await list({ level: 'SD', structure: structureGrandchild, page: 999 })).page, 67)
+assert.equal((await list({ level: 'SD', structure: structureSibling, page: 1 })).total, 1)
+assert.equal((await list({ level: 'SD', structure: structureArchived, page: 1 })).total, 0)
+assert.equal((await list({ level: 'SMP', structure: structureRoot, page: 1 })).total, 0)
+structureFailure = true
+await assert.rejects(
+  list({ level: 'SD', structure: structureRoot, page: 1 }),
+  (error) => error.statusCode === 503,
+)
+source = 'demo'
+assert.equal((await list({ level: 'SD', structure: structureRoot, page: 1 })).total, 0)
+console.log(
+  'PASS: catalog structure validation, subtree/direct matches, scoped pagination/facets over 1000 rows, draft exclusion, missing/archived/wrong-level branches, demo and failure propagation.',
+)

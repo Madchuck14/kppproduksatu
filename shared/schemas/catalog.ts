@@ -9,6 +9,7 @@ export const catalogQuerySchema = z
     q: z.string().trim().max(100).default(''),
     featured: z.enum(['true', 'false']).optional(),
     level: educationLevelSchema.optional(),
+    structure: z.string().uuid().optional(),
     division: divisionCodeSchema.optional(),
     grade: z.coerce.number().int().min(1).max(12).optional(),
     subject: z.union([bookSubjectSchema, z.array(bookSubjectSchema).max(50)]).optional(),
@@ -20,6 +21,13 @@ export const catalogQuerySchema = z
     sort: z.enum(['newest', 'title-asc', 'title-desc']).default('newest'),
   })
   .superRefine((query, context) => {
+    if (query.structure && !query.level) {
+      context.addIssue({
+        code: 'custom',
+        path: ['structure'],
+        message: 'Pilih jenjang untuk filter struktur produk.',
+      })
+    }
     if (
       query.grade !== undefined &&
       (!query.level || !getGradesForLevel(query.level).includes(query.grade))

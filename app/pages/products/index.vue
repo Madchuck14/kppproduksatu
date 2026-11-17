@@ -3,6 +3,8 @@ import { educationLevelSchema } from '#shared/schemas/auth'
 import { bookSubjectSchema } from '#shared/schemas/editor'
 import { getGradesForLevel } from '#shared/utils/book-grades'
 import { divisionCodeSchema } from '#shared/utils/book-divisions'
+import { structurePath } from '#shared/schemas/product-structure'
+import { z } from 'zod'
 
 const config = useRuntimeConfig()
 const { divisions: bookDivisions, subjectsForLevel } = await useClassifications()
@@ -25,6 +27,28 @@ const level = computed(() => {
   return parsed.success ? parsed.data : ''
 })
 const gradeOptions = computed(() => getGradesForLevel(level.value))
+const structure = computed(() =>
+  level.value ? z.string().uuid().safeParse(route.query.structure).data : undefined,
+)
+const {
+  data: structureNodes,
+  status: structureStatus,
+  error: structureError,
+  refresh: refreshStructure,
+} = await useAsyncData(
+  () => `catalog-structure-${level.value}-${structure.value ?? ''}`,
+  () =>
+    structure.value && level.value
+      ? $fetch('/api/catalog/product-structure', { query: { level: level.value } })
+      : Promise.resolve([]),
+)
+const structureLabel = computed(() =>
+  structure.value
+    ? structurePath(structureNodes.value ?? [], structure.value)
+        .map((node) => node.name)
+        .join(' / ')
+    : '',
+)
 const division = computed(() => {
   const parsed = divisionCodeSchema.safeParse(route.query.division)
   return parsed.success ? parsed.data : undefined
@@ -58,6 +82,7 @@ const { data, error, status, refresh } = await useFetch('/api/products', {
   query: computed(() => ({
     q: appliedSearch.value,
     level: level.value || undefined,
+    structure: structure.value,
     division: division.value,
     grade: grade.value,
     subject: subjects.value.length ? subjects.value : undefined,
@@ -123,6 +148,7 @@ async function updateQuery(changes: Record<string, string | string[] | number | 
 function selectLevel(value: string) {
   return updateQuery({
     level: value || undefined,
+    structure: undefined,
     grade: undefined,
     subject: subjects.value.filter(
       (subject) => !value || subjectsForLevel(value).includes(subject),
@@ -150,6 +176,7 @@ function clearFilters() {
     grade: undefined,
     subject: undefined,
     division: undefined,
+    structure: undefined,
   })
 }
 </script>
@@ -170,6 +197,22 @@ function clearFilters() {
     </nav>
     <div class="catalog-heading">
       <h1>{{ appliedSearch ? `Hasil untuk “${appliedSearch}”` : 'Katalog Buku' }}</h1>
+      <div v-if="structure" class="structure-filter">
+        <p>
+          Struktur Produk:
+          {{
+            structureStatus === 'pending'
+              ? 'Memuat cabang...'
+              : structureError
+                ? 'Nama cabang belum dapat dimuat.'
+                : structureLabel || 'Cabang tidak tersedia'
+          }}
+        </p>
+        <button v-if="structureError" type="button" @click="refreshStructure()">Coba lagi</button>
+        <button type="button" @click="updateQuery({ structure: undefined })">
+          Hapus filter struktur
+        </button>
+      </div>
       <p v-if="divisionName" class="flex items-center gap-3">
         Divisi: {{ divisionName }}
         <button type="button" class="underline" @click="updateQuery({ division: undefined })">
@@ -409,6 +452,23 @@ function clearFilters() {
   color: #6b6f6b;
   font-size: 15px;
   line-height: 24px;
+}
+.structure-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  border: 1px solid #dce8e0;
+  border-radius: 12px;
+  background: #f0f7f3;
+  font-size: 14px;
+}
+.structure-filter button {
+  color: #1f5c3f;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .catalog-search {
   display: flex;

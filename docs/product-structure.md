@@ -6,6 +6,20 @@ buku dalam jenjangnya. Katalog dan struktur aktif tetap dapat dibaca publik.
 
 ## Model dan sumber data
 
+Halaman `/divisi` menampilkan bagian Struktur Produk tersendiri setelah kotak-kotak divisi,
+sebelum koleksi buku paling sering diakses. Judulnya setara dengan judul Divisi. Dropdown
+SD/SMP/SMA/SMK menyimpan pilihan melalui query `level` (default SD), mengikuti navigasi
+back/forward, dan membaca API publik yang sama melalui SSR. Diagram menampilkan kategori,
+subcabang, serta status produk. Klik cabang membuka `/products?level=SD&structure=<UUID>`
+dengan filter jenjang dan struktur aktif. Kotak Produk membuka katalog seluruh buku pada jenjang itu.
+Kategori mencakup buku yang terhubung langsung maupun seluruh turunannya; cabang kosong,
+arsip, hilang, atau salah jenjang menghasilkan katalog kosong. Filter struktur tampil dengan
+jalurnya dan tombol hapus. Pencarian, kelas, mapel, urutan, serta pagination mempertahankannya;
+mengganti jenjang atau menghapus semua filter melepas filter struktur.
+Diagram mengalir dari kiri ke kanan: jenjang, kategori, lalu subcabang. Teks tetap mendatar,
+dan lebar cabang menyesuaikan layar tanpa scroll horizontal pada diagram. Pemuatan,
+kegagalan dengan tombol coba lagi, dan jenjang kosong memiliki status tersendiri.
+
 `product_structure_nodes` menyimpan UUID, `education_level`, `parent_id` nullable,
 `name`, `sort_order`, `product_status` nullable, dan `archived`. Induk harus aktif dalam
 jenjang yang sama. Jenjang cabang tidak dapat diubah; perpindahan induk dalam jenjang
@@ -84,6 +98,13 @@ Input form tetap tersedia ketika penyimpanan gagal. Tidak ada fallback diam-diam
 data contoh jika Supabase gagal. Demo menampilkan struktur kosong dan tidak menyediakan mutasi.
 
 ## API dan otorisasi
+
+`GET /api/products` menerima `structure` berupa UUID yang memerlukan `level`. Server membaca
+struktur aktif jenjang tersebut dan menyaring `products.structure_node_id` berdasarkan subtree.
+Daftar, total, pagination, dan jumlah per mapel memakai cakupan yang sama; filter mapel tetap
+tidak membatasi hitungan facet. Query metadata mapel dibaca dalam batch 1.000 row saat filter
+struktur aktif karena RPC facet lama belum menerima struktur. Semua query buku tetap
+membatasi `published=true`. Tidak memerlukan migration atau perubahan hak akses.
 
 | Endpoint                                        | Akses dan perilaku                                                                                      |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
