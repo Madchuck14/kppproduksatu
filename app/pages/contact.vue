@@ -21,12 +21,12 @@ const channels = computed(() => {
   return [
     { name: 'Kantor pusat', icon: 'location', value: content.address, wide: true, href: undefined },
     { name: 'Email', icon: 'email', value: content.email, href: 'mailto:' + content.email },
-    ...content.phones.map((phone) => ({
-      name: phone.label,
+    {
+      name: content.phones[0]!.label,
       icon: 'phone',
-      value: phone.number,
-      href: contactPhoneHref(phone.number),
-    })),
+      value: content.phones[0]!.number,
+      href: contactPhoneHref(content.phones[0]!.number),
+    },
     { name: 'Fax', icon: 'fax', value: content.fax, href: undefined },
     {
       name: 'Hotline',
@@ -43,6 +43,18 @@ const channels = computed(() => {
     },
   ]
 })
+const directory = computed(() =>
+  (contact.value?.phones.slice(1) ?? []).map((phone) => {
+    const parts = /^(.*?)\s*\(([^()]+)\)$/.exec(phone.label)
+    return {
+      label: phone.label,
+      role: parts?.[1]?.trim() ?? phone.label,
+      name: parts?.[2]?.trim(),
+      number: phone.number,
+      href: contactPhoneHref(phone.number),
+    }
+  }),
+)
 </script>
 
 <template>
@@ -109,6 +121,28 @@ const channels = computed(() => {
         </div>
       </div>
     </section>
+    <section v-if="directory.length" class="contact-directory" aria-labelledby="directory-heading">
+      <header class="directory-heading">
+        <p>DIREKTORI PENGURUS</p>
+        <h2 id="directory-heading">Terhubung dengan tim yang tepat</h2>
+      </header>
+      <div class="directory-grid">
+        <a
+          v-for="(person, index) in directory"
+          :key="index"
+          :href="person.href"
+          class="directory-card"
+          :aria-label="`Telepon ${person.label}, ${person.number}`"
+        >
+          <div class="directory-role">
+            <h3>{{ person.role }}</h3>
+            <img src="/images/contact/phone.svg" alt="" width="20" height="20" />
+          </div>
+          <p v-if="person.name" class="directory-name">{{ person.name }}</p>
+          <p class="directory-number">{{ person.number }}</p>
+        </a>
+      </div>
+    </section>
     <section class="opening-hours" aria-labelledby="hours-heading">
       <span class="section-badge">Jam Operasional</span>
       <h2 id="hours-heading">
@@ -134,8 +168,22 @@ const channels = computed(() => {
 </template>
 
 <style scoped>
+@font-face {
+  font-family: 'Contact Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Contact Lora';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/lora-latin.woff2') format('woff2');
+}
 .contact-page {
-  font-family: var(--font-sans);
+  font-family: 'Contact Inter', var(--font-sans);
   color: #222;
   display: grid;
   gap: 40px;
@@ -166,7 +214,7 @@ const channels = computed(() => {
 }
 .contact-heading h1 {
   margin: 16px 0 10px;
-  font-family: var(--font-sans);
+  font-family: 'Contact Lora', var(--font-sans);
   font-size: 46px;
   font-weight: 500;
   line-height: 1.2;
@@ -244,6 +292,80 @@ const channels = computed(() => {
   border-color: #1f5c3f;
   background: #f7fbf8;
 }
+.contact-directory {
+  display: grid;
+  gap: 24px;
+  color: #1f5c3f;
+}
+.directory-heading {
+  display: grid;
+  gap: 8px;
+}
+.directory-heading > p {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.directory-heading h2 {
+  margin: 0;
+  font-family: 'Contact Lora', var(--font-sans);
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.directory-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+.directory-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #e6e8e4;
+  border-radius: 16px;
+  background: #fff;
+  overflow-wrap: anywhere;
+}
+.directory-role {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.directory-role h3 {
+  margin: 0;
+  color: #6b6f6b;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+}
+.directory-role img {
+  flex-shrink: 0;
+}
+.directory-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 27px;
+}
+.directory-number {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 30px;
+}
+.directory-card:hover {
+  border-color: #1f5c3f;
+  background: #f7fbf8;
+}
+.directory-card:focus-visible {
+  outline: 2px solid #1f5c3f;
+  outline-offset: 4px;
+}
 .location-card {
   border: 1px solid #e6e8e4;
   border-radius: 20px;
@@ -302,7 +424,7 @@ const channels = computed(() => {
 }
 .opening-hours h2 {
   margin: 15px 0 8px;
-  font-family: var(--font-sans);
+  font-family: 'Contact Lora', var(--font-sans);
   font-size: 36px;
   line-height: 1.2;
   font-weight: 500;
@@ -340,7 +462,7 @@ const channels = computed(() => {
 }
 .hours-card p {
   margin: 0 0 6px;
-  font-family: var(--font-sans);
+  font-family: 'Contact Lora', var(--font-sans);
   font-size: 26px;
   font-weight: 600;
   line-height: 33px;
@@ -350,6 +472,9 @@ const channels = computed(() => {
   font-size: 13px;
 }
 @media (max-width: 1100px) {
+  .directory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .contact-grid {
     grid-template-columns: 1fr;
   }
@@ -365,8 +490,12 @@ const channels = computed(() => {
     font-size: 32px;
   }
   .contact-channels,
+  .directory-grid,
   .hours-grid {
     grid-template-columns: 1fr;
+  }
+  .directory-heading h2 {
+    font-size: 28px;
   }
   .contact-card {
     min-height: 100px;

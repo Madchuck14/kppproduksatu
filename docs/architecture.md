@@ -581,8 +581,22 @@ menyediakan penyimpanan. Semua teks dirender sebagai teks biasa. URL iframe hany
 sematan HTTPS `www.google.com/maps/embed`; tautan telepon/WhatsApp dibentuk dari nomor.
 
 Migration `202611100003_contact_phones.sql` menambahkan kolom JSON `contact_page.phones`
-berupa daftar 1–10 pasangan label/nomor. Modal menyediakan tanda pengenal, tambah, dan
+berupa daftar pasangan label/nomor (awalnya maksimal 10). Modal menyediakan tanda pengenal, tambah, dan
 hapus nomor; halaman publik menampilkan tiap nomor sebagai kartu dengan labelnya.
+Desain publik mengikuti frame Figma `Kontak New` (`276:148`): nomor pertama tampil
+bersama saluran kantor, sedangkan nomor berikutnya masuk Direktori Pengurus sesuai
+urutan admin. Label berbentuk `Jabatan (Nama)` dipisahkan menjadi jabatan dan nama;
+label tanpa nama dalam kurung tetap ditampilkan utuh. Direktori memakai tiga kolom
+desktop, dua kolom tablet, dan satu kolom mobile, dengan tautan telepon pada setiap
+kartu. Font Inter dan Lora dimuat dari aset lokal khusus halaman Kontak. Peta tetap
+memakai URL sematan yang dikelola admin, bukan ilustrasi statis pada desain Figma.
+Pengaturan `/admin/kontak` memisahkan nomor kantor dari daftar pengurus tanpa batas jumlah.
+Migration `202611180001_unlimited_contact_phones.sql` menghapus batas jumlah pada
+validasi database, tanpa mengubah kontak lama, batas panjang per field, atau RLS.
+Kolom jabatan, nama opsional, dan nomor menyusun label kompatibel `Jabatan (Nama)`;
+label lama tanpa nama tetap utuh. Tombol Naik/Turun hanya mengubah urutan pengurus,
+sehingga nomor kantor tetap di posisi pertama. Tambah, hapus, dan perubahan urutan
+baru diterapkan setelah Simpan perubahan; kegagalan simpan mempertahankan isian.
 Nomor lama tetap berada di `content.phone` dan dibaca sebagai label Telepon bila kolom
 baru NULL. Saat menyimpan, repository memperbarui daftar dan nomor pertama legacy dalam
 satu operasi. JSON konten lama dan CHECK sebelumnya tetap dipertahankan; RLS Editor super

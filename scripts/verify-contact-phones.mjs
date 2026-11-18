@@ -20,7 +20,6 @@ const phones = [
 ]
 const invalid = [
   [],
-  Array.from({ length: 11 }, () => phones[0]),
   [{ label: '', number: '123' }],
   [{ label: 'a'.repeat(61), number: '123' }],
   [{ label: 'Sales', number: 'abc' }],
@@ -51,6 +50,36 @@ try {
   await db.exec(await readFile('supabase/migrations/202611100002_contact_page.sql', 'utf8'))
   const before = (await db.query('select content from public.contact_page')).rows[0].content
   await db.exec(migration)
+  const unlimitedMigration = await readFile(
+    'supabase/migrations/202611180001_unlimited_contact_phones.sql',
+    'utf8',
+  )
+  const oldState = (await db.query('select content,phones from public.contact_page')).rows[0]
+  await db.exec(unlimitedMigration)
+  await db.exec(unlimitedMigration)
+  assert.deepEqual(
+    (await db.query('select content,phones from public.contact_page')).rows[0],
+    oldState,
+  )
+  const manyPhones = Array.from({ length: 101 }, (_, index) => ({
+    label: `Pengurus ${index}`,
+    number: '08123456789',
+  }))
+  assert.equal(contactPhonesSchema.safeParse(manyPhones).success, true)
+  assert.equal(
+    (
+      await db.query('select public.valid_contact_phones($1) as valid', [
+        JSON.stringify(manyPhones),
+      ])
+    ).rows[0].valid,
+    true,
+  )
+  await db.query('update public.contact_page set phones=$1', [JSON.stringify(manyPhones)])
+  assert.deepEqual(
+    (await db.query('select phones from public.contact_page')).rows[0].phones,
+    manyPhones,
+  )
+  await db.exec('update public.contact_page set phones=null')
   assert.deepEqual(
     (await db.query('select content,phones from public.contact_page')).rows[0],
     { content: before, phones: null },
@@ -82,7 +111,7 @@ try {
     assert.equal(result.rows.length, role === 'editor' && isSuper ? 1 : 0)
     await db.exec('reset role')
   }
-  await db.exec(migration)
+  await db.exec(unlimitedMigration)
   assert.deepEqual(
     (await db.query('select phones from public.contact_page')).rows[0].phones,
     phones,
@@ -144,5 +173,5 @@ assert.equal(
 )
 assert.deepEqual(written.phones, phones.slice(1))
 console.log(
-  'PASS: legacy number/label fallback, first-number compatibility, atomic repository save/read, 1–10 validated labelled phones, RLS super-only writes/public reads, migration preserves existing content and retry preserves extra numbers.',
+  'PASS: 101 contacts accepted and persisted, invalid entries rejected, legacy compatibility, atomic save/read, RLS super-only writes/public reads, migration preserves data and retries safely.',
 )

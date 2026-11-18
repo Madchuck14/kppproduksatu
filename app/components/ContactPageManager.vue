@@ -2,7 +2,6 @@
 import {
   contactPageSchema,
   defaultContactPage,
-  maxContactPhones,
   type ContactPage,
 } from '#shared/schemas/contact-page'
 
@@ -15,6 +14,26 @@ const failure = ref('')
 const message = ref('')
 const original = ref('')
 const dirty = computed(() => JSON.stringify(form.value) !== original.value)
+const staff = computed(() => form.value.phones.slice(1))
+function phoneParts(label: string) {
+  const parts = /^(.*) \(([^()]*)\)$/.exec(label)
+  return { role: parts?.[1] ?? label, name: parts?.[2] ?? '' }
+}
+function updatePerson(index: number, field: 'role' | 'name', event: Event) {
+  const phone = form.value.phones[index]
+  if (!phone || saving.value) return
+  const parts = phoneParts(phone.label)
+  parts[field] = (event.target as HTMLInputElement).value
+  phone.label = parts.name ? `${parts.role} (${parts.name})` : parts.role
+}
+async function movePhone(index: number, direction: -1 | 1) {
+  const next = index + direction
+  if (saving.value || next < 1 || next >= form.value.phones.length) return
+  const phone = form.value.phones.splice(index, 1)[0]!
+  form.value.phones.splice(next, 0, phone)
+  await nextTick()
+  manager.value?.querySelector<HTMLInputElement>(`#contact-phone-label-${next}`)?.focus()
+}
 type Field = {
   key: Exclude<keyof ContactPage, 'hours' | 'phones' | 'phone'>
   label: string
@@ -73,7 +92,7 @@ async function load() {
 }
 onMounted(load)
 async function addPhone() {
-  if (saving.value || form.value.phones.length >= maxContactPhones) return
+  if (saving.value) return
   form.value.phones.push({ label: '', number: '' })
   await nextTick()
   manager.value
@@ -86,7 +105,18 @@ async function save() {
   message.value = ''
   const parsed = contactPageSchema.safeParse(form.value)
   if (!parsed.success) {
-    failure.value = parsed.error.issues[0]?.message ?? 'Periksa informasi kontak.'
+    const issue = parsed.error.issues[0]
+    const index = issue?.path[0] === 'phones' ? issue.path[1] : undefined
+    const prefix =
+      typeof index === 'number' ? (index === 0 ? 'Nomor kantor: ' : `Pengurus ${index}: `) : ''
+    failure.value = prefix + (issue?.message ?? 'Periksa informasi kontak.')
+    if (typeof index === 'number') {
+      manager.value
+        ?.querySelector<HTMLInputElement>(
+          `#contact-phone-${issue?.path[2] === 'number' ? 'number' : 'label'}-${index}`,
+        )
+        ?.focus()
+    }
     return
   }
   saving.value = true
@@ -158,50 +188,126 @@ async function save() {
           :disabled="saving"
           class="phone-settings"
         >
-          <legend>Nomor telepon</legend>
-          <div v-for="(phone, index) in form.phones" :key="index" class="phone-row">
+          <legend>Nomor kantor</legend>
+          <p class="help">
+            Tampil bersama email, fax, hotline, dan WhatsApp di bagian atas halaman.
+          </p>
+          <div class="fields-grid">
             <div>
-              <label :for="`contact-phone-label-${index}`"
-                >Tanda pengenal telepon {{ index + 1 }}</label
-              >
+              <label for="contact-phone-label-0">Label nomor kantor</label>
               <input
-                :id="`contact-phone-label-${index}`"
-                v-model="phone.label"
-                placeholder="Contoh: Kantor pusat atau Customer service"
+                id="contact-phone-label-0"
+                v-model="form.phones[0]!.label"
+                placeholder="Contoh: Nomor Kantor"
                 maxlength="60"
                 required
               />
             </div>
             <div>
-              <label :for="`contact-phone-number-${index}`">Nomor telepon {{ index + 1 }}</label>
+              <label for="contact-phone-number-0">Nomor telepon kantor</label>
               <input
-                :id="`contact-phone-number-${index}`"
-                v-model="phone.number"
+                id="contact-phone-number-0"
+                v-model="form.phones[0]!.number"
                 type="tel"
                 maxlength="40"
                 required
               />
             </div>
-            <UButton
-              type="button"
-              color="error"
-              variant="ghost"
-              :aria-label="`Hapus nomor telepon ${index + 1}`"
-              :disabled="saving || form.phones.length === 1"
-              @click="form.phones.splice(index, 1)"
-              >Hapus</UButton
-            >
           </div>
-          <UButton
-            type="button"
-            variant="outline"
-            :disabled="saving || form.phones.length >= maxContactPhones"
-            @click="addPhone"
-            ><span aria-hidden="true">+</span> Tambah nomor telepon</UButton
+        </fieldset>
+        <fieldset
+          v-if="group.title === 'Kantor dan saluran kontak'"
+          :disabled="saving"
+          class="phone-settings"
+        >
+          <legend>Direktori pengurus ({{ staff.length }})</legend>
+          <p class="help">
+            Urutan berikut sama dengan kartu di halaman publik. Isi nama tanpa tanda kurung. Jabatan
+            dan nama disimpan sebagai Jabatan (Nama), maksimal 60 karakter gabungan.
+          </p>
+          <p v-if="!staff.length" class="help">Belum ada pengurus. Tambahkan kontak pertama.</p>
+          <div v-for="(phone, index) in staff" :key="index" class="person-card">
+            <div class="person-heading">
+              <h2>Pengurus {{ index + 1 }}</h2>
+              <div class="person-actions">
+                <UButton
+                  type="button"
+                  variant="ghost"
+                  :aria-label="`Naikkan pengurus ${index + 1}`"
+                  :disabled="saving || index === 0"
+                  @click="movePhone(index + 1, -1)"
+                  >Naik</UButton
+                >
+                <UButton
+                  type="button"
+                  variant="ghost"
+                  :aria-label="`Turunkan pengurus ${index + 1}`"
+                  :disabled="saving || index === staff.length - 1"
+                  @click="movePhone(index + 1, 1)"
+                  >Turun</UButton
+                >
+                <UButton
+                  type="button"
+                  color="error"
+                  variant="ghost"
+                  :aria-label="`Hapus pengurus ${index + 1}`"
+                  :disabled="saving"
+                  @click="form.phones.splice(index + 1, 1)"
+                  >Hapus</UButton
+                >
+              </div>
+            </div>
+            <div class="person-fields">
+              <div>
+                <label :for="`contact-phone-label-${index + 1}`"
+                  >Jabatan pengurus {{ index + 1 }}</label
+                >
+                <input
+                  :id="`contact-phone-label-${index + 1}`"
+                  :value="phoneParts(phone.label).role"
+                  maxlength="60"
+                  placeholder="Contoh: Sekretariat 1 atau CE SD 1"
+                  required
+                  @input="updatePerson(index + 1, 'role', $event)"
+                />
+              </div>
+              <div>
+                <label :for="`contact-phone-name-${index + 1}`"
+                  >Nama pengurus {{ index + 1 }} (opsional)</label
+                >
+                <input
+                  :id="`contact-phone-name-${index + 1}`"
+                  :value="phoneParts(phone.label).name"
+                  maxlength="60"
+                  placeholder="Contoh: Dera"
+                  pattern="[^()]*"
+                  title="Isi nama tanpa tanda kurung."
+                  @input="updatePerson(index + 1, 'name', $event)"
+                />
+              </div>
+              <div>
+                <label :for="`contact-phone-number-${index + 1}`"
+                  >Nomor pengurus {{ index + 1 }}</label
+                >
+                <input
+                  :id="`contact-phone-number-${index + 1}`"
+                  v-model="phone.number"
+                  type="tel"
+                  maxlength="40"
+                  required
+                />
+              </div>
+            </div>
+            <p class="help">
+              Label tersimpan: {{ phone.label || 'Belum diisi' }} ({{ phone.label.length }}/60)
+            </p>
+          </div>
+          <UButton type="button" variant="outline" :disabled="saving" @click="addPhone"
+            ><span aria-hidden="true">+</span> Tambah pengurus</UButton
           >
           <p class="help">
-            Setiap nomor ditampilkan dengan tanda pengenalnya di halaman Kontak. Maksimal
-            {{ maxContactPhones }} nomor.
+            Jumlah pengurus tidak dibatasi. Satu nomor kantor tetap wajib. Penghapusan dan perubahan
+            urutan diterapkan setelah Simpan perubahan.
           </p>
         </fieldset>
       </template>
@@ -283,15 +389,40 @@ legend {
 .fields-grid > div {
   min-width: 0;
 }
-.phone-row {
+.person-fields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: end;
   gap: 12px;
   margin-bottom: 16px;
 }
-.phone-row > div {
+.person-fields > div {
   min-width: 0;
+}
+.person-card {
+  margin-block: 16px;
+  padding: 16px;
+  border: 1px solid #e6e8e4;
+  border-radius: 12px;
+  background: #f7fbf8;
+}
+.person-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.person-heading h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f5c3f;
+}
+.person-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 .full-width {
   grid-column: 1 / -1;
@@ -346,11 +477,11 @@ button:focus-visible {
   .fields-grid {
     grid-template-columns: minmax(0, 1fr);
   }
-  .phone-row {
+  .person-fields {
     grid-template-columns: minmax(0, 1fr);
   }
-  .phone-row > button {
-    justify-self: end;
+  .dialog-actions {
+    flex-wrap: wrap;
   }
 }
 </style>

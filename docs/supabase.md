@@ -129,8 +129,15 @@ Terapkan `supabase/migrations/202611100003_contact_phones.sql` setelah migration
 sebelum deploy aplikasi baru. Migration menambahkan kolom nullable `contact_page.phones`
 tanpa mengubah JSON konten atau nomor lama. NULL dibaca sebagai satu nomor dengan label
 Telepon. Pengaturan menyediakan tanda pengenal (contoh: Kantor pusat/Customer service),
-nomor, tombol **+ Tambah nomor telepon**, dan Hapus. Minimal satu dan maksimal sepuluh
+nomor, tombol **+ Tambah pengurus**, dan Hapus. Minimal satu
 nomor; setiap label wajib diisi, maksimal 60 karakter, dan nomor maksimal 40 karakter.
+
+Terapkan `202611180001_unlimited_contact_phones.sql` sebelum menjalankan aplikasi
+tanpa batas jumlah pengurus. Migration mengganti validator CHECK agar menerima
+daftar berapa pun panjangnya, tanpa mengubah kontak lama atau RLS. Satu nomor
+kantor tetap wajib; nomor berikutnya menjadi direktori pengurus.
+Rollback aplikasi dapat mempertahankan validator baru dan seluruh data. Jangan
+mengembalikan validator maksimal 10 bila daftar yang tersimpan sudah lebih panjang.
 
 Penyimpanan memperbarui kolom `phones` dan konten lama dalam satu UPDATE. `content.phone`
 tetap menyimpan nomor pertama untuk pembaca versi lama. RLS UPDATE yang sudah ada juga

@@ -6,11 +6,9 @@ const phone = text(40)
   .regex(/^[+\d().\s-]+$/, 'Nomor kontak tidak valid.')
   .refine((value) => /\d/.test(value), 'Nomor kontak wajib berisi angka.')
 
-export const maxContactPhones = 10
 export const contactPhonesSchema = z
   .array(z.object({ label: text(60), number: phone }).strict())
   .min(1, 'Isi minimal satu nomor telepon.')
-  .max(maxContactPhones, `Maksimal ${maxContactPhones} nomor telepon.`)
 
 export const contactPageSchema = z
   .object({

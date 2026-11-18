@@ -96,22 +96,30 @@ try {
       await dialog.getByLabel('Judul', { exact: true }).waitFor()
       await dialog.getByLabel('Judul', { exact: true }).fill('Hubungi tim Erlangga')
       assert.equal(
-        await dialog.getByLabel('Nomor telepon 1', { exact: true }).inputValue(),
+        await dialog.getByLabel('Nomor telepon kantor', { exact: true }).inputValue(),
         content.phone,
       )
-      await dialog.getByLabel('Tanda pengenal telepon 1', { exact: true }).fill('Kantor pusat')
+      await dialog.getByLabel('Label nomor kantor', { exact: true }).fill('Kantor pusat')
+      await dialog.getByRole('button', { name: 'Tambah pengurus' }).click()
+      await dialog.getByLabel('Jabatan pengurus 1', { exact: true }).fill('Customer service')
+      await dialog.getByLabel('Nama pengurus 1 (opsional)', { exact: true }).fill('Dera')
+      await dialog.getByLabel('Nomor pengurus 1', { exact: true }).fill('(021) 123 4567')
+      await dialog.getByRole('button', { name: 'Tambah pengurus' }).click()
+      await dialog.getByLabel('Jabatan pengurus 2', { exact: true }).fill('CE SD 1')
+      await dialog.getByLabel('Nama pengurus 2 (opsional)', { exact: true }).fill('Fajar Addana')
+      await dialog.getByLabel('Nomor pengurus 2', { exact: true }).fill('0856-9301-0659')
+      await dialog.getByRole('button', { name: 'Naikkan pengurus 2', exact: true }).click()
       assert.equal(
-        await dialog
-          .getByRole('button', { name: 'Hapus nomor telepon 1', exact: true })
-          .isDisabled(),
-        true,
+        await dialog.getByLabel('Jabatan pengurus 1', { exact: true }).inputValue(),
+        'CE SD 1',
       )
-      await dialog.getByRole('button', { name: 'Tambah nomor telepon' }).click()
-      await dialog.getByLabel('Tanda pengenal telepon 2', { exact: true }).fill('Customer service')
-      await dialog.getByLabel('Nomor telepon 2', { exact: true }).fill('(021) 123 4567')
-      await dialog.getByRole('button', { name: 'Tambah nomor telepon' }).click()
-      await dialog.getByRole('button', { name: 'Hapus nomor telepon 3', exact: true }).click()
-      assert.equal(await dialog.getByLabel('Nomor telepon 3', { exact: true }).count(), 0)
+      assert.equal(
+        await dialog.getByLabel('Nomor telepon kantor', { exact: true }).inputValue(),
+        content.phone,
+      )
+      await dialog.getByRole('button', { name: 'Turunkan pengurus 1', exact: true }).click()
+      await dialog.getByRole('button', { name: 'Hapus pengurus 2', exact: true }).click()
+      assert.equal(await dialog.getByLabel('Nomor pengurus 2', { exact: true }).count(), 0)
       await dialog.getByLabel('URL sematan Google Maps').fill('https://evil.example/maps/embed')
       await dialog.getByRole('button', { name: 'Simpan perubahan' }).click()
       await dialog.getByRole('alert').filter({ hasText: 'Gunakan URL sematan' }).waitFor()
@@ -129,7 +137,7 @@ try {
       assert.equal(writes, 2)
       assert.deepEqual(content.phones, [
         { label: 'Kantor pusat', number: defaultContactPage.phone },
-        { label: 'Customer service', number: '(021) 123 4567' },
+        { label: 'Customer service (Dera)', number: '(021) 123 4567' },
       ])
       assert.equal(
         await dialog.getByRole('button', { name: 'Simpan perubahan' }).isDisabled(),
@@ -142,13 +150,17 @@ try {
       await dialog.getByLabel('Judul', { exact: true }).waitFor()
       assert.equal(await dialog.getByLabel('Judul', { exact: true }).inputValue(), content.heading)
       assert.equal(
-        await dialog.getByLabel('Tanda pengenal telepon 2', { exact: true }).inputValue(),
+        await dialog.getByLabel('Jabatan pengurus 1', { exact: true }).inputValue(),
         'Customer service',
       )
-      await dialog.locator('.phone-settings').scrollIntoViewIfNeeded()
+      assert.equal(
+        await dialog.getByLabel('Nama pengurus 1 (opsional)', { exact: true }).inputValue(),
+        'Dera',
+      )
+      await dialog.locator('.phone-settings').last().scrollIntoViewIfNeeded()
       await page.screenshot({ path: '.data/contact-page-qa/phones-desktop.png' })
       await page.setViewportSize({ width: 390, height: 844 })
-      await dialog.locator('.phone-settings').scrollIntoViewIfNeeded()
+      await dialog.locator('.phone-settings').last().scrollIntoViewIfNeeded()
       await page.screenshot({ path: '.data/contact-page-qa/phones-mobile.png' })
       assert(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth))
       await page.screenshot({ path: '.data/contact-page-qa/modal-mobile.png', fullPage: true })
